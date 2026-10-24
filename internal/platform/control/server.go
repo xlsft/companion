@@ -166,11 +166,11 @@ func (s *Server) serveConn(c *net.UnixConn) {
 	w := bufio.NewWriter(c)
 	reply := func(code string) {
 		if code == "" {
-			w.WriteString("ok\n")
+			_, _ = w.WriteString("ok\n")
 		} else {
-			w.WriteString("err " + code + "\n")
+			_, _ = w.WriteString("err " + code + "\n")
 		}
-		w.Flush()
+		_ = w.Flush() // a client that hung up gets no reply
 	}
 	// The socket mode already limits access to our uid; the credential
 	// check also covers root and a socket reached through a bind mount.

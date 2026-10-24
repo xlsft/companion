@@ -434,7 +434,12 @@ func (r *Repo) Get(ctx context.Context, id string) (*Conversation, error) {
 				return nil, err
 			}
 		}
-		i := byID[mid]
+		// A turn appended between the two queries has captures but no
+		// message in this snapshot; it shows up on the next Get.
+		i, ok := byID[mid]
+		if !ok {
+			continue
+		}
 		c.Messages[i].Captures = append(c.Messages[i].Captures, cp)
 	}
 	if err := crows.Err(); err != nil {

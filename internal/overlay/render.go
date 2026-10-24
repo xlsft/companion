@@ -368,10 +368,6 @@ func newStablePainter(dst *canvas, box image.Rectangle) *painter {
 	return &painter{dst: dst.RGBA, box: box, src: image.NewUniform(color.NRGBA{}), r: &vector.Rasterizer{}}
 }
 
-func newRasterizer(box image.Rectangle) *vector.Rasterizer {
-	return vector.NewRasterizer(box.Dx(), box.Dy())
-}
-
 func (p *painter) color(c color.NRGBA) { p.src.C = c }
 
 func (p *painter) polygon(pts []contracts.Point) {

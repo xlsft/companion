@@ -79,7 +79,7 @@ func TestElevenLabsUnsupportedFormats(t *testing.T) {
 func TestElevenLabsListVoices(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/voices" || r.Header.Get("xi-api-key") != testKey {
-			http.Error(w, "nope", 401)
+			http.Error(w, "nope", http.StatusUnauthorized)
 			return
 		}
 		io.WriteString(w, `{"voices":[

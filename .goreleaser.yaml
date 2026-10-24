@@ -1,0 +1,103 @@
+version: 2
+
+# The binaries are cgo (Gio UI, whisper.cpp) and are built natively per
+# architecture by the Release workflow with `make dist-linux`, which also
+# lays out the tarball. GoReleaser only checksums, signs and publishes them,
+# and writes the changelog.
+#
+# Asset names are a contract with the in-app updater and install.sh:
+#   companion-<version>-linux-<uname -m>.tar.gz, checksums.txt,
+#   checksums.txt.sigstore.json
+project_name: companion
+
+builds:
+  - skip: true
+
+archives:
+  - formats: [none]
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+  extra_files:
+    - glob: ./dist-release/*.tar.gz
+    - glob: ./dist-release/*.AppImage
+
+# checksums.txt, which covers every asset, is signed keylessly with Sigstore
+# by the Release workflow's GitHub OIDC identity (release.yml on a v* tag).
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sigstore.json"
+    args: ["sign-blob", "--yes", "--bundle=${signature}", "${artifact}"]
+
+# Homebrew is not configured here: GoReleaser's homebrew_casks/brews only
+# package archives it built itself, and these binaries are cgo builds made
+# by make dist-linux. The Release workflow writes the tap's formula from
+# checksums.txt instead (.github/scripts/homebrew-formula.sh).
+
+# Scoop is Windows-only, and GoReleaser refuses a scoops block without a
+# Windows archive (even with skip_upload), so it stays commented out until a
+# Windows build ships; then uncomment it and drop skip_upload.
+# scoops:
+#   - name: companion
+#     repository:
+#       owner: xlsft
+#       name: scoop-bucket
+#       token: '{{ envOrDefault "COMPANION_PACKAGES_TOKEN" "" }}'
+#     homepage: https://github.com/xlsft/companion
+#     description: Voice and screen assistant with local speech recognition
+#     license: FSL-1.1-ALv2
+#     commit_author:
+#       name: github-actions[bot]
+#       email: 41898282+github-actions[bot]@users.noreply.github.com
+#     skip_upload: true
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Performance
+      regexp: '^.*?perf(\(.+\))??!?:.+$'
+      order: 2
+    - title: Other
+      order: 999
+  filters:
+    exclude:
+      - '^.*?(docs|test|style|chore|ci|build)(\(.+\))??!?:.+$'
+      - '^Merge '
+
+release:
+  github:
+    owner: xlsft
+    name: companion
+  extra_files:
+    - glob: ./dist-release/*.tar.gz
+    - glob: ./dist-release/*.AppImage
+  header: |
+    Companion {{ .Version }} for Linux (x86_64 and aarch64). Windows and macOS builds are not available yet.
+  footer: |
+    ## Install
+
+    ```sh
+    curl -fsSL https://raw.githubusercontent.com/xlsft/companion/main/install.sh | sh
+    ```
+
+    Or download `companion-{{ .Version }}-linux-x86_64.tar.gz`, extract it and run `./install.sh`. Runtime dependencies: [docs/linux.md](https://github.com/xlsft/companion/blob/main/docs/linux.md#runtime-dependencies).
+
+    ## Verify
+
+    `checksums.txt` is signed with [Sigstore](https://www.sigstore.dev) by this repository's release workflow:
+
+    ```sh
+    cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
+      --certificate-identity-regexp '^https://github.com/xlsft/companion/.github/workflows/release.yml@refs/tags/v.*$' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com
+    sha256sum --ignore-missing -c checksums.txt
+    ```

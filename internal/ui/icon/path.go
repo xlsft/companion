@@ -229,8 +229,8 @@ func arc(from, to f32.Point, rx, ry, phiDeg float32, large, sweep bool) []seg {
 		return p, d
 	}
 	segs := make([]seg, 0, n)
-	a, da := from, f32.Point{}
-	_, da = pt(t1)
+	a := from
+	_, da := pt(t1)
 	for i := 1; i <= n; i++ {
 		b, db := pt(t1 + step*float64(i))
 		if i == n {

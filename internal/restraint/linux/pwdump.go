@@ -233,7 +233,7 @@ func propInt(p map[string]json.RawMessage, k string) int {
 	}
 	var s string
 	if json.Unmarshal(p[k], &s) == nil {
-		fmt.Sscanf(s, "%d", &n)
+		_, _ = fmt.Sscanf(s, "%d", &n) // not a number: 0
 	}
 	return n
 }

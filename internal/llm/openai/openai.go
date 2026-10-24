@@ -103,7 +103,7 @@ func parseError(status int, h http.Header, body []byte) error {
 	var e apiError
 	if json.Unmarshal(body, &env) == nil && len(env.Error) > 0 {
 		if json.Unmarshal(env.Error, &e) != nil {
-			json.Unmarshal(env.Error, &e.Message) // {"error": "text"}
+			_ = json.Unmarshal(env.Error, &e.Message) // {"error": "text"}
 		}
 	}
 	code := e.code()

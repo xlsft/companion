@@ -154,7 +154,7 @@ func TestSTT(t *testing.T) {
 		}, code: CodeSTTUnavailable},
 		{name: "session refused", stt: &fakeSTT{startErr: supervisor.ErrNotReady}, code: CodeSTTUnavailable},
 		{name: "mic missing", mic: &fakeMic{openErr: audio.ErrDeviceNotFound}, stt: &fakeSTT{}, code: CodeMicNotFound},
-		{name: "mic lost", mic: &fakeMic{frames: 3, end: audio.ErrDeviceLost}, stt: &fakeSTT{}, code: CodeMicLost},
+		{name: "mic lost", mic: &fakeMic{frames: 3, end: audio.ErrDeviceLost}, stt: &fakeSTT{noEndpoint: true}, code: CodeMicLost},
 		{name: "sidecar died", stt: &fakeSTT{finishErr: supervisor.ErrInterrupted}, code: CodeSTTUnavailable},
 		{name: "decode error", stt: &fakeSTT{finishErr: errBoom}, code: CodeSTTFailed},
 	}

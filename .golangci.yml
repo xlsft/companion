@@ -1,0 +1,61 @@
+version: "2"
+
+run:
+  # Gio's Vulkan backend needs vulkan-headers; the Makefile builds without it.
+  build-tags: [novulkan]
+
+linters:
+  # errcheck, govet, ineffassign, staticcheck, unused. bodyclose and nilerr
+  # were tried and only flagged deliberate code (bodies handed to streams,
+  # best-effort fallbacks); misspell would fight the British spelling used
+  # throughout.
+  default: standard
+  enable:
+    - copyloopvar
+  settings:
+    errcheck:
+      exclude-functions:
+        # Closing on cleanup or error paths, where the operation's own error
+        # is what gets reported. Writes that must succeed check Close
+        # explicitly (see internal/models/download.go).
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (net.Conn).Close
+        - (net.Listener).Close
+        - (*net.UnixConn).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (*github.com/godbus/dbus/v5.Conn).Close
+        - syscall.Close
+        - golang.org/x/sys/unix.Close
+    staticcheck:
+      checks:
+        - all
+        # Quick fixes are editor refactoring suggestions, not defects.
+        - -QF*
+        # Style checks the codebase does not follow: package comments on
+        # every package, initialism casing, receiver-name consistency and
+        # "Name ..." doc comment openings (CLAUDE.md: comments explain why).
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+  exclusions:
+    generated: lax
+    presets:
+      - std-error-handling
+    rules:
+      # Tests fail through their assertions; unchecked cleanup and fake-server
+      # writes in them only add noise.
+      - path: _test\.go
+        linters: [errcheck]
+      # cmd/spikes are throwaway experiments for platform research, never
+      # shipped or built into a release.
+      - path: ^cmd/spikes/
+        linters: [errcheck, staticcheck, unused]
+
+formatters:
+  enable:
+    - gofmt

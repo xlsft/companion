@@ -100,7 +100,7 @@ func parseError(status int, h http.Header, body []byte) error {
 	var env struct {
 		Error apiError `json:"error"`
 	}
-	json.Unmarshal(body, &env)
+	_ = json.Unmarshal(body, &env) // a non-JSON body still maps by status
 	e := env.Error
 	ctxLen := status == http.StatusBadRequest && wire.MentionsContextLength(e.Message)
 	return wire.StatusError(status, h, e.Type, ctxLen)

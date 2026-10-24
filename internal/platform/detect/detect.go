@@ -15,6 +15,7 @@ const probeTimeout = 1500 * time.Millisecond
 // New returns the detector for the running OS.
 func New() contracts.CapabilityDetector { return newDetector() }
 
+//nolint:unused // used by the non-Linux detector in unsupported.go
 var allCapabilities = []contracts.Capability{
 	contracts.CapGlobalHotkey, contracts.CapHotkeyRelease, contracts.CapScreenCapture,
 	contracts.CapOverlayClickThrough, contracts.CapOverlayFallbackPanel,

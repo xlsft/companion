@@ -106,7 +106,6 @@ func TestUpdatePersistsAndNotifies(t *testing.T) {
 	}
 	// Slow reader: latest wins, writer never blocks.
 	for _, sp := range []float64{0.6, 0.7, 0.8} {
-		sp := sp
 		if err := s.Update(ctx, func(x *Settings) { x.Voice.TTSSpeed = sp }); err != nil {
 			t.Fatal(err)
 		}

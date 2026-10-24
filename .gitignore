@@ -6,3 +6,4 @@
 /.claude/worktrees/
 /third_party/whisper-build/
 /third_party/whisper-install/
+/dist-release/

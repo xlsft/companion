@@ -350,6 +350,15 @@ func (h *harness) eventually(what string, cond func() bool) {
 // click queues a click on an action's button and renders it.
 func (h *harness) click(a Action) {
 	h.t.Helper()
+	if _, ok := h.w.btns[a]; !ok && (a == ActCheck || a == ActRecheck) {
+		// Steps check themselves on arrival. On a slow machine (CI, -race)
+		// that run has already finished and the button reads Re-check (or
+		// the other way round); press the step's check button either way.
+		h.eventually("arrival check", h.idle)
+		if _, ok := h.w.btns[a]; !ok {
+			a = map[Action]Action{ActCheck: ActRecheck, ActRecheck: ActCheck}[a]
+		}
+	}
 	b, ok := h.w.btns[a]
 	if !ok {
 		h.t.Fatalf("no %s button rendered", a)

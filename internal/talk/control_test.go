@@ -300,8 +300,10 @@ func within(t *testing.T, what string, t0 time.Time, cond func() bool) time.Dura
 }
 
 // maxStop is the interruption budget (FR-VOICE-005/006): speech silent and
-// hints gone within 100 ms.
-const maxStop = 100 * time.Millisecond
+// hints gone within 100 ms. The race detector slows everything several
+// times over, so -race runs get a wider budget; the plain run (make test)
+// holds the real one.
+const maxStop = 100 * time.Millisecond * raceSlowdown
 
 func TestInterruptStopsTheAnswer(t *testing.T) {
 	tests := []struct {
