@@ -253,6 +253,7 @@ func (b *banner) start(bg string) {
     <clipPath id="frame"><rect width="%[1]g" height="%[2]g" rx="12"/></clipPath>
     <filter id="glow-blur" x="-50%%" y="-50%%" width="200%%" height="200%%"><feGaussianBlur stdDeviation="9"/></filter>
     <filter id="soft" x="-50%%" y="-50%%" width="200%%" height="200%%"><feGaussianBlur stdDeviation="1.5"/></filter>
+    <filter id="bubble" x="-30%%" y="-60%%" width="160%%" height="260%%"><feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.45"/></filter>
     <filter id="shadow" x="-30%%" y="-30%%" width="160%%" height="170%%"><feDropShadow dx="0" dy="30" stdDeviation="30" flood-color="#000" flood-opacity="0.5"/></filter>
   </defs>
   <g clip-path="url(#frame)">
@@ -331,6 +332,25 @@ func (b *banner) variantB() {
 	b.rect(px, by, 96, 30, 6, hsl(240, 5, 16))
 	b.rect(px+106, by, 96, 30, 6, hsl(240, 5, 16))
 	b.hint(px+106+48, by+15, 41, 4, "Export")
+	b.question(846, oy+92, "How do I export this?")
+}
+
+// micIcon is MingCute's mic-line on its 24×24 grid, as the chat uses it.
+const micIcon = "M19.07 12.01a1 1 0 0 1 .85 1.132A8.004 8.004 0 0 1 13 19.938V21a1 1 0 1 1-2 0v-1.062a8.005 8.005 0 0 1-6.919-6.796a1 1 0 0 1 1.98-.284a6.002 6.002 0 0 0 11.878 0a1 1 0 0 1 1.132-.848ZM12 2a5 5 0 0 1 5 5v5a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3v5a3 3 0 1 0 6 0V7a3 3 0 0 0-3-3"
+
+// question is the user's spoken question as a chat bubble, its lower right
+// corner tucked like the chat's own user bubbles.
+func (b *banner) question(x, y float64, s string) {
+	const px, padX, padY, icon, gap = 15.0, 14.0, 10.0, 14.0, 8.0
+	lh := px * 1.2
+	w := padX*2 + icon + gap + b.sans.width(s, px)
+	h := padY*2 + lh
+	r, rs := 14.0, 4.0
+	d := fmt.Sprintf("M%.1f %.1fH%.1fA%g %g 0 0 1 %.1f %.1fV%.1fA%g %g 0 0 1 %.1f %.1fH%.1fA%g %g 0 0 1 %.1f %.1fV%.1fA%g %g 0 0 1 %.1f %.1fZ",
+		x+r, y, x+w-r, r, r, x+w, y+r, y+h-rs, rs, rs, x+w-rs, y+h, x+r, r, r, x, y+h-r, y+r, r, r, x+r, y)
+	b.printf(`  <path d="%s" fill="%s" stroke="%s" stroke-width="1" filter="url(#bubble)"/>`+"\n", d, hsl(258, 32, 22), hsl(258, 40, 32))
+	b.printf(`  <path d="%s" fill="#c4b5fd" transform="translate(%.1f %.1f) scale(%.4f)"/>`+"\n", micIcon, x+padX, y+(h-icon)/2, icon/24)
+	b.text(b.sans, s, px, x+padX+icon+gap, b.sans.baseline(y+padY, lh, px), hsl(240, 15, 99))
 }
 
 // variantC: light, a faint grid, the logo left and a large hint ring right.
