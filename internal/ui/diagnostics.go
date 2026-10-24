@@ -8,8 +8,8 @@ import (
 
 	"gioui.org/layout"
 	"gioui.org/widget"
-	"gioui.org/widget/material"
 
+	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
 	"github.com/xlsft/companion/pkg/contracts"
@@ -82,14 +82,6 @@ func (p *diagPage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Di
 		running = true
 	}
 	var rows []layout.Widget
-	rows = append(rows,
-		heading(th, T(l, "diag.heading")).Layout,
-		func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Top: 12, Bottom: 12}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return button(gtx, th, &p.runBtn, T(l, "diag.run"))
-			})
-		},
-	)
 	if running {
 		rows = append(rows, muted(th, T(l, "diag.running")).Layout)
 	}
@@ -97,12 +89,15 @@ func (p *diagPage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Di
 		rows = append(rows, th.StatusLabel(theme.StatusWarn, T(l, "diag.failed")).Layout)
 	}
 	if have {
-		rows = append(rows, body(th, Tf(l, "diag.system", strings.TrimSpace(report.OS+" "+report.OSVersion), report.Session, kit.OrDash(report.Desktop))).Layout)
+		// The session type and desktop stay in the JSON report: the page
+		// names no desktop environment or display protocol.
+		rows = append(rows, body(th, Tf(l, "diag.system", strings.TrimSpace(report.OS+" "+report.OSVersion))).Layout)
 	}
 	rows = append(rows, kit.CapabilityRows(th, l, report, nil)...)
-	return layout.UniformInset(24).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return material.List(th.Theme, &p.list).Layout(gtx, len(rows), func(gtx layout.Context, i int) layout.Dimensions {
-			return rows[i](gtx)
-		})
-	})
+	return pageScaffold(gtx, th, T(l, "diag.heading"), func(gtx layout.Context) layout.Dimensions {
+		if running {
+			gtx = gtx.Disabled()
+		}
+		return kit.ButtonStyle{Kind: kit.Secondary, Label: T(l, "diag.run"), Icon: icon.Refresh2, Small: true}.Layout(gtx, th, &p.runBtn)
+	}, &p.list, rows)
 }

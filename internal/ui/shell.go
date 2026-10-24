@@ -88,6 +88,8 @@ type Options struct {
 	Setup wizard.Backends
 	// Tray may be nil; then closing the last window quits the app.
 	Tray contracts.Tray
+	// Chat is the Home chat's backend; nil shows the chat as not connected.
+	Chat ChatBackend
 	// Diagnose produces the capability report for the Diagnostics page.
 	Diagnose func(ctx context.Context) (contracts.CapabilityReport, error)
 	// Quit asks the process to shut down; the app lifecycle then calls Stop.
@@ -191,7 +193,7 @@ func (s *Shell) Stop(ctx context.Context) error {
 	s.stopping = true
 	wins := []window{s.wizWin, s.mainWin}
 	s.wizWin, s.mainWin = nil, nil
-	wizUI := s.wizard
+	wizUI, mainView := s.wizard, s.main
 	unsub := s.unsub
 	trayOK := s.trayOK
 	s.mu.Unlock()
@@ -202,6 +204,9 @@ func (s *Shell) Stop(ctx context.Context) error {
 	}
 	if wizUI != nil {
 		wizUI.close()
+	}
+	if mainView != nil {
+		mainView.close()
 	}
 	if unsub != nil {
 		unsub()
@@ -429,5 +434,20 @@ func (s *Shell) navShortcut(digit int) {
 		return
 	}
 	m.navigate(r)
+	s.invalidateAll()
+}
+
+// newChatShortcut handles Ctrl+N in the main window.
+func (s *Shell) newChatShortcut() {
+	s.mu.Lock()
+	m := s.main
+	if s.mode != ModeMain {
+		m = nil
+	}
+	s.mu.Unlock()
+	if m == nil || m.chat.be == nil {
+		return
+	}
+	m.newChat()
 	s.invalidateAll()
 }
