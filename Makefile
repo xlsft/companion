@@ -7,7 +7,7 @@ LDFLAGS := -X github.com/xlsft/companion/internal/buildinfo.Version=$(VERSION) \
 # covers every target, so build without it (ADR-0001 amendment 1).
 export GOFLAGS := $(strip $(GOFLAGS) -tags=novulkan)
 
-.PHONY: build test vet cross whisper build-whisper test-whisper whisper-clean
+.PHONY: build test vet cross whisper build-whisper test-whisper whisper-clean dist-linux
 
 # Native build with cgo: covers the Gio UI and cmd/companion, which the
 # CGO_ENABLED=0 cross build below skips.
@@ -104,3 +104,13 @@ test-whisper:
 
 whisper-clean:
 	rm -rf $(WHISPER_BUILD) $(WHISPER_PREFIX)
+
+# --- Linux packaging (OC-75) ---------------------------------------------------
+# dist/companion-VERSION-linux-ARCH.tar.gz and an AppImage. The sidecar must be
+# the whisper build, so this target builds that itself (needs `make whisper`
+# once). APPIMAGE=skip builds the tarball only; the default fails when
+# appimagetool cannot be found or fetched with a verified checksum.
+dist-linux:
+	@test -f $(WHISPER_PREFIX)/lib/libwhisper.a || { echo "run 'make whisper' first: the sidecar must be the whisper build" >&2; exit 1; }
+	$(MAKE) build build-whisper
+	sh packaging/dist-linux.sh $(VERSION)

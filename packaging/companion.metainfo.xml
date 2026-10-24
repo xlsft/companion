@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>companion</id>
+  <name>Companion</name>
+  <summary>Voice and screen assistant for the desktop</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <!-- No project licence has been chosen yet; replace before publishing. -->
+  <project_license>LicenseRef-proprietary</project_license>
+  <description>
+    <p>
+      Companion listens when you hold or toggle a hotkey, transcribes your
+      speech locally with whisper.cpp, looks at your screen when you ask it
+      to, and answers through the language model you configure with your own
+      API key. There is no Companion backend.
+    </p>
+    <p>
+      Speech models are downloaded on first run into your user data directory.
+    </p>
+  </description>
+  <launchable type="desktop-id">companion.desktop</launchable>
+  <provides>
+    <binary>companion</binary>
+  </provides>
+  <categories>
+    <category>Utility</category>
+    <category>Accessibility</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+</component>

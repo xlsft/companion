@@ -1,0 +1,54 @@
+# Maintainer: xlsft <dev@xlsft.ru>
+#
+# Builds from the repository checkout this file lives in (packaging/PKGBUILD):
+#   cd packaging && makepkg -f
+# The source is the parent directory, so no tarball is fetched. whisper.cpp
+# comes from the git submodule.
+pkgname=companion
+pkgver=0.0.0
+pkgrel=1
+pkgdesc='Voice and screen assistant with local speech recognition'
+arch=(x86_64)
+url='https://github.com/xlsft/companion'
+license=(custom)
+depends=(libglvnd wayland libx11 libxcursor libxfixes libxkbcommon libxkbcommon-x11
+         libxcb gcc-libs pipewire-pulse xdg-desktop-portal)
+makedepends=(go cmake gcc git pkgconf wayland-protocols libxkbcommon-x11 libxcursor libglvnd)
+optdepends=('gnome-keyring: Secret Service for API keys'
+            'kwallet: Secret Service for API keys'
+            'keepassxc: Secret Service for API keys'
+            'xdg-desktop-portal-gnome: portals on GNOME'
+            'xdg-desktop-portal-kde: portals on KDE Plasma'
+            'xdg-desktop-portal-wlr: screenshot/screencast on sway'
+            'xdg-desktop-portal-hyprland: portals on Hyprland'
+            'at-spi2-core: accessibility context')
+options=(!lto)
+
+_root=$(cd "$startdir/.." && pwd)
+
+build() {
+  cd "$_root"
+  # Redistributable ggml: not tuned to the build machine.
+  make whisper WHISPER_NATIVE=OFF
+  make build build-whisper VERSION="$pkgver"
+}
+
+check() {
+  cd "$_root"
+  make vet test
+}
+
+package() {
+  cd "$_root"
+  install -Dm755 bin/companion "$pkgdir/usr/lib/companion/companion"
+  install -Dm755 bin/stt-sidecar "$pkgdir/usr/lib/companion/stt-sidecar"
+  install -d "$pkgdir/usr/bin"
+  ln -s /usr/lib/companion/companion "$pkgdir/usr/bin/companion"
+  install -Dm644 packaging/companion.desktop -t "$pkgdir/usr/share/applications"
+  install -Dm644 packaging/companion.metainfo.xml -t "$pkgdir/usr/share/metainfo"
+  install -Dm644 packaging/companion.svg -t "$pkgdir/usr/share/icons/hicolor/scalable/apps"
+  install -Dm644 packaging/companion.png -t "$pkgdir/usr/share/icons/hicolor/256x256/apps"
+  install -Dm644 packaging/NOTICE -t "$pkgdir/usr/share/licenses/$pkgname"
+  install -Dm644 internal/assets/fonts/OFL.txt -t "$pkgdir/usr/share/licenses/$pkgname"
+  install -Dm644 internal/ui/icon/LICENSE.mingcute -t "$pkgdir/usr/share/licenses/$pkgname"
+}
