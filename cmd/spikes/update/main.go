@@ -5,6 +5,7 @@
 // instance and answers the GitHub API calls the updater makes.
 //
 //	go build -ldflags "-X github.com/xlsft/companion/internal/buildinfo.Version=0.2.0" -o /tmp/v2/ ./cmd/companion ./cmd/stt-sidecar
+//	cp bin/libsherpa-onnx-c-api.so bin/libonnxruntime.so /tmp/v2/  # from make build-stt
 //	update -version 0.2.0 -bin /tmp/v2 -dir /tmp/release
 //	COMPANION_UPDATE_URL=http://127.0.0.1:8765/repos/xlsft/companion \
 //	COMPANION_UPDATE_TRUSTED_ROOT=/tmp/release/trusted_root.json companion
@@ -24,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/xlsft/companion/internal/update"
@@ -32,7 +34,7 @@ import (
 
 func main() {
 	version := flag.String("version", "0.2.0", "version of the fake release")
-	bin := flag.String("bin", "", "directory with the new companion and stt-sidecar")
+	bin := flag.String("bin", "", "directory with the new companion, stt-sidecar and the sherpa-onnx libraries")
 	dir := flag.String("dir", "", "where the release files and trusted_root.json are written")
 	addr := flag.String("addr", "127.0.0.1:8765", "listen address")
 	identity := flag.String("identity", "", "certificate identity (default: the release workflow at tag v<version>)")
@@ -127,12 +129,18 @@ func pack(out, bin, version string) error {
 	if err := tw.WriteHeader(&tar.Header{Name: top, Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
 		return err
 	}
-	for _, name := range []string{"companion", "stt-sidecar"} {
+	// The same files the updater replaces, so a fake release installs
+	// like a real one.
+	for _, name := range update.DefaultBinaries() {
 		b, err := os.ReadFile(filepath.Join(bin, name))
 		if err != nil {
 			return err
 		}
-		if err := tw.WriteHeader(&tar.Header{Name: top + name, Typeflag: tar.TypeReg, Mode: 0o755, Size: int64(len(b))}); err != nil {
+		mode := int64(0o755)
+		if strings.HasSuffix(name, ".so") {
+			mode = 0o644
+		}
+		if err := tw.WriteHeader(&tar.Header{Name: top + name, Typeflag: tar.TypeReg, Mode: mode, Size: int64(len(b))}); err != nil {
 			return err
 		}
 		if _, err := tw.Write(b); err != nil {

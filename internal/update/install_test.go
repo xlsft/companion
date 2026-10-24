@@ -76,6 +76,26 @@ func installDir(t *testing.T) string {
 	return dir
 }
 
+func TestInstallLibrariesNotExecutable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permissions")
+	}
+	dir := installDir(t)
+	tarball := filepath.Join(t.TempDir(), "r.tar.gz")
+	d := "companion-0.2.0-linux-x86_64/"
+	writeTarball(t, tarball, append(releaseTar("new core", "new sidecar"), tarEntry{name: d + "libonnxruntime.so", body: "new lib"}))
+	in := &Installer{Dir: dir, Names: []string{"companion", "stt-sidecar", "libonnxruntime.so"}}
+	if err := in.Install(context.Background(), tarball); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, filepath.Join(dir, "libonnxruntime.so")); got != "new lib" {
+		t.Errorf("library = %q", got)
+	}
+	if st, err := os.Stat(filepath.Join(dir, "libonnxruntime.so")); err != nil || st.Mode().Perm() != 0o644 {
+		t.Errorf("library mode = %v, %v; want 0644", st.Mode(), err)
+	}
+}
+
 func TestInstallReplacesAndRollsBack(t *testing.T) {
 	dir := installDir(t)
 	tarball := filepath.Join(t.TempDir(), "r.tar.gz")

@@ -33,9 +33,14 @@ type Installer struct {
 }
 
 // DefaultBinaries are the files of the release tarball the app replaces.
+// On Linux they include sherpa-onnx's libraries: the sidecar loads them
+// from its own directory, so a new sidecar must not run against old ones.
 func DefaultBinaries() []string {
-	if runtime.GOOS == "windows" {
+	switch runtime.GOOS {
+	case "windows":
 		return []string{"companion.exe", "stt-sidecar.exe"}
+	case "linux":
+		return []string{"companion", "stt-sidecar", "libsherpa-onnx-c-api.so", "libonnxruntime.so"}
 	}
 	return []string{"companion", "stt-sidecar"}
 }
@@ -289,7 +294,11 @@ func (in *Installer) stage(n string, r io.Reader, size int64) (string, error) {
 	p := f.Name()
 	_, err = io.CopyN(f, r, size)
 	if err == nil {
-		err = f.Chmod(0o755)
+		mode := os.FileMode(0o755)
+		if strings.HasSuffix(n, ".so") {
+			mode = 0o644
+		}
+		err = f.Chmod(mode)
 	}
 	if err == nil {
 		err = f.Sync()
