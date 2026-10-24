@@ -19,11 +19,11 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"github.com/xlsft/openclick/internal/readiness"
-	"github.com/xlsft/openclick/internal/ui/i18n"
-	"github.com/xlsft/openclick/internal/ui/kit"
-	"github.com/xlsft/openclick/internal/ui/theme"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/kit"
+	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Action identifies a control the wizard offers. Tests assert that no

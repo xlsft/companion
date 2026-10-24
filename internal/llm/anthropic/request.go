@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/xlsft/openclick/internal/llm"
+	"github.com/xlsft/companion/internal/llm"
 )
 
 type messagesRequest struct {

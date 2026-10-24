@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/store"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/store"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func newRepo(t *testing.T) (*Repo, string) {

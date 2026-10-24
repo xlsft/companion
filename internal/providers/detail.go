@@ -1,6 +1,6 @@
 package providers
 
-import "github.com/xlsft/openclick/internal/llm/probe"
+import "github.com/xlsft/companion/internal/llm/probe"
 
 // Detail key suffixes and prefixes of TestResult.Detail.
 const (

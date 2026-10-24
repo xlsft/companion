@@ -5,8 +5,8 @@ package audio
 import (
 	"context"
 
-	core "github.com/xlsft/openclick/internal/audio"
-	"github.com/xlsft/openclick/pkg/contracts"
+	core "github.com/xlsft/companion/internal/audio"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Without cgo there is no miniaudio; report the capability as missing rather

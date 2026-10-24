@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/secrets"
-	"github.com/xlsft/openclick/internal/store"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/secrets"
+	"github.com/xlsft/companion/internal/store"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 const goodKey = "sk-CANARY-good-key-123"

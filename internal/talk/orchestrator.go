@@ -11,11 +11,11 @@ import (
 	"io"
 	"sync"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/overlay"
-	"github.com/xlsft/openclick/internal/session"
-	"github.com/xlsft/openclick/internal/speech"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/overlay"
+	"github.com/xlsft/companion/internal/session"
+	"github.com/xlsft/companion/internal/speech"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Overlay is the part of overlay.Engine the pipeline drives.

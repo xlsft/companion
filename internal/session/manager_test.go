@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 var errBoom = errors.New("boom")

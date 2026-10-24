@@ -17,7 +17,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // fakeCompositor speaks just enough Wayland to serve screencopy frames from

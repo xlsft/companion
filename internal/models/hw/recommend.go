@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/xlsft/openclick/internal/models"
+	"github.com/xlsft/companion/internal/models"
 )
 
 const gib = 1 << 30

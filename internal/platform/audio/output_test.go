@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/audio/playback"
+	"github.com/xlsft/companion/internal/audio/playback"
 )
 
 // silence is an endless source of digital silence, so the hardware test is

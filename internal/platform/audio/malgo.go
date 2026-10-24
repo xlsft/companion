@@ -16,8 +16,8 @@ import (
 	"unsafe"
 
 	"github.com/gen2brain/malgo"
-	core "github.com/xlsft/openclick/internal/audio"
-	"github.com/xlsft/openclick/pkg/contracts"
+	core "github.com/xlsft/companion/internal/audio"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // periodMS keeps callbacks small so cancellation and device release are quick

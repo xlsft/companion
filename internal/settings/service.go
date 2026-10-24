@@ -8,7 +8,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/xlsft/openclick/internal/store"
+	"github.com/xlsft/companion/internal/store"
 )
 
 const kvKey = "app"

@@ -15,8 +15,8 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/xlsft/openclick/internal/platform/detect"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/platform/detect"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Backend names, as the capability report uses them.

@@ -6,7 +6,7 @@ import (
 
 	"github.com/jezek/xgb/xproto"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // testKeymap builds a small server mapping: keycode -> keysyms (2 per code),

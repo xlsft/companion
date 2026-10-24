@@ -282,7 +282,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/xlsft/openclick/internal/platform/pixconv"
+	"github.com/xlsft/companion/internal/platform/pixconv"
 )
 
 const Available = true

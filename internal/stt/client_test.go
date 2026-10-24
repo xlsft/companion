@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/stt/engine/fake"
-	"github.com/xlsft/openclick/internal/stt/protocol"
-	"github.com/xlsft/openclick/internal/stt/server"
+	"github.com/xlsft/companion/internal/stt/engine/fake"
+	"github.com/xlsft/companion/internal/stt/protocol"
+	"github.com/xlsft/companion/internal/stt/server"
 )
 
 // sidecarBin is the real cmd/stt-sidecar built once for the process tests.
@@ -27,7 +27,7 @@ func TestMain(m *testing.M) {
 		if runtime.GOOS == "windows" {
 			bin += ".exe"
 		}
-		build := exec.Command("go", "build", "-tags", sidecarTags, "-o", bin, "github.com/xlsft/openclick/cmd/stt-sidecar")
+		build := exec.Command("go", "build", "-tags", sidecarTags, "-o", bin, "github.com/xlsft/companion/cmd/stt-sidecar")
 		build.Stderr = os.Stderr
 		if build.Run() == nil {
 			sidecarBin = bin

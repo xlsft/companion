@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/llm/probe"
-	"github.com/xlsft/openclick/internal/providers"
-	"github.com/xlsft/openclick/internal/readiness"
-	"github.com/xlsft/openclick/internal/ui/i18n"
-	"github.com/xlsft/openclick/internal/ui/theme"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/llm/probe"
+	"github.com/xlsft/companion/internal/providers"
+	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 func contains(s, sub string) bool { return strings.Contains(strings.ToLower(s), strings.ToLower(sub)) }

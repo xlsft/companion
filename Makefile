@@ -1,7 +1,7 @@
 VERSION ?= dev
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
-LDFLAGS := -X github.com/xlsft/openclick/internal/buildinfo.Version=$(VERSION) \
-           -X github.com/xlsft/openclick/internal/buildinfo.Commit=$(COMMIT)
+LDFLAGS := -X github.com/xlsft/companion/internal/buildinfo.Version=$(VERSION) \
+           -X github.com/xlsft/companion/internal/buildinfo.Commit=$(COMMIT)
 
 # Gio's Vulkan backend needs vulkan-headers at build time; the GL/EGL backend
 # covers every target, so build without it (ADR-0001 amendment 1).

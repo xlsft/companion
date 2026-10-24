@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/xlsft/openclick/internal/settings"
+	"github.com/xlsft/companion/internal/settings"
 )
 
 func TestSpeedMapping(t *testing.T) {

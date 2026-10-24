@@ -15,11 +15,11 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/xlsft/openclick/internal/readiness"
-	"github.com/xlsft/openclick/internal/settings"
-	"github.com/xlsft/openclick/internal/ui/theme"
-	"github.com/xlsft/openclick/internal/ui/wizard"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/settings"
+	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/internal/ui/wizard"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Mode selects which windows the shell may create.

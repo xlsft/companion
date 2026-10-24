@@ -10,13 +10,13 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 
-	"github.com/xlsft/openclick/internal/audio"
-	"github.com/xlsft/openclick/internal/models"
-	"github.com/xlsft/openclick/internal/models/hw"
-	"github.com/xlsft/openclick/internal/readiness"
-	"github.com/xlsft/openclick/internal/ui/i18n"
-	"github.com/xlsft/openclick/internal/ui/kit"
-	"github.com/xlsft/openclick/internal/ui/theme"
+	"github.com/xlsft/companion/internal/audio"
+	"github.com/xlsft/companion/internal/models"
+	"github.com/xlsft/companion/internal/models/hw"
+	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/kit"
+	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 const meterRefresh = 50 * time.Millisecond

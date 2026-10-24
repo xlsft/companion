@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/audio"
-	"github.com/xlsft/openclick/internal/session"
-	"github.com/xlsft/openclick/internal/stt"
-	"github.com/xlsft/openclick/internal/stt/engine/fake"
-	"github.com/xlsft/openclick/internal/stt/protocol"
-	"github.com/xlsft/openclick/internal/stt/server"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/audio"
+	"github.com/xlsft/companion/internal/session"
+	"github.com/xlsft/companion/internal/stt"
+	"github.com/xlsft/companion/internal/stt/engine/fake"
+	"github.com/xlsft/companion/internal/stt/protocol"
+	"github.com/xlsft/companion/internal/stt/server"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func inProcessSTT(t *testing.T) *stt.Client {

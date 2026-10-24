@@ -5,7 +5,7 @@ package detect
 import (
 	"time"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // probeTimeout bounds each individual probe so one hung service cannot stall

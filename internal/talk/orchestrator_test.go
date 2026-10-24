@@ -10,10 +10,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/overlay"
-	"github.com/xlsft/openclick/internal/session"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/overlay"
+	"github.com/xlsft/companion/internal/session"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // scriptedProvider returns one scripted event list per Stream call and

@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 type linuxDetector struct{}

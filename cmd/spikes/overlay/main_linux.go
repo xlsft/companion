@@ -18,9 +18,9 @@ import (
 	"strings"
 	"time"
 
-	wloverlay "github.com/xlsft/openclick/internal/platform/linuxwayland/overlay"
-	x11overlay "github.com/xlsft/openclick/internal/platform/linuxx11/overlay"
-	"github.com/xlsft/openclick/pkg/contracts"
+	wloverlay "github.com/xlsft/companion/internal/platform/linuxwayland/overlay"
+	x11overlay "github.com/xlsft/companion/internal/platform/linuxx11/overlay"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 type host interface {

@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/providers"
-	"github.com/xlsft/openclick/internal/store"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/providers"
+	"github.com/xlsft/companion/internal/store"
 )
 
 // Role is a place in the product that needs a model.

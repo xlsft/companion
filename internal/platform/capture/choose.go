@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Backend names, as reported in CapabilityState.Backend and in

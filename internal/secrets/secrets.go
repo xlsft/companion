@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 	"github.com/zalando/go-keyring"
 )
 

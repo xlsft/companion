@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/llm/probe"
-	"github.com/xlsft/openclick/internal/providers"
-	"github.com/xlsft/openclick/internal/secrets"
-	"github.com/xlsft/openclick/internal/store"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/llm/probe"
+	"github.com/xlsft/companion/internal/providers"
+	"github.com/xlsft/companion/internal/secrets"
+	"github.com/xlsft/companion/internal/store"
 )
 
 type env struct {

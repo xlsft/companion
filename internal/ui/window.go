@@ -14,7 +14,7 @@ import (
 	"gioui.org/op/paint"
 	"gioui.org/unit"
 
-	"github.com/xlsft/openclick/internal/ui/theme"
+	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 // surface is a window's content.

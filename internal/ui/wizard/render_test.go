@@ -9,12 +9,12 @@ import (
 
 	"gioui.org/gpu/headless"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/llm/probe"
-	"github.com/xlsft/openclick/internal/providers"
-	"github.com/xlsft/openclick/internal/readiness"
-	"github.com/xlsft/openclick/internal/ui/i18n"
-	"github.com/xlsft/openclick/internal/ui/theme"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/llm/probe"
+	"github.com/xlsft/companion/internal/providers"
+	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 // TestHeadlessRender draws every step through Gio's GPU pipeline when an

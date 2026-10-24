@@ -11,7 +11,7 @@ import (
 	"github.com/jezek/xgb/xproto"
 	"github.com/jezek/xgb/xtest"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // TestLive drives a real X server with XTEST. It needs $DISPLAY and is

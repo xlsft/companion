@@ -13,7 +13,7 @@ import (
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Backend owns one X connection.

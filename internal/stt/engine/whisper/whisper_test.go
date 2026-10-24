@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/stt/engine"
-	"github.com/xlsft/openclick/internal/stt/protocol"
+	"github.com/xlsft/companion/internal/stt/engine"
+	"github.com/xlsft/companion/internal/stt/protocol"
 )
 
 // Models are never committed; point OPENCLICK_WHISPER_MODEL at a ggml file

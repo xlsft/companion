@@ -6,8 +6,8 @@ import (
 	"gioui.org/layout"
 	"gioui.org/widget"
 
-	"github.com/xlsft/openclick/internal/ui/theme"
-	"github.com/xlsft/openclick/internal/ui/wizard"
+	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/internal/ui/wizard"
 )
 
 // wizardUI is the only window content allowed before the app is Ready: the

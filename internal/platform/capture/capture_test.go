@@ -13,8 +13,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/xlsft/openclick/internal/coordinates"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/coordinates"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Two displays: a 1x primary at the origin and a 2x one to its right,

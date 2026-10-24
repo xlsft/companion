@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/xlsft/openclick/internal/llm"
+	"github.com/xlsft/companion/internal/llm"
 )
 
 type chatRequest struct {

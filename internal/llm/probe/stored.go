@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/store"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/store"
 )
 
 // Stored is the JSON kept in providers.capabilities: the user's manual

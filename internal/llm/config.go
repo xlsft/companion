@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Kind is the wire protocol of a provider.

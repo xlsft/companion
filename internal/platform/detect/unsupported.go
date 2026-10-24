@@ -6,7 +6,7 @@ import (
 	"context"
 	"runtime"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Windows and macOS bridges land later; until then every capability is

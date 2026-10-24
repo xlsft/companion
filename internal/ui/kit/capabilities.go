@@ -5,9 +5,9 @@ import (
 
 	"gioui.org/layout"
 
-	"github.com/xlsft/openclick/internal/ui/i18n"
-	"github.com/xlsft/openclick/internal/ui/theme"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func init() {

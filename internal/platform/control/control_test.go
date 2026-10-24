@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func TestParseLine(t *testing.T) {

@@ -6,9 +6,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/xlsft/openclick/internal/stt"
-	"github.com/xlsft/openclick/internal/stt/protocol"
-	"github.com/xlsft/openclick/internal/stt/supervisor"
+	"github.com/xlsft/companion/internal/stt"
+	"github.com/xlsft/companion/internal/stt/protocol"
+	"github.com/xlsft/companion/internal/stt/supervisor"
 )
 
 // SmokeSignal is the bundled test input: 1 s of silence followed by 1 s of

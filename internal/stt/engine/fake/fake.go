@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/xlsft/openclick/internal/stt/engine"
-	"github.com/xlsft/openclick/internal/stt/protocol"
+	"github.com/xlsft/companion/internal/stt/engine"
+	"github.com/xlsft/companion/internal/stt/protocol"
 )
 
 type Options struct {

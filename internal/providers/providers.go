@@ -13,11 +13,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/llm/probe"
-	"github.com/xlsft/openclick/internal/secrets"
-	"github.com/xlsft/openclick/internal/store"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/llm/probe"
+	"github.com/xlsft/companion/internal/secrets"
+	"github.com/xlsft/companion/internal/store"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // ErrNotFound is returned for unknown provider ids.

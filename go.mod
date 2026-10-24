@@ -1,4 +1,4 @@
-module github.com/xlsft/openclick
+module github.com/xlsft/companion
 
 go 1.27.3
 

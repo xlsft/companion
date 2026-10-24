@@ -5,7 +5,7 @@ package hotkeys
 import (
 	"context"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // New has no Windows or macOS backend yet; those are separate tickets.

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xlsft/openclick/internal/llm"
+	"github.com/xlsft/companion/internal/llm"
 )
 
 // maxErrorBody bounds how much of an error response is read for

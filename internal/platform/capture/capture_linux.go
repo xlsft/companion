@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/xlsft/openclick/internal/platform/linuxwayland/screencopy"
-	"github.com/xlsft/openclick/internal/platform/linuxwayland/screenshot"
-	x11capture "github.com/xlsft/openclick/internal/platform/linuxx11/capture"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/platform/linuxwayland/screencopy"
+	"github.com/xlsft/companion/internal/platform/linuxwayland/screenshot"
+	x11capture "github.com/xlsft/companion/internal/platform/linuxx11/capture"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // New opens the best capture backend for the session in report, using topo

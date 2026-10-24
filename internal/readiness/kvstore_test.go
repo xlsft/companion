@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/xlsft/openclick/internal/store"
+	"github.com/xlsft/companion/internal/store"
 )
 
 func TestKVStoreRoundTrip(t *testing.T) {

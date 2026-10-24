@@ -9,9 +9,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/xlsft/openclick/internal/buildinfo"
-	"github.com/xlsft/openclick/internal/diagnostics/logging"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/buildinfo"
+	"github.com/xlsft/companion/internal/diagnostics/logging"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // ProviderTest is the outcome of the last "test connection" for a provider.

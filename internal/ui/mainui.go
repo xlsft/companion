@@ -10,7 +10,7 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"github.com/xlsft/openclick/internal/ui/theme"
+	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 // page is one main-window section.

@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/image/draw"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // prepareCaptures downscales each capture for the model, records the model

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/tts"
+	"github.com/xlsft/companion/internal/tts"
 )
 
 const srcRate = 24000

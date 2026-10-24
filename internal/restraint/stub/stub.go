@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/xlsft/openclick/internal/restraint"
+	"github.com/xlsft/companion/internal/restraint"
 )
 
 var ErrNotImplemented = errors.New("not implemented")

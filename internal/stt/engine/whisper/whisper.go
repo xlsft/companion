@@ -50,8 +50,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/xlsft/openclick/internal/stt/engine"
-	"github.com/xlsft/openclick/internal/stt/protocol"
+	"github.com/xlsft/companion/internal/stt/engine"
+	"github.com/xlsft/companion/internal/stt/protocol"
 )
 
 func init() { engine.Register("whisper", New) }

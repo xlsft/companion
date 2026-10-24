@@ -14,11 +14,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/xlsft/openclick/internal/overlay"
-	"github.com/xlsft/openclick/internal/platform/detect"
-	pdisplays "github.com/xlsft/openclick/internal/platform/displays"
-	wloverlay "github.com/xlsft/openclick/internal/platform/linuxwayland/overlay"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/overlay"
+	"github.com/xlsft/companion/internal/platform/detect"
+	pdisplays "github.com/xlsft/companion/internal/platform/displays"
+	wloverlay "github.com/xlsft/companion/internal/platform/linuxwayland/overlay"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func main() {

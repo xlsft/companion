@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/stt/engine/fake"
+	"github.com/xlsft/companion/internal/stt/engine/fake"
 )
 
 // voice is a tone with a 4 Hz envelope, speech-like for the energy VAD.

@@ -17,9 +17,9 @@ import (
 	"gioui.org/op"
 	"gioui.org/unit"
 
-	"github.com/xlsft/openclick/internal/settings"
-	"github.com/xlsft/openclick/internal/ui/theme"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/settings"
+	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 var frameSize = image.Pt(960, 640)

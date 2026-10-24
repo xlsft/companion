@@ -11,7 +11,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Provider streams one model response per request.

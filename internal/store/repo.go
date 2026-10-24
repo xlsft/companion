@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // ErrNotFound is returned when a row does not exist.

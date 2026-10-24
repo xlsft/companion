@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/llm/anthropic"
-	"github.com/xlsft/openclick/internal/llm/openai"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/llm/anthropic"
+	"github.com/xlsft/companion/internal/llm/openai"
 )
 
 // Canaries that must never appear in an error string.

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/stt/engine/fake"
-	"github.com/xlsft/openclick/internal/stt/protocol"
+	"github.com/xlsft/companion/internal/stt/engine/fake"
+	"github.com/xlsft/companion/internal/stt/protocol"
 )
 
 // voice is a 220 Hz tone with a 4 Hz syllabic envelope: speech-like enough

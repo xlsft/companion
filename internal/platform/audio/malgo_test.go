@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	core "github.com/xlsft/openclick/internal/audio"
+	core "github.com/xlsft/companion/internal/audio"
 )
 
 // Touches real hardware, so it only runs when asked for explicitly.

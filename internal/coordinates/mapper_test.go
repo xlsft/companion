@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Mixed-DPI layout with a negative origin:

@@ -14,7 +14,7 @@ import (
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/image/vector"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 var (

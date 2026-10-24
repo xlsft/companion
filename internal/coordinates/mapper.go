@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 var ErrInvalidMetadata = errors.New("invalid capture metadata")

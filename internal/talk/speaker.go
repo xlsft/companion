@@ -5,8 +5,8 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/xlsft/openclick/internal/audio/playback"
-	"github.com/xlsft/openclick/internal/tts"
+	"github.com/xlsft/companion/internal/audio/playback"
+	"github.com/xlsft/companion/internal/tts"
 )
 
 // Prefetcher is an optional Speaker extension. Prefetch starts producing the

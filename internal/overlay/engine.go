@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xlsft/openclick/internal/coordinates"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/coordinates"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 var ErrUnknownCapture = errors.New("overlay command references unknown capture")

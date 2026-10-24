@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/xlsft/openclick/internal/audio"
+	"github.com/xlsft/companion/internal/audio"
 )
 
 const (

@@ -288,7 +288,7 @@ func buildSidecar(t *testing.T) string {
 		if runtime.GOOS == "windows" {
 			bin += ".exe"
 		}
-		if exec.Command("go", "build", "-o", bin, "github.com/xlsft/openclick/cmd/stt-sidecar").Run() == nil {
+		if exec.Command("go", "build", "-o", bin, "github.com/xlsft/companion/cmd/stt-sidecar").Run() == nil {
 			sidecar = bin
 		}
 	})

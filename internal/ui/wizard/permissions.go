@@ -10,11 +10,11 @@ import (
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 
-	"github.com/xlsft/openclick/internal/readiness"
-	"github.com/xlsft/openclick/internal/ui/i18n"
-	"github.com/xlsft/openclick/internal/ui/kit"
-	"github.com/xlsft/openclick/internal/ui/theme"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/kit"
+	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // permissionCaps are the rows of the permissions step (FR-ONB-005).

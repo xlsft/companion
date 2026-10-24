@@ -9,7 +9,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/xlsft/openclick/internal/diagnostics/logging"
+	"github.com/xlsft/companion/internal/diagnostics/logging"
 )
 
 // ErrSecretDetected is returned by Export when the final redaction pass still

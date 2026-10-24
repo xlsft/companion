@@ -5,7 +5,7 @@ import (
 
 	"github.com/jezek/xgb/xproto"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Keysyms that identify modifier roles in the server's modifier mapping.

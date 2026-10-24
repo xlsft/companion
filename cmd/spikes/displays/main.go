@@ -11,9 +11,9 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/xlsft/openclick/internal/platform/detect"
-	platdisplays "github.com/xlsft/openclick/internal/platform/displays"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/platform/detect"
+	platdisplays "github.com/xlsft/companion/internal/platform/displays"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func main() {

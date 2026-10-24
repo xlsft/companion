@@ -5,7 +5,7 @@ package capture
 import (
 	"context"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // New is not implemented yet for Windows and macOS.

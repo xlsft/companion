@@ -18,8 +18,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/xlsft/openclick/internal/coordinates"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/coordinates"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // TopologySource is the part of the displays Tracker capture needs.

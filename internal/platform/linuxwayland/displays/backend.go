@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 const (

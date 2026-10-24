@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/audio/playback"
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/session"
-	"github.com/xlsft/openclick/internal/tts"
+	"github.com/xlsft/companion/internal/audio/playback"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/session"
+	"github.com/xlsft/companion/internal/tts"
 )
 
 func noLeaks(t *testing.T) {

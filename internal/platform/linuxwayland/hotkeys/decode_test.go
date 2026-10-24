@@ -6,7 +6,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 var talk = contracts.HotkeyBinding{ID: "talk", Hotkey: contracts.Hotkey{Mods: contracts.ModCtrl | contracts.ModAlt, Key: "space"}, Description: "Talk"}

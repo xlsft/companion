@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Kind is an overlay primitive (FR-OVERLAY-003).

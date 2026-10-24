@@ -6,7 +6,7 @@ import (
 	"image/color"
 	"testing"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // desktopImage paints each pixel with its own coordinates so a crop can be

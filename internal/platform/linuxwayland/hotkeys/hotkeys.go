@@ -27,8 +27,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/xlsft/openclick/internal/platform/linuxwayland/portal"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/platform/linuxwayland/portal"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 const desktopPath = dbus.ObjectPath("/org/freedesktop/portal/desktop")

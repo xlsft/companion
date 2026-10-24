@@ -9,7 +9,7 @@ import (
 
 	"fyne.io/systray"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 var errNotRunning = errors.New("tray: not running")

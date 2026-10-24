@@ -3,7 +3,7 @@ package detect
 import (
 	"testing"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func portals(gs, sc, rd bool) map[string]portalProbe {

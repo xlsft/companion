@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"net"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Peer credentials are only implemented for Linux, where the control

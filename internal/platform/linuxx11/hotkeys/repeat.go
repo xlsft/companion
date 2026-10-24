@@ -1,6 +1,6 @@
 package hotkeys
 
-import "github.com/xlsft/openclick/pkg/contracts"
+import "github.com/xlsft/companion/pkg/contracts"
 
 // repeatFilter turns raw key events of grabbed keys into one press and one
 // release per physical key stroke.

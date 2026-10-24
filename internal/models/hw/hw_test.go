@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/xlsft/openclick/internal/models"
+	"github.com/xlsft/companion/internal/models"
 )
 
 func mustCatalog(t *testing.T) models.Catalog {

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/stt/protocol"
+	"github.com/xlsft/companion/internal/stt/protocol"
 )
 
 // TestWhisperSidecarEndToEnd streams jfk.wav in real time through the real

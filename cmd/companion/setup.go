@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 
-	"github.com/xlsft/openclick/internal/readiness"
-	"github.com/xlsft/openclick/internal/store"
+	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/store"
 )
 
 // openGate loads the persisted setup progress from the settings KV.

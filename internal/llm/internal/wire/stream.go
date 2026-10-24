@@ -7,7 +7,7 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/xlsft/openclick/internal/llm"
+	"github.com/xlsft/companion/internal/llm"
 )
 
 // Decoder converts provider SSE events into normalized events. It returns

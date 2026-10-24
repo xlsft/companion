@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Tool names exposed to the model (OC-51). Models point and draw only

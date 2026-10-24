@@ -11,8 +11,8 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 
-	"github.com/xlsft/openclick/internal/ui/kit"
-	"github.com/xlsft/openclick/internal/ui/theme"
+	"github.com/xlsft/companion/internal/ui/kit"
+	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 // Shared widgets live in kit so the wizard package can use them too.

@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/stt"
-	"github.com/xlsft/openclick/internal/stt/protocol"
+	"github.com/xlsft/companion/internal/stt"
+	"github.com/xlsft/companion/internal/stt/protocol"
 )
 
 var sidecarBin string
@@ -26,7 +26,7 @@ func TestMain(m *testing.M) {
 		if runtime.GOOS == "windows" {
 			bin += ".exe"
 		}
-		build := exec.Command("go", "build", "-o", bin, "github.com/xlsft/openclick/cmd/stt-sidecar")
+		build := exec.Command("go", "build", "-o", bin, "github.com/xlsft/companion/cmd/stt-sidecar")
 		build.Stderr = os.Stderr
 		if build.Run() == nil {
 			sidecarBin = bin

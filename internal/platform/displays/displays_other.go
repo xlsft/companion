@@ -5,8 +5,8 @@ package displays
 import (
 	"context"
 
-	"github.com/xlsft/openclick/internal/displays"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/displays"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // New is not implemented yet for Windows and macOS.

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func TestMarshalReadRoundTrip(t *testing.T) {

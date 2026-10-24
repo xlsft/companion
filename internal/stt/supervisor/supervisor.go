@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xlsft/openclick/internal/stt"
+	"github.com/xlsft/companion/internal/stt"
 )
 
 var (

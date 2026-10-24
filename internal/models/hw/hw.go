@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/sys/cpu"
 
-	"github.com/xlsft/openclick/internal/models/disk"
+	"github.com/xlsft/companion/internal/models/disk"
 )
 
 // GPU backend names; they match Manifest.Backends plus "rocm" which no

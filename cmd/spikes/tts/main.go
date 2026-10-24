@@ -20,11 +20,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xlsft/openclick/internal/audio/playback"
-	paudio "github.com/xlsft/openclick/internal/platform/audio"
-	"github.com/xlsft/openclick/internal/speech"
-	"github.com/xlsft/openclick/internal/talk"
-	"github.com/xlsft/openclick/internal/tts"
+	"github.com/xlsft/companion/internal/audio/playback"
+	paudio "github.com/xlsft/companion/internal/platform/audio"
+	"github.com/xlsft/companion/internal/speech"
+	"github.com/xlsft/companion/internal/talk"
+	"github.com/xlsft/companion/internal/tts"
 )
 
 const keyEnv = "OPENCLICK_TTS_KEY"

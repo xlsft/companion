@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/xlsft/openclick/internal/audio"
-	"github.com/xlsft/openclick/internal/session"
-	"github.com/xlsft/openclick/internal/stt"
-	"github.com/xlsft/openclick/internal/stt/supervisor"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/audio"
+	"github.com/xlsft/companion/internal/session"
+	"github.com/xlsft/companion/internal/stt"
+	"github.com/xlsft/companion/internal/stt/supervisor"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // STTSession is one recognition session; *stt.Session and the

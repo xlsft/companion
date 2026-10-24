@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Backend is the OS-specific source of display facts. It only reports raw

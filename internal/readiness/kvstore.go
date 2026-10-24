@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/xlsft/openclick/internal/store"
+	"github.com/xlsft/companion/internal/store"
 )
 
 // ProgressKey is the settings KV key holding the persisted Progress.

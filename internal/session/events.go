@@ -1,6 +1,6 @@
 package session
 
-import "github.com/xlsft/openclick/pkg/contracts"
+import "github.com/xlsft/companion/pkg/contracts"
 
 // Event is an input to the Manager. Every event carries the SessionRef it
 // belongs to; the Manager drops events whose Ref is not the active

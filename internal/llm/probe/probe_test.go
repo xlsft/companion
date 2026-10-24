@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/llm"
-	_ "github.com/xlsft/openclick/internal/llm/anthropic"
-	"github.com/xlsft/openclick/internal/llm/llmtest"
-	_ "github.com/xlsft/openclick/internal/llm/openai"
-	"github.com/xlsft/openclick/internal/llm/probe"
+	"github.com/xlsft/companion/internal/llm"
+	_ "github.com/xlsft/companion/internal/llm/anthropic"
+	"github.com/xlsft/companion/internal/llm/llmtest"
+	_ "github.com/xlsft/companion/internal/llm/openai"
+	"github.com/xlsft/companion/internal/llm/probe"
 )
 
 var textOK = llmtest.Response{Steps: []llmtest.Step{llmtest.Text("pong"), llmtest.Finish(llm.StopEnd, llm.Usage{})}}

@@ -3,7 +3,7 @@ package buildinfo
 
 import "runtime"
 
-// Set with -ldflags "-X github.com/xlsft/openclick/internal/buildinfo.Version=...".
+// Set with -ldflags "-X github.com/xlsft/companion/internal/buildinfo.Version=...".
 var (
 	Version = "dev"
 	Commit  = "unknown"

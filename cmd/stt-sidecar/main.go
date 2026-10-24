@@ -13,11 +13,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/xlsft/openclick/internal/buildinfo"
-	"github.com/xlsft/openclick/internal/stt/engine"
-	"github.com/xlsft/openclick/internal/stt/engine/fake"
-	"github.com/xlsft/openclick/internal/stt/server"
-	"github.com/xlsft/openclick/internal/stt/vad"
+	"github.com/xlsft/companion/internal/buildinfo"
+	"github.com/xlsft/companion/internal/stt/engine"
+	"github.com/xlsft/companion/internal/stt/engine/fake"
+	"github.com/xlsft/companion/internal/stt/server"
+	"github.com/xlsft/companion/internal/stt/vad"
 )
 
 func main() {

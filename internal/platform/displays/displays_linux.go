@@ -7,10 +7,10 @@ package displays
 import (
 	"context"
 
-	"github.com/xlsft/openclick/internal/displays"
-	waylanddisplays "github.com/xlsft/openclick/internal/platform/linuxwayland/displays"
-	x11displays "github.com/xlsft/openclick/internal/platform/linuxx11/displays"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/displays"
+	waylanddisplays "github.com/xlsft/companion/internal/platform/linuxwayland/displays"
+	x11displays "github.com/xlsft/companion/internal/platform/linuxx11/displays"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // New starts a Tracker for the session in report. The caller owns it and

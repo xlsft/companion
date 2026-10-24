@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Opcodes of the interfaces we speak (events unless marked request).

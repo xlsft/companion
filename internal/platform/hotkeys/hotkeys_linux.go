@@ -3,10 +3,10 @@ package hotkeys
 import (
 	"context"
 
-	"github.com/xlsft/openclick/internal/platform/control"
-	waylandhotkeys "github.com/xlsft/openclick/internal/platform/linuxwayland/hotkeys"
-	x11hotkeys "github.com/xlsft/openclick/internal/platform/linuxx11/hotkeys"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/platform/control"
+	waylandhotkeys "github.com/xlsft/companion/internal/platform/linuxwayland/hotkeys"
+	x11hotkeys "github.com/xlsft/companion/internal/platform/linuxx11/hotkeys"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // New starts the hotkey service for the session in report, with the

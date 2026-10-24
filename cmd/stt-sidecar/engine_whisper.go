@@ -3,4 +3,4 @@
 package main
 
 // Registers the whisper.cpp engine; it becomes the default -engine.
-import _ "github.com/xlsft/openclick/internal/stt/engine/whisper"
+import _ "github.com/xlsft/companion/internal/stt/engine/whisper"

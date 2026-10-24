@@ -17,8 +17,8 @@ import (
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
 
-	"github.com/xlsft/openclick/internal/platform/keys"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/platform/keys"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // repeatWindow is how long a release is held back waiting for the press

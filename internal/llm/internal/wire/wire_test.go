@@ -12,7 +12,7 @@ import (
 	"testing/iotest"
 	"time"
 
-	"github.com/xlsft/openclick/internal/llm"
+	"github.com/xlsft/companion/internal/llm"
 )
 
 func readAll(t *testing.T, r io.Reader) ([]SSEEvent, error) {

@@ -3,11 +3,11 @@ package wizard
 import (
 	"context"
 
-	"github.com/xlsft/openclick/internal/audio"
-	"github.com/xlsft/openclick/internal/models"
-	"github.com/xlsft/openclick/internal/models/hw"
-	"github.com/xlsft/openclick/internal/providers"
-	"github.com/xlsft/openclick/internal/tts"
+	"github.com/xlsft/companion/internal/audio"
+	"github.com/xlsft/companion/internal/models"
+	"github.com/xlsft/companion/internal/models/hw"
+	"github.com/xlsft/companion/internal/providers"
+	"github.com/xlsft/companion/internal/tts"
 )
 
 // Backends are the UI-side operations of the steps: forms, lists, downloads

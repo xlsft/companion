@@ -24,8 +24,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/xlsft/openclick/internal/platform/linuxwayland/pipewire"
-	"github.com/xlsft/openclick/internal/platform/linuxwayland/portal"
+	"github.com/xlsft/companion/internal/platform/linuxwayland/pipewire"
+	"github.com/xlsft/companion/internal/platform/linuxwayland/portal"
 )
 
 const usage = `usage: portals <command> [flags]

@@ -15,8 +15,8 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/xlsft/openclick/internal/audio"
-	paudio "github.com/xlsft/openclick/internal/platform/audio"
+	"github.com/xlsft/companion/internal/audio"
+	paudio "github.com/xlsft/companion/internal/platform/audio"
 )
 
 func main() {

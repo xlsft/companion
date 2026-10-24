@@ -4,7 +4,7 @@
 // contracts.Unsupported(contracts.CapTray).
 package tray
 
-import "github.com/xlsft/openclick/pkg/contracts"
+import "github.com/xlsft/companion/pkg/contracts"
 
 // New returns the tray for the current platform. Only one tray may exist per
 // process: the underlying OS icon is a singleton.

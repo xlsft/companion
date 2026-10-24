@@ -14,7 +14,7 @@ import (
 	"github.com/jezek/xgb/randr"
 	"github.com/jezek/xgb/xproto"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Backend implements internal/displays.Backend for X11.

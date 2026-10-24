@@ -9,7 +9,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // NiriActive asks niri for its focused output over the IPC socket, the

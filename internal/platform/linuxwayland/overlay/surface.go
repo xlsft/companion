@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xlsft/openclick/internal/platform/linuxwayland/wl"
-	"github.com/xlsft/openclick/internal/platform/pixconv"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/platform/linuxwayland/wl"
+	"github.com/xlsft/companion/internal/platform/pixconv"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 const (

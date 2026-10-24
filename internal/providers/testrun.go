@@ -12,11 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/xlsft/openclick/internal/llm"
-	_ "github.com/xlsft/openclick/internal/llm/anthropic" // register adapters
-	_ "github.com/xlsft/openclick/internal/llm/openai"
-	"github.com/xlsft/openclick/internal/llm/probe"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/llm"
+	_ "github.com/xlsft/companion/internal/llm/anthropic" // register adapters
+	_ "github.com/xlsft/companion/internal/llm/openai"
+	"github.com/xlsft/companion/internal/llm/probe"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Step identifiers of a provider test, in execution order.

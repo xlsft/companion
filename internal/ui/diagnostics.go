@@ -10,9 +10,9 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"github.com/xlsft/openclick/internal/ui/kit"
-	"github.com/xlsft/openclick/internal/ui/theme"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/ui/kit"
+	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 const diagTimeout = 10 * time.Second

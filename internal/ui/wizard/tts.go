@@ -10,11 +10,11 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"github.com/xlsft/openclick/internal/readiness"
-	"github.com/xlsft/openclick/internal/tts"
-	"github.com/xlsft/openclick/internal/ui/i18n"
-	"github.com/xlsft/openclick/internal/ui/kit"
-	"github.com/xlsft/openclick/internal/ui/theme"
+	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/tts"
+	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/kit"
+	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 // ttsState is the speech-output form. Widgets are UI-goroutine only; the

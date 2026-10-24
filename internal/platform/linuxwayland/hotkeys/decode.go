@@ -5,8 +5,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/xlsft/openclick/internal/platform/keys"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/platform/keys"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // shortcut is one element of the a(sa{sv}) array BindShortcuts takes.

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 var cc = CallContext{Session: contracts.SessionRef{ID: "s", Generation: 3}, Capture: "cap", CallID: "call1", Segment: -1}

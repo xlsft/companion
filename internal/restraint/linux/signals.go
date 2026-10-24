@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/xlsft/openclick/internal/restraint"
+	"github.com/xlsft/companion/internal/restraint"
 )
 
 // Signal names reported as restraint reasons.

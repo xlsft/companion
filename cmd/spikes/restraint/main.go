@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xlsft/openclick/internal/restraint"
+	"github.com/xlsft/companion/internal/restraint"
 )
 
 func main() {

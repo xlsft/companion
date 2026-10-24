@@ -19,7 +19,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Binding IDs the ctl CLI addresses. They match what the core registers for

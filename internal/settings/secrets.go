@@ -3,7 +3,7 @@ package settings
 import (
 	"reflect"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 var secretRefType = reflect.TypeOf(contracts.SecretRef(""))

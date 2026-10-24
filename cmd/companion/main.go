@@ -18,16 +18,16 @@ import (
 
 	gioapp "gioui.org/app"
 
-	"github.com/xlsft/openclick/internal/app"
-	"github.com/xlsft/openclick/internal/buildinfo"
-	"github.com/xlsft/openclick/internal/platform/control"
-	"github.com/xlsft/openclick/internal/platform/detect"
-	"github.com/xlsft/openclick/internal/platform/tray"
-	"github.com/xlsft/openclick/internal/settings"
-	"github.com/xlsft/openclick/internal/store"
-	"github.com/xlsft/openclick/internal/ui"
-	"github.com/xlsft/openclick/internal/ui/wizard"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/app"
+	"github.com/xlsft/companion/internal/buildinfo"
+	"github.com/xlsft/companion/internal/platform/control"
+	"github.com/xlsft/companion/internal/platform/detect"
+	"github.com/xlsft/companion/internal/platform/tray"
+	"github.com/xlsft/companion/internal/settings"
+	"github.com/xlsft/companion/internal/store"
+	"github.com/xlsft/companion/internal/ui"
+	"github.com/xlsft/companion/internal/ui/wizard"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func main() {

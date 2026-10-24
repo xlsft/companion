@@ -3,7 +3,7 @@ package keys
 import (
 	"testing"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func TestKeysym(t *testing.T) {

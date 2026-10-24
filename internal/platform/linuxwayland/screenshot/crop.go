@@ -5,7 +5,7 @@ import (
 	"image"
 	"math"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // sizeTolerance absorbs the rounding of fractional logical sizes when the

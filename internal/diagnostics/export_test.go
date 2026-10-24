@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xlsft/openclick/internal/diagnostics/logging"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/diagnostics/logging"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func sampleReport() Report {

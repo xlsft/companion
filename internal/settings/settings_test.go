@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/store"
+	"github.com/xlsft/companion/internal/store"
 )
 
 func newSvc(t *testing.T) (*Service, *store.KV) {

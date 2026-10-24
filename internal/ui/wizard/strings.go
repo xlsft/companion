@@ -1,6 +1,6 @@
 package wizard
 
-import "github.com/xlsft/openclick/internal/ui/i18n"
+import "github.com/xlsft/companion/internal/ui/i18n"
 
 func init() { i18n.Register(texts) }
 

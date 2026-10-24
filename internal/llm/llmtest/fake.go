@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/llm"
+	"github.com/xlsft/companion/internal/llm"
 )
 
 // Dialect is a wire protocol a fake server speaks.

@@ -22,8 +22,8 @@ import (
 	"github.com/jezek/xgb/shape"
 	"github.com/jezek/xgb/xproto"
 
-	"github.com/xlsft/openclick/internal/platform/pixconv"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/platform/pixconv"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 const Backend = "x11-shape-override-redirect"

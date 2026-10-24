@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/xlsft/openclick/internal/tts"
+	"github.com/xlsft/companion/internal/tts"
 )
 
 // FromTTS adapts a synthesis stream requested in format f. Only raw PCM16 is

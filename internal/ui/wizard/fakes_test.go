@@ -14,15 +14,15 @@ import (
 	"gioui.org/op"
 	"gioui.org/unit"
 
-	"github.com/xlsft/openclick/internal/audio"
-	"github.com/xlsft/openclick/internal/models"
-	"github.com/xlsft/openclick/internal/models/hw"
-	"github.com/xlsft/openclick/internal/providers"
-	"github.com/xlsft/openclick/internal/readiness"
-	"github.com/xlsft/openclick/internal/tts"
-	"github.com/xlsft/openclick/internal/ui/i18n"
-	"github.com/xlsft/openclick/internal/ui/theme"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/audio"
+	"github.com/xlsft/companion/internal/models"
+	"github.com/xlsft/companion/internal/models/hw"
+	"github.com/xlsft/companion/internal/providers"
+	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/tts"
+	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 type memStore struct {

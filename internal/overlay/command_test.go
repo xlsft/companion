@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func show(kind Kind, pts ...contracts.Point) Command {

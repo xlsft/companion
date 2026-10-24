@@ -16,8 +16,8 @@ import (
 	"unsafe"
 
 	"github.com/gen2brain/malgo"
-	"github.com/xlsft/openclick/internal/audio/playback"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/audio/playback"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // A 10 ms period bounds how long a Stop waits for the sample in flight;

@@ -16,7 +16,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/xlsft/openclick/internal/audio"
+	"github.com/xlsft/companion/internal/audio"
 )
 
 // Format is interleaved PCM: the source format given to Play, or a device's

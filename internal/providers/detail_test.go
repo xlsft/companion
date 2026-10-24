@@ -4,8 +4,8 @@ import (
 	"maps"
 	"testing"
 
-	"github.com/xlsft/openclick/internal/llm"
-	"github.com/xlsft/openclick/internal/llm/probe"
+	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/llm/probe"
 )
 
 func TestResultDetail(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // State is a user-visible session state (FR-VOICE-009).

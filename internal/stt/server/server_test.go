@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/stt/engine/fake"
-	"github.com/xlsft/openclick/internal/stt/protocol"
+	"github.com/xlsft/companion/internal/stt/engine/fake"
+	"github.com/xlsft/companion/internal/stt/protocol"
 )
 
 type harness struct {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/jezek/xgb/randr"
 
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func TestBuildDisplays(t *testing.T) {

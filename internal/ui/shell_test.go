@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xlsft/openclick/internal/readiness"
-	"github.com/xlsft/openclick/internal/settings"
-	"github.com/xlsft/openclick/internal/store"
-	"github.com/xlsft/openclick/pkg/contracts"
+	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/settings"
+	"github.com/xlsft/companion/internal/store"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 type fakeWindow struct {

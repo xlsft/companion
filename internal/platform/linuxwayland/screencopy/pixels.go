@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"image"
 
-	"github.com/xlsft/openclick/internal/platform/pixconv"
+	"github.com/xlsft/companion/internal/platform/pixconv"
 )
 
 // wl_shm formats this package can convert. ARGB8888 and XRGB8888 have the

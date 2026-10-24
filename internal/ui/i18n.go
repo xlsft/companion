@@ -1,6 +1,6 @@
 package ui
 
-import "github.com/xlsft/openclick/internal/ui/i18n"
+import "github.com/xlsft/companion/internal/ui/i18n"
 
 // Lang is a UI language; values match settings.UI.Language.
 type Lang = i18n.Lang

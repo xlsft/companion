@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xlsft/openclick/internal/stt/protocol"
+	"github.com/xlsft/companion/internal/stt/protocol"
 )
 
 // Partial is an interim transcript; each one replaces the previous.
