@@ -165,3 +165,22 @@ The session is removed when the response is sent. If `session.cancel` arrives du
 | `-vad-threshold-db` | `-45` | frame RMS in dBFS counted as speech |
 | `-vad-hangover` | `400ms` | silence before speech→silence transition |
 | `-vad` | `true` | `false` treats all audio as speech |
+
+## whisper.cpp build
+
+`make whisper` builds whisper.cpp from the `third_party/whisper.cpp` submodule (pinned release tag) as static libraries into `third_party/whisper-install/`, then `make build-whisper` builds `bin/stt-sidecar` with `-tags whisper`. Without the tag the sidecar is pure Go and only offers the `fake` engine; `make cross` never uses the tag.
+
+CMake flags always set: `-DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_EXAMPLES=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF`, plus `-DGGML_NATIVE=$(WHISPER_NATIVE)` (default `ON`: tuned to the build host's CPU; set `WHISPER_NATIVE=OFF` for redistributable binaries). GPU/BLAS backends are enabled only when detected on the build host:
+
+| Backend | Detected by | CMake flag | Extra link flags |
+|---|---|---|---|
+| Vulkan | `pkg-config vulkan`, `vulkan/vulkan.h` and `glslc` | `-DGGML_VULKAN=ON` | `-lggml-vulkan -lvulkan` |
+| CUDA | `nvcc` on `PATH` | `-DGGML_CUDA=ON` | `-lggml-cuda -lcudart -lcublas -lcublasLt -lcuda` |
+| OpenBLAS | `pkg-config openblas` | `-DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS` | `-lggml-blas -lopenblas` |
+| Metal | macOS (ggml default) | — | frameworks in `whisper_darwin.go` |
+
+Override detection with `WHISPER_CMAKE_EXTRA=...` and `WHISPER_CGO_LDFLAGS=...`. Silero VAD (whisper.cpp `whisper_vad_*`) is not used yet; `internal/stt/vad.VAD` is the hook for it.
+
+The cgo code lives in `internal/stt/engine/whisper` (build tag `whisper && cgo`) and is imported only by `cmd/stt-sidecar/engine_whisper.go`, so no core binary links it. ADR-0001 rule 6 names only `internal/platform/*` and `cmd/stt-sidecar` as cgo locations; this package is the sidecar's private runtime and should be added to that rule.
+
+Tests: `make test-whisper` runs the tagged tests; the model-dependent ones run only when `OPENCLICK_WHISPER_MODEL` points at a ggml model (for example `ggml-tiny.bin` from the `ggerganov/whisper.cpp` Hugging Face repo) and use the submodule's `samples/jfk.wav`. Models and audio are never committed.

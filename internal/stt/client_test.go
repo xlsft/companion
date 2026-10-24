@@ -27,7 +27,7 @@ func TestMain(m *testing.M) {
 		if runtime.GOOS == "windows" {
 			bin += ".exe"
 		}
-		build := exec.Command("go", "build", "-o", bin, "github.com/xlsft/openclick/cmd/stt-sidecar")
+		build := exec.Command("go", "build", "-tags", sidecarTags, "-o", bin, "github.com/xlsft/openclick/cmd/stt-sidecar")
 		build.Stderr = os.Stderr
 		if build.Run() == nil {
 			sidecarBin = bin

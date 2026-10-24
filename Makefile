@@ -3,7 +3,7 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 LDFLAGS := -X github.com/xlsft/openclick/internal/buildinfo.Version=$(VERSION) \
            -X github.com/xlsft/openclick/internal/buildinfo.Commit=$(COMMIT)
 
-.PHONY: build test vet cross whisper whisper-clean
+.PHONY: build test vet cross whisper build-whisper test-whisper whisper-clean
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o bin/ ./cmd/...
@@ -72,6 +72,21 @@ whisper:
 	cmake --build $(WHISPER_BUILD) --config Release -j
 	cmake --install $(WHISPER_BUILD) --prefix $(WHISPER_PREFIX)
 	@printf '%s\n' '$(WHISPER_CGO_LDFLAGS)' > $(WHISPER_PREFIX)/cgo_ldflags
+
+# Detected GPU/BLAS archives are linked as a second group that repeats the
+# core libraries, because cgo's own LDFLAGS group cannot be extended.
+WHISPER_GO_ENV = CGO_ENABLED=1 CGO_LDFLAGS="$$(x=$$(cat $(WHISPER_PREFIX)/cgo_ldflags 2>/dev/null); \
+	if [ -n "$$x" ]; then echo "-L$(CURDIR)/$(WHISPER_PREFIX)/lib -Wl,--start-group -lwhisper -lggml -lggml-base -lggml-cpu $$x -Wl,--end-group"; fi)"
+
+build-whisper:
+	@test -f $(WHISPER_PREFIX)/lib/libwhisper.a || { echo "run 'make whisper' first" >&2; exit 1; }
+	$(WHISPER_GO_ENV) go build -tags whisper -ldflags "$(LDFLAGS)" -o bin/ ./cmd/stt-sidecar
+
+# Model-dependent tests skip unless OPENCLICK_WHISPER_MODEL points at a
+# ggml model (models are never committed).
+test-whisper:
+	@test -f $(WHISPER_PREFIX)/lib/libwhisper.a || { echo "run 'make whisper' first" >&2; exit 1; }
+	$(WHISPER_GO_ENV) go test -tags whisper -v ./internal/stt/...
 
 whisper-clean:
 	rm -rf $(WHISPER_BUILD) $(WHISPER_PREFIX)
