@@ -185,6 +185,16 @@ func grid(th *theme.Theme, cols int, gap float32, items ...layout.Widget) layout
 	}
 }
 
+// flow is a grid with as many columns (at most len(items)) as fit cells
+// of at least minCell dp.
+func flow(th *theme.Theme, minCell, gap float32, items ...layout.Widget) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions {
+		cell := gtx.Dp(th.Dp(minCell + gap))
+		cols := min(max(1, (gtx.Constraints.Max.X+gtx.Dp(th.Dp(gap)))/cell), len(items))
+		return grid(th, cols, gap, items...)(gtx)
+	}
+}
+
 // columns splits the width between a flexible left part and a fixed
 // right one (right dp wide), or stacks them when the width is below
 // minWide dp: the window is often narrower than the prototypes.

@@ -7,6 +7,7 @@ import (
 	"gioui.org/font"
 	"gioui.org/io/semantic"
 	"gioui.org/layout"
+	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
@@ -396,7 +397,9 @@ func (w *Wizard) content(gtx layout.Context, th *theme.Theme, l i18n.Lang, s sna
 	// The list spans the whole column so its scrollbar sits at the window
 	// edge; the page padding and width cap apply per row.
 	return material.List(th.Theme, &w.list).Layout(gtx, len(rows), func(gtx layout.Context, i int) layout.Dimensions {
-		in := layout.Inset{Top: th.Dp(22), Left: th.Dp(56), Right: th.Dp(56)}
+		// The page margin shrinks in narrow windows and at large text sizes.
+		side := min(th.Dp(56), unit.Dp(float32(gtx.Constraints.Max.X)/14/gtx.Metric.PxPerDp))
+		in := layout.Inset{Top: th.Dp(22), Left: side, Right: side}
 		if i == 0 {
 			in.Top = th.Dp(36)
 		}

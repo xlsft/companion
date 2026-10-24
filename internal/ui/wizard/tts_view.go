@@ -59,7 +59,7 @@ func (t *ttsState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) ste
 	}
 
 	return stepBody{maxW: 748, rows: []layout.Widget{
-		grid(th, 2, 8, prov(TTSElevenLabs), prov(TTSOpenAI)),
+		flow(th, 220, 8, prov(TTSElevenLabs), prov(TTSOpenAI)),
 		vstack(th, 8, keyRow, status),
 		t.voicesBlock(w, th, l, voices, voice, loadingV, enabled && cfg.HasKey && !loadingV),
 		func(gtx layout.Context) layout.Dimensions {

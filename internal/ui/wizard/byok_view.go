@@ -59,10 +59,10 @@ func (b *byokState) form(w *Wizard, th *theme.Theme, l i18n.Lang, info *provider
 		status = w.text(kit.Muted(th, i18n.T(l, "wiz.loading")))
 	}
 	return vstack(th, 22,
-		grid(th, 2, 8, kind(llm.KindAnthropic), kind(llm.KindOpenAI)),
+		flow(th, 220, 8, kind(llm.KindAnthropic), kind(llm.KindOpenAI)),
 		vstack(th, 14,
 			field(w, th, i18n.T(l, "wiz.byok.baseURL"), "https://api.example.com/v1", &b.baseURL, enabled),
-			grid(th, 2, 12,
+			flow(th, 200, 12,
 				field(w, th, i18n.T(l, "wiz.byok.model"), i18n.T(l, "wiz.byok.model.hint"), &b.model, enabled),
 				keyField),
 			headers,
