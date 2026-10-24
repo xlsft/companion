@@ -33,7 +33,7 @@ func TestDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	if d.Version != CurrentVersion || d.Screen.KeepScreenshots || d.Screen.Target != ScreenActive ||
-		d.Voice.Language != "auto" || d.Voice.TTSSpeed != 1.0 {
+		d.Voice.Language != "auto" || d.Voice.TTSSpeed != 1.0 || d.UI.Language != "en" {
 		t.Errorf("defaults: %+v", d)
 	}
 	s, _ := newSvc(t)
@@ -53,7 +53,8 @@ func TestValidateRejects(t *testing.T) {
 		{"speed high", func(s *Settings) { s.Voice.TTSSpeed = 1.6 }},
 		{"language", func(s *Settings) { s.Voice.Language = "English!" }},
 		{"screen target", func(s *Settings) { s.Screen.Target = "some" }},
-		{"ui language", func(s *Settings) { s.UI.Language = "de" }},
+		{"ui language", func(s *Settings) { s.UI.Language = "xx" }},
+		{"ui language region", func(s *Settings) { s.UI.Language = "en-US" }},
 	}
 	s, _ := newSvc(t)
 	before := s.Get()

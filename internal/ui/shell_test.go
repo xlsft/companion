@@ -245,7 +245,7 @@ func TestEnterMain(t *testing.T) {
 	if h.sh.Mode() != ModeMain || h.sh.wizard != nil {
 		t.Error("still in setup or wizard UI kept")
 	}
-	if h.tray.sets != 1 || h.tray.snapshot()[0].Label != T(LangRU, "tray.open") {
+	if h.tray.sets != 1 || h.tray.snapshot()[0].Label != T(LangEN, "tray.open") {
 		t.Errorf("tray not switched to main items: %+v", h.tray.snapshot())
 	}
 	if err := h.sh.EnterMain(); err != nil {

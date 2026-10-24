@@ -5,6 +5,7 @@ package settings
 import (
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/xlsft/companion/pkg/contracts"
 )
@@ -78,8 +79,12 @@ type Platform struct {
 }
 
 type UI struct {
-	Language string `json:"language"` // "ru" | "en"
+	Language string `json:"language"` // one of UILanguages
 }
+
+// UILanguages are the interface languages, English first as the default.
+// The UI's catalogue (internal/ui/i18n) has a translation for each.
+var UILanguages = []string{"en", "es", "pt", "fr", "de", "it", "pl", "tr", "uk", "ru"}
 
 // Settings is the whole persisted configuration. Only plain values (no
 // slices or maps) so a struct copy is a deep copy.
@@ -103,7 +108,7 @@ func Defaults() Settings {
 		Screen:   Screen{Target: ScreenActive},
 		Memory:   Memory{Enabled: true},
 		Platform: Platform{TrayIcon: true},
-		UI:       UI{Language: "ru"},
+		UI:       UI{Language: "en"},
 	}
 }
 
@@ -132,7 +137,7 @@ func (s Settings) Validate() error {
 	default:
 		return fmt.Errorf("settings: screen.target %q invalid", s.Screen.Target)
 	}
-	if s.UI.Language != "ru" && s.UI.Language != "en" {
+	if !slices.Contains(UILanguages, s.UI.Language) {
 		return fmt.Errorf("settings: ui.language %q invalid", s.UI.Language)
 	}
 	return nil
