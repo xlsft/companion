@@ -2,3 +2,5 @@
 *.test
 *.out
 /.claude/settings.local.json
+/third_party/whisper-build/
+/third_party/whisper-install/
