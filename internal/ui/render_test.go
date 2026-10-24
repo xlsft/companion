@@ -1,0 +1,242 @@
+package ui
+
+import (
+	"context"
+	"fmt"
+	"image"
+	"image/png"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"gioui.org/gpu/headless"
+	"gioui.org/io/input"
+	"gioui.org/io/key"
+	"gioui.org/layout"
+	"gioui.org/op"
+	"gioui.org/unit"
+
+	"github.com/xlsft/openclick/internal/settings"
+	"github.com/xlsft/openclick/internal/ui/theme"
+	"github.com/xlsft/openclick/pkg/contracts"
+)
+
+var frameSize = image.Pt(960, 640)
+
+// frame lays out content once against router r, like a window frame.
+func frame(r *input.Router, sh *Shell, th *theme.Theme, content surface) *op.Ops {
+	ops := new(op.Ops)
+	gtx := layout.Context{
+		Ops:         ops,
+		Metric:      unit.Metric{PxPerDp: 1, PxPerSp: 1},
+		Now:         time.Now(),
+		Source:      r.Source(),
+		Constraints: layout.Exact(frameSize),
+	}
+	renderFrame(gtx, th, sh, content)
+	r.Frame(ops)
+	return ops
+}
+
+func reportWithCaps() contracts.CapabilityReport {
+	return contracts.CapabilityReport{
+		OS: "linux", Session: contracts.SessionWayland, Desktop: "niri",
+		Capabilities: map[contracts.Capability]contracts.CapabilityState{
+			contracts.CapTray:          {Status: contracts.StatusAvailable, Backend: "sni"},
+			contracts.CapGlobalHotkey:  {Status: contracts.StatusDegraded, Reason: "no key release"},
+			contracts.CapScreenCapture: {Status: contracts.StatusUnavailable, Reason: "portal missing"},
+			contracts.CapMicrophone:    {Status: contracts.StatusUnknown},
+		},
+	}
+}
+
+// TestLayoutAllScreens builds every window's widget tree in both
+// languages, themes and the text scale extremes without a display.
+func TestLayoutAllScreens(t *testing.T) {
+	h := newHarness(t, ModeMain, nil)
+	h.sh.diag = newDiagModel(func(context.Context) (contracts.CapabilityReport, error) { return reportWithCaps(), nil }, func() {})
+	m, _ := h.mainBuilt()
+	wiz := newWizardUI(h.sh)
+	for _, lang := range []string{"ru", "en"} {
+		if err := h.sh.opts.Settings.Update(context.Background(), func(s *settings.Settings) { s.UI.Language = lang }); err != nil {
+			t.Fatal(err)
+		}
+		for _, dark := range []bool{false, true} {
+			for _, scale := range []float32{theme.MinScale, 1, theme.MaxScale} {
+				th := theme.New(dark, scale)
+				h.sh.mu.Lock()
+				h.sh.lang, h.sh.dark, h.sh.scale = langOf(lang), dark, scale
+				h.sh.mu.Unlock()
+				r := new(input.Router)
+				for _, route := range Routes {
+					m.navigate(route)
+					frame(r, h.sh, th, m)
+				}
+				m.about.show("t", "b")
+				frame(r, h.sh, th, m)
+				m.about.open = false
+				frame(r, h.sh, th, wiz)
+				wiz.showDiagnostics(true)
+				frame(r, h.sh, th, wiz)
+				wiz.showDiagnostics(false)
+			}
+		}
+	}
+	if len(m.pages) != len(Routes) {
+		t.Errorf("pages built = %d", len(m.pages))
+	}
+}
+
+type recTarget struct {
+	quit  chan struct{}
+	scale []int
+	nav   []int
+}
+
+func (r *recTarget) Quit()             { r.quit <- struct{}{} }
+func (r *recTarget) stepScale(n int)   { r.scale = append(r.scale, n) }
+func (r *recTarget) navShortcut(d int) { r.nav = append(r.nav, d) }
+func (r *recTarget) Layout(gtx layout.Context, _ *theme.Theme, _ Lang) layout.Dimensions {
+	handleShortcuts(gtx, r)
+	return layout.Dimensions{Size: gtx.Constraints.Max}
+}
+
+func TestShortcuts(t *testing.T) {
+	rt := &recTarget{quit: make(chan struct{}, 1)}
+	r := new(input.Router)
+	run := func() {
+		gtx := layout.Context{Ops: new(op.Ops), Source: r.Source(), Constraints: layout.Exact(frameSize)}
+		rt.Layout(gtx, nil, LangEN)
+		r.Frame(gtx.Ops)
+	}
+	run()
+	r.Queue(
+		key.Event{Name: "=", Modifiers: key.ModShortcut, State: key.Press},
+		key.Event{Name: "-", Modifiers: key.ModShortcut, State: key.Press},
+		key.Event{Name: "0", Modifiers: key.ModShortcut, State: key.Press},
+		key.Event{Name: "3", Modifiers: key.ModShortcut, State: key.Press},
+		key.Event{Name: "3", State: key.Press}, // without Ctrl: ignored
+		key.Event{Name: "Q", Modifiers: key.ModShortcut, State: key.Press},
+	)
+	run()
+	select {
+	case <-rt.quit:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Ctrl+Q did not quit")
+	}
+	if fmt.Sprint(rt.scale) != "[1 -1 0]" || fmt.Sprint(rt.nav) != "[3]" {
+		t.Errorf("scale=%v nav=%v", rt.scale, rt.nav)
+	}
+}
+
+// Tab must walk the sidebar in display order (FR-UI-007).
+func TestTabOrderStartsWithNavigation(t *testing.T) {
+	h := newHarness(t, ModeMain, nil)
+	m, _ := h.mainBuilt()
+	th := theme.New(false, 1)
+	r := new(input.Router)
+	frame(r, h.sh, th, m)
+	for i := range Routes {
+		r.MoveFocus(key.FocusForward)
+		frame(r, h.sh, th, m)
+		if !r.Source().Focused(&m.navBtns[i]) {
+			t.Fatalf("Tab %d: nav item %d not focused", i+1, i)
+		}
+	}
+	// Enter activates the focused item like a click.
+	r.Queue(key.Event{Name: key.NameReturn, State: key.Press}, key.Event{Name: key.NameReturn, State: key.Release})
+	frame(r, h.sh, th, m)
+	if m.current() != Routes[len(Routes)-1] {
+		t.Errorf("route after Enter = %v", m.current())
+	}
+}
+
+func TestEscClosesDialog(t *testing.T) {
+	h := newHarness(t, ModeMain, nil)
+	m, _ := h.mainBuilt()
+	th := theme.New(false, 1)
+	r := new(input.Router)
+	m.about.show("About", "text")
+	frame(r, h.sh, th, m)
+	if !r.Source().Focused(&m.about.closeBtn) {
+		t.Error("dialog button not focused on open")
+	}
+	r.Queue(key.Event{Name: key.NameEscape, State: key.Press})
+	frame(r, h.sh, th, m)
+	if m.about.open {
+		t.Error("Esc did not close the dialog")
+	}
+}
+
+// TestHeadlessRender draws real frames through Gio's GPU pipeline when an
+// offscreen GL context is available. Set OC_UI_SNAPSHOT_DIR to keep PNGs.
+func TestHeadlessRender(t *testing.T) {
+	w, err := headless.NewWindow(frameSize.X, frameSize.Y)
+	if err != nil {
+		t.Skipf("no headless GPU context on this machine: %v", err)
+	}
+	defer w.Release()
+
+	h := newHarness(t, ModeMain, nil)
+	h.sh.diag = newDiagModel(func(context.Context) (contracts.CapabilityReport, error) { return reportWithCaps(), nil }, func() {})
+	h.sh.diag.Refresh()
+	for _, running := true, true; running; {
+		_, _, running, _ = h.sh.diag.snapshot()
+		time.Sleep(time.Millisecond)
+	}
+	m, _ := h.mainBuilt()
+	wiz := newWizardUI(h.sh)
+	th := theme.New(false, 1)
+	shots := []struct {
+		name    string
+		content surface
+		route   Route
+	}{
+		{"wizard", wiz, 0},
+		{"home", m, RouteHome},
+		{"settings", m, RouteSettings},
+		{"diagnostics", m, RouteDiagnostics},
+		{"history", m, RouteHistory},
+	}
+	dir := os.Getenv("OC_UI_SNAPSHOT_DIR")
+	for _, s := range shots {
+		m.navigate(s.route)
+		r := new(input.Router)
+		frame(r, h.sh, th, s.content)
+		ops := frame(r, h.sh, th, s.content) // second frame: lazily built pages settle
+		if err := w.Frame(ops); err != nil {
+			t.Fatalf("%s: frame: %v", s.name, err)
+		}
+		img := image.NewRGBA(image.Rectangle{Max: frameSize})
+		if err := w.Screenshot(img); err != nil {
+			t.Fatalf("%s: screenshot: %v", s.name, err)
+		}
+		if uniform(img) {
+			t.Errorf("%s: frame is a single colour", s.name)
+		}
+		if dir != "" {
+			f, err := os.Create(filepath.Join(dir, s.name+".png"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := png.Encode(f, img); err != nil {
+				t.Fatal(err)
+			}
+			f.Close()
+		}
+	}
+}
+
+func uniform(img *image.RGBA) bool {
+	first := img.RGBAAt(0, 0)
+	b := img.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y += 4 {
+		for x := b.Min.X; x < b.Max.X; x += 4 {
+			if img.RGBAAt(x, y) != first {
+				return false
+			}
+		}
+	}
+	return true
+}

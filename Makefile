@@ -3,9 +3,16 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 LDFLAGS := -X github.com/xlsft/openclick/internal/buildinfo.Version=$(VERSION) \
            -X github.com/xlsft/openclick/internal/buildinfo.Commit=$(COMMIT)
 
+# Gio's Vulkan backend needs vulkan-headers at build time; the GL/EGL backend
+# covers every target, so build without it (ADR-0001 amendment 1).
+export GOFLAGS := $(strip $(GOFLAGS) -tags=novulkan)
+
 .PHONY: build test vet cross whisper build-whisper test-whisper whisper-clean
 
+# Native build with cgo: covers the Gio UI and cmd/companion, which the
+# CGO_ENABLED=0 cross build below skips.
 build:
+	go build ./...
 	go build -ldflags "$(LDFLAGS)" -o bin/ ./cmd/...
 
 test:
@@ -14,11 +21,18 @@ test:
 vet:
 	go vet ./...
 
+# Gio needs cgo on Linux (Wayland/X11/EGL) and macOS, so the UI and the
+# binary that links it are built natively only (ADR-0001 amendment 1).
+CGO_PKGS_RE := /cmd/companion$$|/internal/ui(/|$$)
+# Listed per target OS: naming a package whose files are all excluded by
+# build constraints is an error, whereas ./... silently skips it.
+pure_pkgs    = $(shell GOOS=$(1) CGO_ENABLED=0 go list ./... | grep -Ev '$(CGO_PKGS_RE)')
+
 # Pure-Go packages must cross-compile for every target OS (ADR-0001 rule 6).
 cross:
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...
-	GOOS=darwin  GOARCH=arm64 CGO_ENABLED=0 go build ./...
-	GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build ./...
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(call pure_pkgs,windows)
+	GOOS=darwin  GOARCH=arm64 CGO_ENABLED=0 go build $(call pure_pkgs,darwin)
+	GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build $(call pure_pkgs,linux)
 
 # --- whisper.cpp (OC-29) -----------------------------------------------------
 # Static whisper.cpp/ggml libraries for the `whisper` build tag, see
