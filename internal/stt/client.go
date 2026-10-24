@@ -116,6 +116,15 @@ func newClient(r io.Reader, w io.WriteCloser, cmd *exec.Cmd, log *slog.Logger) *
 // Info is the initialize result.
 func (c *Client) Info() protocol.InitializeResult { return c.info }
 
+// Pid is the sidecar's process id, or 0 for an in-process transport. The
+// benchmark samples its memory with it (OC-37).
+func (c *Client) Pid() int {
+	if c.cmd == nil || c.cmd.Process == nil {
+		return 0
+	}
+	return c.cmd.Process.Pid
+}
+
 // Done is closed when the sidecar connection ends; Err then says why.
 func (c *Client) Done() <-chan struct{} { return c.done }
 
