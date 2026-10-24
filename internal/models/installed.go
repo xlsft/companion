@@ -13,23 +13,48 @@ import (
 // ErrNotInstalled is returned by Remove for an unknown model id.
 var ErrNotInstalled = errors.New("model not installed")
 
-// InstalledModel is a model whose file was fully downloaded and verified.
+// InstalledFile is one file of an unpacked model directory.
+type InstalledFile struct {
+	Name   string `json:"name"`
+	Size   int64  `json:"size"`
+	SHA256 string `json:"sha256"`
+}
+
+// InstalledModel is a model whose file was fully downloaded and verified,
+// or whose archive was verified and unpacked into a directory.
 type InstalledModel struct {
-	ID         string    `json:"id"`
-	File       string    `json:"file"`
-	Path       string    `json:"-"`
-	Size       int64     `json:"size"`
+	ID string `json:"id"`
+	// File is the model file, or for a directory model the directory name.
+	File string `json:"file"`
+	// Path is the file or directory the sidecar loads.
+	Path string `json:"-"`
+	// Size is the file size, or the sum of Files for a directory.
+	Size int64 `json:"size"`
+	// SHA256 is the model file's hash, or the archive's for a directory:
+	// it identifies what was installed.
 	SHA256     string    `json:"sha256"`
 	VerifiedAt time.Time `json:"verified_at"`
+	// Engine is the manifest's family; empty in records written before
+	// sherpa models existed (all whisper).
+	Engine string `json:"engine,omitempty"`
+	// Dir marks an unpacked model; Files are its verified contents and
+	// Archive the downloaded file name (to clean up a leftover .part).
+	Dir     bool            `json:"dir,omitempty"`
+	Files   []InstalledFile `json:"files,omitempty"`
+	Archive string          `json:"archive,omitempty"`
 }
 
 // record is the <file>.ok sidecar. A model counts as installed only while the
-// final file and this record both exist, so a crash at any point of the
-// download leaves the model uninstalled rather than half-usable.
+// final file (or directory) and this record both exist, so a crash at any
+// point of the download leaves the model uninstalled rather than half-usable.
 type record = InstalledModel
 
 func writeRecord(final string, m Manifest) error {
-	rec := record{ID: m.ID, File: m.File, Size: m.Size, SHA256: m.SHA256, VerifiedAt: time.Now().UTC()}
+	return storeRecord(final, record{ID: m.ID, File: m.File, Size: m.Size, SHA256: m.SHA256, Engine: m.Family, VerifiedAt: time.Now().UTC()})
+}
+
+// storeRecord writes final.ok atomically.
+func storeRecord(final string, rec record) error {
 	data, err := json.Marshal(rec)
 	if err != nil {
 		return err
@@ -61,9 +86,33 @@ func readRecord(path string) (record, error) {
 	return rec, nil
 }
 
-// Installed lists verified models in dir. It trusts the record and checks the
-// file's size instead of rehashing gigabytes on every call; .part files and
-// files without a record are never listed.
+// present checks the files behind a record by size, as Installed does.
+func present(rec record, path string) bool {
+	st, err := os.Stat(path)
+	if err != nil || !validSHA256(rec.SHA256) {
+		return false
+	}
+	if !rec.Dir {
+		return !st.IsDir() && st.Size() == rec.Size
+	}
+	if !st.IsDir() || len(rec.Files) == 0 {
+		return false
+	}
+	for _, f := range rec.Files {
+		if !bareName(f.Name) {
+			return false
+		}
+		fst, err := os.Stat(filepath.Join(path, f.Name))
+		if err != nil || fst.Size() != f.Size {
+			return false
+		}
+	}
+	return true
+}
+
+// Installed lists verified models in dir. It trusts the record and checks
+// sizes instead of rehashing gigabytes on every call; .part files, unpack
+// leftovers and files without a record are never listed.
 func Installed(dir string) ([]InstalledModel, error) {
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
@@ -82,8 +131,7 @@ func Installed(dir string) ([]InstalledModel, error) {
 			continue
 		}
 		path := filepath.Join(dir, rec.File)
-		st, err := os.Stat(path)
-		if err != nil || st.Size() != rec.Size || !validSHA256(rec.SHA256) {
+		if !present(rec, path) {
 			continue
 		}
 		rec.Path = path
@@ -103,9 +151,16 @@ func Remove(dir, id string) error {
 		if m.ID != id {
 			continue
 		}
+		paths := []string{m.Path + okSuffix, m.Path, m.Path + partSuffix}
+		if m.Dir {
+			paths = []string{m.Path + okSuffix, m.Path, m.Path + unpackSuffix}
+			if bareName(m.Archive) {
+				paths = append(paths, filepath.Join(dir, m.Archive+partSuffix))
+			}
+		}
 		var first error
-		for _, p := range []string{m.Path + okSuffix, m.Path, m.Path + partSuffix} {
-			if err := os.Remove(p); err != nil && !os.IsNotExist(err) && first == nil {
+		for _, p := range paths {
+			if err := os.RemoveAll(p); err != nil && first == nil {
 				first = err
 			}
 		}

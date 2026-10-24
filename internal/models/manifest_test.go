@@ -21,6 +21,18 @@ func TestBuiltinCatalogValid(t *testing.T) {
 	if _, ok := c.Find("whisper-small"); !ok {
 		t.Fatal("whisper-small missing")
 	}
+	for _, id := range []string{"parakeet-tdt-0.6b-v3-int8", "parakeet-tdt-0.6b-v2-int8", "sense-voice-small-int8",
+		"zipformer-streaming-en-int8", "zipformer-streaming-zh-en-int8"} {
+		m, ok := c.Find(id)
+		if !ok || m.Family != FamilySherpa || !m.Archive() || m.Fallback || m.Hidden || m.License == "" {
+			t.Errorf("%s: %+v", id, m)
+		}
+	}
+	for _, m := range c {
+		if m.Family == FamilyWhisper && !m.Fallback {
+			t.Errorf("%s: whisper models are fallbacks", m.ID)
+		}
+	}
 }
 
 func TestManifestValidate(t *testing.T) {

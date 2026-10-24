@@ -214,6 +214,9 @@ func (a *Activator) Remove(id string, force bool) error {
 // verify re-hashes the file when asked, or when it changed after the record
 // was written (a replaced file must never ride on an old verdict).
 func (a *Activator) verify(ctx context.Context, m InstalledModel, force bool) error {
+	if m.Dir {
+		return a.verifyDir(ctx, m, force)
+	}
 	st, err := os.Stat(m.Path)
 	if err != nil {
 		return err
@@ -229,7 +232,38 @@ func (a *Activator) verify(ctx context.Context, m InstalledModel, force bool) er
 		return fmt.Errorf("%w: %s", ErrChecksumMismatch, m.ID)
 	}
 	// Refresh the record so the next activation skips the hash.
-	return writeRecord(m.Path, Manifest{ID: m.ID, File: m.File, Size: m.Size, SHA256: m.SHA256})
+	m.VerifiedAt = time.Now().UTC()
+	return storeRecord(m.Path, m)
+}
+
+// verifyDir re-hashes the files of an unpacked model that changed after
+// the record, or all of them when forced, against the hashes taken while
+// unpacking.
+func (a *Activator) verifyDir(ctx context.Context, m InstalledModel, force bool) error {
+	stale := false
+	for _, f := range m.Files {
+		p := filepath.Join(m.Path, f.Name)
+		st, err := os.Stat(p)
+		if err != nil {
+			return err
+		}
+		if !force && !st.ModTime().After(m.VerifiedAt) {
+			continue
+		}
+		sum, err := hashFile(ctx, p)
+		if err != nil {
+			return err
+		}
+		if sum != f.SHA256 {
+			return fmt.Errorf("%w: %s/%s", ErrChecksumMismatch, m.ID, f.Name)
+		}
+		stale = true
+	}
+	if !stale {
+		return nil
+	}
+	m.VerifiedAt = time.Now().UTC()
+	return storeRecord(m.Path, m)
 }
 
 func hashFile(ctx context.Context, path string) (string, error) {
