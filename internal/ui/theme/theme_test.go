@@ -51,14 +51,22 @@ func TestPaletteContrast(t *testing.T) {
 			{"ok/surface", rgb3(p.OK), rgb3(p.Surface)},
 			{"warn/surface", rgb3(p.Warn), rgb3(p.Surface)},
 			{"error/surface", rgb3(p.Error), rgb3(p.Surface)},
-			{"fg/selected", rgb3(p.Fg), rgb3(over(p.Selected, p.Bg))},
+			{"fg/selected", rgb3(p.Fg), rgb3(p.Selected)},
+			{"fg/accentsoft", rgb3(p.Fg), rgb3(p.AccentSoft)},
+			{"accenttext/accentsoft", rgb3(p.AccentText), rgb3(p.AccentSoft)},
+			{"fg/accentstrong", rgb3(p.Fg), rgb3(p.AccentStrong)},
+			{"fg/warntint", rgb3(p.Fg), rgb3(p.WarnTint)},
+			{"muted/warntint", rgb3(p.Muted), rgb3(p.WarnTint)},
+			{"muted/errtint", rgb3(p.Muted), rgb3(p.ErrTint)},
+			{"warn/warntint", rgb3(p.Warn), rgb3(p.WarnTint)},
+			{"error/errtint", rgb3(p.Error), rgb3(p.ErrTint)},
 			{"fg2/surface", rgb3(p.Fg2), rgb3(p.Surface)},
 			{"muted/raised", rgb3(p.Muted), rgb3(p.Raised)},
 			{"subtle/bg", rgb3(p.Subtle), rgb3(p.Bg)},
 			{"accenttext/surface", rgb3(p.AccentText), rgb3(p.Surface)},
-			{"ok/oksoft", rgb3(p.OK), rgb3(over(p.OKSoft, p.Surface))},
-			{"warn/warnsoft", rgb3(p.Warn), rgb3(over(p.WarnSoft, p.Surface))},
-			{"error/errsoft", rgb3(p.Error), rgb3(over(p.ErrSoft, p.Surface))},
+			{"ok/oksoft", rgb3(p.OK), rgb3(p.OKSoft)},
+			{"warn/warnsoft", rgb3(p.Warn), rgb3(p.WarnSoft)},
+			{"error/errsoft", rgb3(p.Error), rgb3(p.ErrSoft)},
 		} {
 			if r := contrast(pair.fg, pair.bg); r < 4.5 {
 				t.Errorf("%s %s contrast %.2f < 4.5", name, pair.label, r)
@@ -67,11 +75,29 @@ func TestPaletteContrast(t *testing.T) {
 	}
 }
 
-// over composites a translucent tint onto an opaque background.
-func over(fg, bg color.NRGBA) color.NRGBA {
-	a := float64(fg.A) / 255
-	mix := func(f, b uint8) uint8 { return uint8(float64(f)*a + float64(b)*(1-a) + 0.5) }
-	return color.NRGBA{R: mix(fg.R, bg.R), G: mix(fg.G, bg.G), B: mix(fg.B, bg.B), A: 0xff}
+// Gio blends translucent fills in linear light, so every tint must be a
+// pre-mixed opaque colour; only the dialog scrim is translucent.
+func TestTintsOpaque(t *testing.T) {
+	for name, p := range map[string]Palette{"light": Light, "dark": Dark} {
+		for label, c := range map[string]color.NRGBA{
+			"AccentSoft": p.AccentSoft, "AccentTint": p.AccentTint, "AccentStrong": p.AccentStrong, "Selected": p.Selected,
+			"OKSoft": p.OKSoft, "WarnSoft": p.WarnSoft, "ErrSoft": p.ErrSoft, "WarnTint": p.WarnTint, "ErrTint": p.ErrTint,
+		} {
+			if c.A != 0xff {
+				t.Errorf("%s %s is translucent", name, label)
+			}
+			if c == p.Bg || c == p.Surface {
+				t.Errorf("%s %s does not tint", name, label)
+			}
+		}
+	}
+}
+
+func TestMix(t *testing.T) {
+	got := mix(color.NRGBA{0, 0, 0, 255}, color.NRGBA{200, 100, 50, 255}, 0.5)
+	if got != (color.NRGBA{100, 50, 25, 255}) {
+		t.Errorf("mix = %v", got)
+	}
 }
 
 // Tokens must match the prototypes' CSS exactly.

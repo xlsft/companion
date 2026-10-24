@@ -11,11 +11,11 @@ const (
 	RouteAgents
 	RouteSkills
 	RouteSettings
-	RouteDiagnostics
 )
 
-// Routes lists the sidebar in display (and Tab / Ctrl+N) order.
-var Routes = []Route{RouteHome, RouteHistory, RouteAgents, RouteSkills, RouteSettings, RouteDiagnostics}
+// Routes lists the sidebar in display order. Diagnostics is a section of
+// Settings, not a route.
+var Routes = []Route{RouteHome, RouteHistory, RouteAgents, RouteSkills, RouteSettings}
 
 func (r Route) labelKey() string {
 	switch r {
@@ -29,8 +29,6 @@ func (r Route) labelKey() string {
 		return "nav.skills"
 	case RouteSettings:
 		return "nav.settings"
-	case RouteDiagnostics:
-		return "nav.diagnostics"
 	}
 	return "nav.home"
 }
@@ -45,19 +43,28 @@ func (r Route) icon() icon.Name {
 		return icon.Sparkles
 	case RouteSettings:
 		return icon.Settings3
-	case RouteDiagnostics:
-		return icon.Heartbeat
 	}
 	return icon.Chat1
 }
 
-func (r Route) valid() bool { return r >= RouteHome && r <= RouteDiagnostics }
+// Implemented reports whether the route has content yet. The others are
+// shown in the sidebar as "Soon" and cannot be reached at all: not by
+// click, Tab, shortcut or Navigate.
+func (r Route) Implemented() bool { return r == RouteHome || r == RouteSettings }
 
-// Implemented reports whether the route has real content yet; the others
-// render a placeholder.
-func (r Route) Implemented() bool {
-	return r == RouteHome || r == RouteSettings || r == RouteDiagnostics
+// NavRoutes are the reachable routes in display order; Tab and Ctrl+1…
+// walk them, so their shortcuts have no gaps.
+func NavRoutes() []Route {
+	var out []Route
+	for _, r := range Routes {
+		if r.Implemented() {
+			out = append(out, r)
+		}
+	}
+	return out
 }
+
+func (r Route) valid() bool { return r >= RouteHome && r <= RouteSettings && r.Implemented() }
 
 const maxHistory = 32
 
@@ -70,7 +77,8 @@ type Navigator struct {
 
 func (n *Navigator) Current() Route { return n.cur }
 
-// Go switches to r and reports whether the route changed.
+// Go switches to r and reports whether the route changed; routes that are
+// not implemented are refused.
 func (n *Navigator) Go(r Route) bool {
 	if !r.valid() || r == n.cur {
 		return false
@@ -93,10 +101,11 @@ func (n *Navigator) Back() bool {
 	return true
 }
 
-// RouteForShortcut maps Ctrl+1…6 to a route.
+// RouteForShortcut maps Ctrl+1… to the reachable routes in order.
 func RouteForShortcut(digit int) (Route, bool) {
-	if digit < 1 || digit > len(Routes) {
+	nav := NavRoutes()
+	if digit < 1 || digit > len(nav) {
 		return 0, false
 	}
-	return Routes[digit-1], true
+	return nav[digit-1], true
 }

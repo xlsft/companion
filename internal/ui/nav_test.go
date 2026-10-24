@@ -16,9 +16,8 @@ func TestNavigator(t *testing.T) {
 		{"same route", func() bool { return n.Go(RouteHome) }, false, RouteHome},
 		{"invalid", func() bool { return n.Go(Route(99)) }, false, RouteHome},
 		{"to settings", func() bool { return n.Go(RouteSettings) }, true, RouteSettings},
-		{"to diagnostics", func() bool { return n.Go(RouteDiagnostics) }, true, RouteDiagnostics},
-		{"back", n.Back, true, RouteSettings},
-		{"back again", n.Back, true, RouteHome},
+		{"soon route", func() bool { return n.Go(RouteHistory) }, false, RouteSettings},
+		{"back", n.Back, true, RouteHome},
 		{"back empty", n.Back, false, RouteHome},
 	}
 	for _, s := range steps {
@@ -31,7 +30,7 @@ func TestNavigator(t *testing.T) {
 func TestNavigatorHistoryBounded(t *testing.T) {
 	var n Navigator
 	for i := 0; i < 3*maxHistory; i++ {
-		n.Go(Routes[i%len(Routes)])
+		n.Go(NavRoutes()[i%len(NavRoutes())])
 	}
 	if len(n.back) != maxHistory {
 		t.Errorf("history len = %d", len(n.back))
@@ -44,7 +43,7 @@ func TestRouteForShortcut(t *testing.T) {
 		want  Route
 		ok    bool
 	}{
-		{0, 0, false}, {1, RouteHome, true}, {5, RouteSettings, true}, {6, RouteDiagnostics, true}, {7, 0, false},
+		{0, 0, false}, {1, RouteHome, true}, {2, RouteSettings, true}, {3, 0, false}, {6, 0, false},
 	}
 	for _, tt := range tests {
 		r, ok := RouteForShortcut(tt.digit)

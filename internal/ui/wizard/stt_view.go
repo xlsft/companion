@@ -62,7 +62,7 @@ func fmtETA(d time.Duration) string {
 func (t *sttState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) stepBody {
 	b := w.cfg.Backends.STT
 	if b == nil {
-		return stepBody{rows: []layout.Widget{badgeLine(w, th, theme.StatusError, i18n.T(l, "wiz.notWired"))}}
+		return stepBody{rows: []layout.Widget{alert(w, th, theme.StatusError, i18n.T(l, "wiz.notWired"), "")}}
 	}
 	w.mu.Lock()
 	loaded := t.loaded
@@ -70,14 +70,10 @@ func (t *sttState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) ste
 	if !loaded {
 		return stepBody{rows: []layout.Widget{w.text(kit.Muted(th, i18n.T(l, "wiz.loading")))}}
 	}
+	// The two cards are stacked at full width: side by side the short
+	// model card would be stretched to the microphone card's height.
 	return stepBody{rows: []layout.Widget{
-		func(gtx layout.Context) layout.Dimensions {
-			model, mic := t.modelCard(w, th, l, s), t.micCard(w, th, l, s)
-			if gtx.Constraints.Max.X < gtx.Dp(th.Dp(720)) {
-				return vstack(th, 16, model, mic)(gtx)
-			}
-			return grid(th, 2, 16, model, mic)(gtx)
-		},
+		kit.VStack(th, 16, t.modelCard(w, th, l, s), t.micCard(w, th, l, s)),
 	}}
 }
 
@@ -92,19 +88,18 @@ func (t *sttState) modelCard(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot
 	if !ok {
 		shown = rec
 	}
-	head := spread(w.text(caption(th, i18n.T(l, "wiz.stt.recFor"))), func(gtx layout.Context) layout.Dimensions {
-		return chip(th, hardwareChip(l, prof))(gtx)
+	hwTxt := hardwareChip(l, prof)
+	w.frame.texts = append(w.frame.texts, hwTxt)
+	head := kit.Spread(w.text(kit.Caption(th, i18n.T(l, "wiz.stt.recFor"))), func(gtx layout.Context) layout.Dimensions {
+		return kit.Tag(gtx, th, hwTxt, kit.TagAccent)
 	})
-	w.frame.texts = append(w.frame.texts, hardwareChip(l, prof))
+	// The name and its size and languages are two lines, so neither ever
+	// wraps beside the other.
 	var title layout.Widget
 	if shown.ID != "" {
-		name := label(th, 20, shown.Name, th.Pal.Fg)
+		name := kit.Text(th, 20, shown.Name, th.Pal.Fg)
 		name.Font = font.Font{Typeface: theme.Display, Weight: font.SemiBold}
-		nm, meta := w.text(name), w.text(label(th, 14, size(l, shown.Size)+" · "+langsOf(l, shown), th.Pal.Muted))
-		title = func(gtx layout.Context) layout.Dimensions {
-			return layout.Flex{Alignment: layout.Baseline}.Layout(gtx,
-				layout.Rigid(nm), kit.HSpace(th.Dp(10)), layout.Flexed(1, meta))
-		}
+		title = kit.VStack(th, 4, w.text(name), w.text(kit.Text(th, 13, size(l, shown.Size)+" · "+langsOf(l, shown), th.Pal.Muted)))
 	}
 
 	labels := make([]string, len(cat))
@@ -121,11 +116,12 @@ func (t *sttState) modelCard(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot
 			sel = i
 		}
 	}
-	pick := vstack(th, 4, w.text(caption(th, i18n.T(l, "wiz.stt.other"))), func(gtx layout.Context) layout.Dimensions {
-		return t.modelDD.layout(w, gtx, th, labels, sel, i18n.T(l, "wiz.stt.pickModel"), !installing && !s.running)
+	w.frame.texts = append(w.frame.texts, i18n.T(l, "wiz.stt.other"))
+	pick := kit.Labeled(th, i18n.T(l, "wiz.stt.other"), func(gtx layout.Context) layout.Dimensions {
+		return w.dropdown(gtx, th, &t.modelDD, labels, sel, i18n.T(l, "wiz.stt.pickModel"), !installing && !s.running)
 	})
 
-	var action layout.Widget
+	var action, progress layout.Widget
 	switch {
 	case installing:
 		frac := float32(0)
@@ -134,36 +130,43 @@ func (t *sttState) modelCard(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot
 		}
 		left := w.text(kit.Muted(th, i18n.Tf(l, "wiz.stt.progress", size(l, prog.Done), size(l, prog.Total))))
 		right := w.text(kit.Muted(th, i18n.Tf(l, "wiz.stt.rate", prog.Rate/(1<<20), fmtETA(prog.ETA))))
-		action = vstack(th, 6, spread(left, right), bar(th, 6, frac),
-			spread(w.text(kit.Muted(th, i18n.T(l, "wiz.stt.checksum"))), func(gtx layout.Context) layout.Dimensions {
+		progress = kit.VStack(th, 6, kit.Spread(left, right),
+			func(gtx layout.Context) layout.Dimensions { return kit.ProgressBar(gtx, th, 6, frac) },
+			kit.Spread(w.text(kit.Muted(th, i18n.T(l, "wiz.stt.checksum"))), func(gtx layout.Context) layout.Dimensions {
 				return w.btn(gtx, th, ActCancel, kit.ButtonStyle{Kind: kit.Secondary, Small: true, Label: i18n.T(l, "wiz.stt.cancel")}, true)
 			}))
 	case inst[selected]:
 		ready := i18n.T(l, "wiz.stt.ready")
 		w.frame.texts = append(w.frame.texts, ready)
-		action = spread(func(gtx layout.Context) layout.Dimensions {
+		action = kit.HStack(th, 8, func(gtx layout.Context) layout.Dimensions {
 			return kit.Badge(gtx, th, theme.StatusOK, ready)
 		}, func(gtx layout.Context) layout.Dimensions {
 			return w.btn(gtx, th, ActDownload, kit.ButtonStyle{Kind: kit.Secondary, Small: true, Label: i18n.T(l, "wiz.stt.use")}, !s.running)
 		})
 	default:
 		action = func(gtx layout.Context) layout.Dimensions {
-			gtx.Constraints.Min.X = 0
-			return w.btn(gtx, th, ActDownload, kit.ButtonStyle{Kind: kit.Primary, Small: true, Icon: icon.Download2,
+			return w.btn(gtx, th, ActDownload, kit.ButtonStyle{Kind: kit.Primary, Icon: icon.Download2,
 				Label: i18n.T(l, "wiz.stt.download") + " · " + size(l, shown.Size)}, sel >= 0 && !s.running)
 		}
 	}
-	var errs layout.Widget
+	model := func(gtx layout.Context) layout.Dimensions {
+		if action == nil || title == nil || gtx.Constraints.Max.X < gtx.Dp(th.Dp(520)) {
+			return kit.VStack(th, 12, title, action)(gtx)
+		}
+		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+			layout.Flexed(1, title),
+			kit.HSpace(th.Dp(16)),
+			layout.Rigid(action),
+		)
+	}
+	var errs []layout.Widget
 	if installErr != "" {
-		errs = vstack(th, 4, badgeLine(w, th, theme.StatusError, i18n.Tf(l, "wiz.stt.installFailed", installErr)),
-			w.text(kit.Muted(th, fixText(l, installErr))))
+		errs = append(errs, alert(w, th, theme.StatusError, i18n.Tf(l, "wiz.stt.installFailed", installErr), fixText(l, installErr)))
 	}
 	if loadErr != "" {
-		errs = vstack(th, 4, errs, badgeLine(w, th, theme.StatusError, loadErr), w.text(kit.Muted(th, fixText(l, loadErr))))
+		errs = append(errs, alert(w, th, theme.StatusError, loadErr, fixText(l, loadErr)))
 	}
-	return func(gtx layout.Context) layout.Dimensions {
-		return card(gtx, th, 18, vstack(th, 14, head, title, pick, action, errs))
-	}
+	return card(th, kit.VStack(th, 16, append([]layout.Widget{head, model, progress, pick}, errs...)...))
 }
 
 // meterBars are the level meter's bar heights (fractions of its height),
@@ -206,7 +209,7 @@ func (t *sttState) micCard(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) 
 	if !anyInstalled {
 		hint = w.text(kit.Muted(th, i18n.T(l, "wiz.stt.micAfter")))
 	}
-	head := spread(w.text(medium(label(th, 14, i18n.T(l, "wiz.stt.mic"), th.Pal.Fg))), hint)
+	head := kit.Spread(w.text(kit.Subheading(th, i18n.T(l, "wiz.stt.mic"))), hint)
 
 	devLabels := []string{i18n.T(l, "wiz.stt.defaultDevice")}
 	devSel := 0
@@ -216,8 +219,9 @@ func (t *sttState) micCard(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) 
 			devSel = i + 1
 		}
 	}
-	pick := vstack(th, 4, w.text(caption(th, i18n.T(l, "wiz.stt.device"))), func(gtx layout.Context) layout.Dimensions {
-		return t.deviceDD.layout(w, gtx, th, devLabels, devSel, devLabels[0], anyInstalled && !s.running)
+	w.frame.texts = append(w.frame.texts, i18n.T(l, "wiz.stt.device"))
+	pick := kit.Labeled(th, i18n.T(l, "wiz.stt.device"), func(gtx layout.Context) layout.Dimensions {
+		return w.dropdown(gtx, th, &t.deviceDD, devLabels, devSel, devLabels[0], anyInstalled && !s.running)
 	})
 
 	var level float32
@@ -244,16 +248,14 @@ func (t *sttState) micCard(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) 
 	}
 	var meterErrs layout.Widget
 	if meterErr != "" {
-		meterErrs = vstack(th, 4, badgeLine(w, th, theme.StatusError, meterErr), w.text(kit.Muted(th, fixText(l, meterErr))))
+		meterErrs = alert(w, th, theme.StatusError, meterErr, fixText(l, meterErr))
 	}
 
-	readCap := w.text(caption(th, i18n.T(l, "wiz.stt.readAloud")))
-	phrase := w.text(label(th, 16, "«"+readiness.MicPhrase(string(l))+"»", th.Pal.Fg))
+	readCap := w.text(kit.Caption(th, i18n.T(l, "wiz.stt.readAloud")))
+	phrase := w.text(kit.Text(th, 16, "«"+readiness.MicPhrase(string(l))+"»", th.Pal.Fg))
 	phraseBox := func(gtx layout.Context) layout.Dimensions {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
-		return box(gtx, th, 4, th.Pal.Bg, th.Pal.Border, func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Top: th.Dp(12), Bottom: th.Dp(12), Left: th.Dp(14), Right: th.Dp(14)}.Layout(gtx, vstack(th, 4, readCap, phrase))
-		})
+		return kit.Box(gtx, th, th.Pal.Bg, th.Pal.Border, 4, kit.Pad(th, 12, 14, kit.VStack(th, 4, readCap, phrase)))
 	}
 
 	act, key := ActCheck, "wiz.stt.record"
@@ -266,18 +268,16 @@ func (t *sttState) micCard(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) 
 	}
 	var heard layout.Widget
 	if transcript != "" {
-		heard = w.text(label(th, 13, i18n.Tf(l, "wiz.stt.heard", transcript), th.Pal.Fg2))
+		heard = w.text(kit.Text(th, 13, i18n.Tf(l, "wiz.stt.heard", transcript), th.Pal.Fg2))
 	}
-	return func(gtx layout.Context) layout.Dimensions {
-		return card(gtx, th, 18, vstack(th, 14, head, pick, meterRow, meterErrs, phraseBox, centered(record), heard))
-	}
-}
-
-// centered centres a widget that takes its natural width.
-func centered(w layout.Widget) layout.Widget {
-	return func(gtx layout.Context) layout.Dimensions {
-		return layout.Flex{Axis: layout.Vertical, Alignment: layout.Middle}.Layout(gtx, layout.Rigid(w))
-	}
+	left := kit.VStack(th, 14, pick, meterRow, meterErrs)
+	right := kit.VStack(th, 14, phraseBox, kit.Centered(record), heard)
+	return card(th, kit.VStack(th, 16, head, func(gtx layout.Context) layout.Dimensions {
+		if gtx.Constraints.Max.X < gtx.Dp(th.Dp(600)) {
+			return kit.VStack(th, 14, left, right)(gtx)
+		}
+		return kit.Grid(th, 2, 24, left, right)(gtx)
+	}))
 }
 
 func (t *sttState) footer(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) footerSpec {

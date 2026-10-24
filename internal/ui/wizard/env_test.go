@@ -28,7 +28,7 @@ func TestNoEnvironmentNames(t *testing.T) {
 			}
 			h.eventually("step "+string(st), func() bool { return h.view() == st })
 			if st == readiness.StepPlatform {
-				h.eventually("report", func() bool { return h.shows(i18n.T(lang, "wiz.platform.col.means")) })
+				h.eventually("report", func() bool { return h.shows(i18n.T(lang, "cap.col.means")) })
 			}
 			for _, s := range h.w.frame.texts {
 				if s == (fakePerm{}).HotkeyInstructions() {

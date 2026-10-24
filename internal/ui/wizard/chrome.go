@@ -4,10 +4,8 @@ import (
 	"image/color"
 	"slices"
 
-	"gioui.org/font"
 	"gioui.org/io/semantic"
 	"gioui.org/layout"
-	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
@@ -47,12 +45,6 @@ func (w *Wizard) btn(gtx layout.Context, th *theme.Theme, a Action, b kit.Button
 	return b.Layout(gtx, th, w.clickable(a))
 }
 
-// text records a label for the frame and returns its widget.
-func (w *Wizard) text(l material.LabelStyle) layout.Widget {
-	w.frame.texts = append(w.frame.texts, l.Text)
-	return l.Layout
-}
-
 // Layout draws the wizard: aside, header, current step, footer.
 func (w *Wizard) Layout(gtx layout.Context, th *theme.Theme, l i18n.Lang) layout.Dimensions {
 	w.frame = frameRecord{}
@@ -63,7 +55,7 @@ func (w *Wizard) Layout(gtx layout.Context, th *theme.Theme, l i18n.Lang) layout
 	w.update(gtx, s, l)
 	s = w.snap()
 
-	fillRect(gtx, th.Pal.Bg)
+	kit.Fill(gtx, th.Pal.Bg)
 	return layout.Flex{}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return w.aside(gtx, th, l, s) }),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.VDivider(gtx, th) }),
@@ -101,12 +93,8 @@ func (w *Wizard) update(gtx layout.Context, s snapshot, l i18n.Lang) {
 	if w.clicked(gtx, ActQuit) && w.cfg.OnQuit != nil {
 		go w.cfg.OnQuit()
 	}
-	if w.clicked(gtx, ActLanguage) && w.cfg.SetLanguage != nil {
-		next := i18n.EN
-		if l == i18n.EN {
-			next = i18n.RU
-		}
-		go w.cfg.SetLanguage(next)
+	if i := w.langDD.Update(gtx, len(i18n.Languages)); i >= 0 && w.cfg.SetLanguage != nil {
+		go w.cfg.SetLanguage(i18n.Languages[i].Code)
 	}
 	switch s.view() {
 	case readiness.StepPermissions:
@@ -130,30 +118,29 @@ func (w *Wizard) aside(gtx layout.Context, th *theme.Theme, l i18n.Lang, s snaps
 	width := min(gtx.Dp(th.Dp(272)), gtx.Constraints.Max.X*2/5)
 	gtx.Constraints.Min.X, gtx.Constraints.Max.X = width, width
 	gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
-	fillRect(gtx, th.Pal.Sidebar)
-	steps := make([]layout.FlexChild, 0, 2*len(readiness.Steps))
-	for i, st := range readiness.Steps {
-		if i > 0 {
-			steps = append(steps, kit.VSpace(th.Dp(2)))
-		}
-		steps = append(steps, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return w.stepEntry(gtx, th, l, s, i, st)
-		}))
-	}
+	kit.Fill(gtx, th.Pal.Sidebar)
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return layout.Inset{Left: th.Dp(20), Right: th.Dp(20)}.Layout(gtx, fixedH(th, 54, func(gtx layout.Context) layout.Dimensions {
+			return layout.Inset{Left: th.Dp(20), Right: th.Dp(20)}.Layout(gtx, kit.FixedH(th, 54, func(gtx layout.Context) layout.Dimensions {
 				return kit.Logo(gtx, th, 15)
 			}))
 		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.Divider(gtx, th) }),
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Top: th.Dp(12), Left: th.Dp(8), Right: th.Dp(8)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{Axis: layout.Vertical}.Layout(gtx, steps...)
+		// The steps scroll when large text leaves too little height, so
+		// the footer with Diagnostics and the language always fits.
+		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+			w.asideList.Axis = layout.Vertical
+			return material.List(th.Theme, &w.asideList).Layout(gtx, len(readiness.Steps), func(gtx layout.Context, i int) layout.Dimensions {
+				in := layout.Inset{Top: th.Dp(2), Left: th.Dp(8), Right: th.Dp(8)}
+				if i == 0 {
+					in.Top = th.Dp(12)
+				}
+				return in.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					return w.stepEntry(gtx, th, l, s, i, readiness.Steps[i])
+				})
 			})
 		}),
-		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return layout.Dimensions{Size: gtx.Constraints.Min} }),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.Divider(gtx, th) }),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return layout.UniformInset(th.Dp(12)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
@@ -163,28 +150,14 @@ func (w *Wizard) aside(gtx layout.Context, th *theme.Theme, l i18n.Lang, s snaps
 	)
 }
 
-// asideFoot is Diagnostics plus the version and language switch.
+// asideFoot is Diagnostics plus the version and the language picker.
 func (w *Wizard) asideFoot(gtx layout.Context, th *theme.Theme, l i18n.Lang) layout.Dimensions {
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
 	diag := func(gtx layout.Context) layout.Dimensions {
 		w.frame.actions = append(w.frame.actions, ActDiagnostics)
 		txt := i18n.T(l, "wiz.diagnostics")
 		w.frame.texts = append(w.frame.texts, txt)
-		c := w.clickable(ActDiagnostics)
-		return kit.FocusRing(gtx, th, gtx.Focused(c), func(gtx layout.Context) layout.Dimensions {
-			return c.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				gtx.Constraints.Min.X = gtx.Constraints.Max.X
-				col := th.Pal.Muted
-				bg := th.Pal.Sidebar
-				if c.Hovered() {
-					bg, col = th.Pal.Hover, th.Pal.Fg
-				}
-				return box(gtx, th, 4, bg, bg, func(gtx layout.Context) layout.Dimensions {
-					return layout.Inset{Left: th.Dp(12), Right: th.Dp(12)}.Layout(gtx, fixedH(th, 36,
-						hstack(th, 10, iconW(th, icon.Heartbeat, 16, col), label(th, 14, txt, col).Layout)))
-				})
-			})
-		})
+		return kit.NavItem(gtx, th, w.clickable(ActDiagnostics), icon.Heartbeat, txt, false)
 	}
 	var meta layout.Widget
 	if w.cfg.Version != "" || w.cfg.SetLanguage != nil {
@@ -193,37 +166,33 @@ func (w *Wizard) asideFoot(gtx layout.Context, th *theme.Theme, l i18n.Lang) lay
 			ver = w.text(kit.Small(th, "v"+w.cfg.Version))
 		}
 		if w.cfg.SetLanguage != nil {
-			lang = func(gtx layout.Context) layout.Dimensions { return w.langButton(gtx, th, l) }
+			lang = func(gtx layout.Context) layout.Dimensions { return w.langPicker(gtx, th, l) }
 		}
 		meta = func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Top: th.Dp(8), Left: th.Dp(12), Right: th.Dp(12)}.Layout(gtx, spread(ver, lang))
+			return layout.Inset{Top: th.Dp(8), Left: th.Dp(6)}.Layout(gtx, kit.Spread(ver, lang))
 		}
 	}
-	return vstack(th, 2, diag, meta)(gtx)
+	return kit.VStack(th, 2, diag, meta)(gtx)
 }
 
-// langButton shows the current interface language and switches to the
-// other one.
-func (w *Wizard) langButton(gtx layout.Context, th *theme.Theme, l i18n.Lang) layout.Dimensions {
+// langPicker is the interface language select, each language under its
+// own name.
+func (w *Wizard) langPicker(gtx layout.Context, th *theme.Theme, l i18n.Lang) layout.Dimensions {
 	w.frame.actions = append(w.frame.actions, ActLanguage)
-	txt := "RU"
-	if l == i18n.EN {
-		txt = "EN"
+	names := make([]string, len(i18n.Languages))
+	sel := 0
+	for i, lg := range i18n.Languages {
+		names[i] = lg.Native
+		if lg.Code == l {
+			sel = i
+		}
 	}
-	w.frame.texts = append(w.frame.texts, txt)
-	c := w.clickable(ActLanguage)
-	return kit.FocusRing(gtx, th, gtx.Focused(c), func(gtx layout.Context) layout.Dimensions {
-		return c.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			semantic.DescriptionOp(i18n.T(l, "wiz.language")).Add(gtx.Ops)
-			bg := th.Pal.Surface
-			if c.Hovered() {
-				bg = th.Pal.Hover
-			}
-			return box(gtx, th, 4, bg, th.Pal.Divider, func(gtx layout.Context) layout.Dimensions {
-				return layout.Inset{Left: th.Dp(8), Right: th.Dp(8)}.Layout(gtx, fixedH(th, 26, label(th, 11, txt, th.Pal.Fg).Layout))
-			})
-		})
-	})
+	w.frame.texts = append(w.frame.texts, names[sel])
+	if w.langDD.Opened() {
+		w.frame.texts = append(w.frame.texts, names...)
+	}
+	gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(th.Dp(156)))
+	return w.langDD.Layout(gtx, th, names, sel, names[sel])
 }
 
 // stepState is how the aside shows a step.
@@ -285,27 +254,26 @@ func (w *Wizard) stepEntry(gtx layout.Context, th *theme.Theme, l i18n.Lang, s s
 	if !unlocked {
 		gtx = gtx.Disabled()
 	}
-	num := label(th, 11, string(rune('1'+i)), th.Pal.Fg)
+	num := string(rune('1' + i))
 	var mark, trail layout.Widget
-	fg, bg := th.Pal.Fg, th.Pal.Sidebar
+	fg, bg := th.Pal.Fg, color.NRGBA{}
+	plain := kit.NumberDisc(th, 22, num, th.Pal.Fg2, color.NRGBA{}, th.Pal.Border, false)
 	switch state {
 	case stepCurrent:
-		bg = soft(th, th.Pal.AccentLine, 0.12)
-		num.Color, num.Font.Weight = th.Pal.AccentFg, font.Bold
-		mark = disc(th, 22, th.Pal.AccentLine, transparent, num.Layout)
+		bg = th.Pal.AccentSoft
+		mark = kit.NumberDisc(th, 22, num, th.Pal.AccentFg, th.Pal.AccentLine, color.NRGBA{}, true)
 	case stepDone:
 		fg = th.Pal.Fg2
-		mark = disc(th, 22, soft(th, th.Pal.OK, 0.16), transparent, iconW(th, icon.Check, 12, th.Pal.OK))
+		mark = kit.Disc(th, 22, th.Pal.OKSoft, color.NRGBA{}, kit.IconW(th, icon.Check, 12, th.Pal.OK))
 	case stepFailed:
-		mark = disc(th, 22, transparent, th.Pal.Border, num.Layout)
-		trail = iconW(th, icon.Close, 14, th.Pal.Error)
+		mark = plain
+		trail = kit.IconW(th, icon.Close, 14, th.Pal.Error)
 	case stepOpen:
-		mark = disc(th, 22, transparent, th.Pal.Border, num.Layout)
+		mark = plain
 	default:
 		fg = th.Pal.Subtle
-		num.Color = th.Pal.Subtle
-		mark = disc(th, 22, transparent, th.Pal.Border, num.Layout)
-		trail = iconW(th, icon.Lock, 14, th.Pal.Subtle)
+		mark = kit.NumberDisc(th, 22, num, th.Pal.Subtle, color.NRGBA{}, th.Pal.Border, false)
+		trail = kit.IconW(th, icon.Lock, 14, th.Pal.Subtle)
 	}
 	b := &w.stepBtns[i]
 	if state != stepCurrent && unlocked && b.Hovered() {
@@ -315,14 +283,14 @@ func (w *Wizard) stepEntry(gtx layout.Context, th *theme.Theme, l i18n.Lang, s s
 		return b.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			semantic.DescriptionOp(name + ", " + word).Add(gtx.Ops)
 			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return box(gtx, th, 4, bg, transparent, func(gtx layout.Context) layout.Dimensions {
-				return layout.Inset{Left: th.Dp(12), Right: th.Dp(12)}.Layout(gtx, fixedH(th, 40, func(gtx layout.Context) layout.Dimensions {
+			return kit.Box(gtx, th, bg, color.NRGBA{}, 4, func(gtx layout.Context) layout.Dimensions {
+				return layout.Inset{Left: th.Dp(12), Right: th.Dp(12)}.Layout(gtx, kit.FixedH(th, 40, func(gtx layout.Context) layout.Dimensions {
 					gtx.Constraints.Min.X = gtx.Constraints.Max.X
 					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 						layout.Rigid(mark),
 						kit.HSpace(th.Dp(10)),
 						layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-							t := label(th, 14, name, fg)
+							t := kit.Text(th, 14, name, fg)
 							t.MaxLines = 1
 							return t.Layout(gtx)
 						}),
@@ -343,8 +311,8 @@ func (w *Wizard) header(gtx layout.Context, th *theme.Theme, l i18n.Lang, s snap
 	i := slices.Index(readiness.Steps, s.view())
 	n := len(readiness.Steps)
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
-	counter := w.text(label(th, 14, i18n.Tf(l, "wiz.stepOf", i+1, n), th.Pal.Muted))
-	return layout.Inset{Left: th.Dp(32), Right: th.Dp(32)}.Layout(gtx, fixedH(th, 54, func(gtx layout.Context) layout.Dimensions {
+	counter := w.text(kit.Text(th, 14, i18n.Tf(l, "wiz.stepOf", i+1, n), th.Pal.Muted))
+	return layout.Inset{Left: th.Dp(32), Right: th.Dp(32)}.Layout(gtx, kit.FixedH(th, 54, func(gtx layout.Context) layout.Dimensions {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 			layout.Rigid(counter),
@@ -364,11 +332,10 @@ func (w *Wizard) header(gtx layout.Context, th *theme.Theme, l i18n.Lang, s snap
 	}))
 }
 
-// stepBody is what a step contributes to the frame.
+// stepBody is what a step contributes to the frame: rows of the page,
+// each spanning the content column.
 type stepBody struct {
 	rows []layout.Widget
-	// maxW caps the body width (dp), 0 for the full column.
-	maxW float32
 }
 
 func (w *Wizard) content(gtx layout.Context, th *theme.Theme, l i18n.Lang, s snapshot) layout.Dimensions {
@@ -388,17 +355,16 @@ func (w *Wizard) content(gtx layout.Context, th *theme.Theme, l i18n.Lang, s sna
 	case readiness.StepEndToEnd:
 		body = w.e2eBody(th, l, s)
 	}
-	head := vstack(th, 8,
+	head := kit.VStack(th, 8,
 		w.text(kit.Heading(th, i18n.T(l, "wiz.head."+string(st)))),
-		maxWidth(th, 640, w.text(kit.Lead(th, i18n.T(l, "wiz.step."+string(st)+".intro")))),
+		kit.MaxWidth(th, 640, w.text(kit.Lead(th, i18n.T(l, "wiz.step."+string(st)+".intro")))),
 	)
 	rows := append([]layout.Widget{head}, body.rows...)
 	rows = append(rows, w.resultRows(th, l, s, st)...)
 	// The list spans the whole column so its scrollbar sits at the window
-	// edge; the page padding and width cap apply per row.
+	// edge; the page padding applies per row and every row spans the rest.
 	return material.List(th.Theme, &w.list).Layout(gtx, len(rows), func(gtx layout.Context, i int) layout.Dimensions {
-		// The page margin shrinks in narrow windows and at large text sizes.
-		side := min(th.Dp(56), unit.Dp(float32(gtx.Constraints.Max.X)/14/gtx.Metric.PxPerDp))
+		side := kit.PageMargin(gtx, th, 56)
 		in := layout.Inset{Top: th.Dp(22), Left: side, Right: side}
 		if i == 0 {
 			in.Top = th.Dp(36)
@@ -408,10 +374,7 @@ func (w *Wizard) content(gtx layout.Context, th *theme.Theme, l i18n.Lang, s sna
 			in.Bottom = th.Dp(28)
 		}
 		return in.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			gtx.Constraints.Min.X = 0
-			if body.maxW > 0 && i > 0 {
-				gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(th.Dp(body.maxW)))
-			}
+			gtx.Constraints.Min.X = gtx.Constraints.Max.X
 			return rows[i](gtx)
 		})
 	})
@@ -450,32 +413,19 @@ func shownCode(c string) string {
 	return c
 }
 
-// failure is a panel row: error tile, what failed and how to fix it.
+// failure is a tinted status row in its own panel: what failed, the
+// subsystem and status code, and how to fix it.
 func (w *Wizard) failure(th *theme.Theme, l i18n.Lang, st readiness.Step, code string) layout.Widget {
-	title := w.text(medium(label(th, 14, i18n.T(l, "wiz.result.failed"), th.Pal.Fg)))
-	meta := w.text(kit.Muted(th, i18n.Tf(l, "wiz.result.subsystem", i18n.T(l, "wiz.subsystem."+string(st)))+" · "+
-		i18n.Tf(l, "wiz.result.status", shownCode(code))))
-	fix := w.text(label(th, 13, i18n.Tf(l, "wiz.result.fix", fixText(l, code)), th.Pal.Fg2))
-	word := i18n.T(l, "wiz.e2e.failed")
-	w.frame.texts = append(w.frame.texts, word)
-	return func(gtx layout.Context) layout.Dimensions {
-		return kit.Rows(gtx, th, func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Top: th.Dp(16), Bottom: th.Dp(16), Left: th.Dp(20), Right: th.Dp(20)}.Layout(gtx,
-				func(gtx layout.Context) layout.Dimensions {
-					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							return kit.IconTile(gtx, th, icon.Close, th.Pal.Error)
-						}),
-						kit.HSpace(th.Dp(16)),
-						layout.Flexed(1, vstack(th, 2, title, meta, fix)),
-						kit.HSpace(th.Dp(16)),
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							return kit.Badge(gtx, th, theme.StatusError, word)
-						}),
-					)
-				})
-		})
-	}
+	return rows(th, w.statusRow(th, kit.StatusRow{
+		Icon:  icon.Close,
+		Title: i18n.T(l, "wiz.result.failed"),
+		Caption: i18n.Tf(l, "wiz.result.subsystem", i18n.T(l, "wiz.subsystem."+string(st))) + " · " +
+			i18n.Tf(l, "wiz.result.status", shownCode(code)),
+		Detail: i18n.Tf(l, "wiz.result.fix", fixText(l, code)),
+		Status: theme.StatusError,
+		Badge:  i18n.T(l, "wiz.e2e.failed"),
+		Tint:   true,
+	}))
 }
 
 // fixText is the fix action for a technical code.
@@ -520,14 +470,14 @@ func (w *Wizard) footer(gtx layout.Context, th *theme.Theme, l i18n.Lang, s snap
 		}
 	}
 	if f.status != "" {
-		st := label(th, 12, f.status, th.Pal.Muted)
+		st := kit.Text(th, 12, f.status, th.Pal.Muted)
 		st.MaxLines = 1 // the footer keeps its height at large text sizes
 		status = w.text(st)
 	}
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
-	return layout.Inset{Left: th.Dp(32), Right: th.Dp(32)}.Layout(gtx, fixedH(th, 72, func(gtx layout.Context) layout.Dimensions {
+	return layout.Inset{Left: th.Dp(32), Right: th.Dp(32)}.Layout(gtx, kit.FixedH(th, 72, func(gtx layout.Context) layout.Dimensions {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
-		return spread(hstack(th, 8, back, status), hstack(th, 8, f.secondary, f.primary))(gtx)
+		return kit.Spread(kit.HStack(th, 8, back, status), kit.HStack(th, 8, f.secondary, f.primary))(gtx)
 	}))
 }
 
@@ -577,5 +527,3 @@ func (w *Wizard) checkClicked(gtx layout.Context) bool {
 	a, b := w.clicked(gtx, ActCheck), w.clicked(gtx, ActRecheck)
 	return a || b
 }
-
-var transparent color.NRGBA

@@ -10,12 +10,14 @@ import (
 	"gioui.org/widget/material"
 
 	"github.com/xlsft/companion/internal/settings"
+	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 // TTS speed range mirrors settings.Validate; the slider snaps to sliderSnap
-// and the Slower/Faster buttons (the keyboard path) move by buttonStep.
+// and arrow keys move it by buttonStep.
 const (
 	speedMin   = 0.5
 	speedMax   = 1.5
@@ -37,18 +39,79 @@ func sliderFromSpeed(s float64) float32 { return float32((s - speedMin) / (speed
 
 func stepSpeed(cur float64, dir int) float64 { return clampSpeed(cur + float64(dir)*buttonStep) }
 
-// settingsPage renders FR-UI-004 groups bound to the settings service. The
-// widgets are a view: every frame they are reset from the service, so a
-// rejected update snaps back to the stored value.
+// settingsSection is a group of Settings, shown one at a time.
+type settingsSection int
+
+const (
+	secGeneral settingsSection = iota
+	secVoice
+	secScreen
+	secPrivacy
+	secDiagnostics
+)
+
+var settingsSections = []settingsSection{secGeneral, secVoice, secScreen, secPrivacy, secDiagnostics}
+
+func (s settingsSection) key() string {
+	switch s {
+	case secVoice:
+		return "settings.sec.voice"
+	case secScreen:
+		return "settings.sec.screen"
+	case secPrivacy:
+		return "settings.sec.privacy"
+	case secDiagnostics:
+		return "settings.sec.diagnostics"
+	}
+	return "settings.sec.general"
+}
+
+func (s settingsSection) icon() icon.Name {
+	switch s {
+	case secVoice:
+		return icon.Mic
+	case secScreen:
+		return icon.Computer
+	case secPrivacy:
+		return icon.Lock
+	case secDiagnostics:
+		return icon.Heartbeat
+	}
+	return icon.Settings3
+}
+
+// sectionByName finds a section by its key suffix, e.g. "diagnostics".
+func sectionByName(name string) (settingsSection, bool) {
+	for _, s := range settingsSections {
+		if s.key() == "settings.sec."+name {
+			return s, true
+		}
+	}
+	return 0, false
+}
+
+// settingsPage renders FR-UI-004 bound to the settings service, one
+// section at a time after Settings.dc.html. The widgets are a view: every
+// frame they are reset from the service, so a rejected update snaps back
+// to the stored value. Settings the app does not act on yet are shown
+// disabled with a "Soon" tag, never as if they worked.
 type settingsPage struct {
 	store SettingsStore
 	list  widget.List
+	diag  *diagView
+	// jump returns a section switch requested from outside (the tray).
+	jump func() (settingsSection, bool)
 
-	hotkey, screenTarget, uiLang widget.Enum
+	section settingsSection
+	secBtns [5]widget.Clickable
+	// secDD stands in for the section list in a narrow page.
+	secDD kit.Dropdown
 
-	speed          widget.Float
-	speedPending   bool
-	slower, faster widget.Clickable
+	hotkey, screenTarget widget.Enum
+	uiLang               kit.Dropdown
+
+	speed        kit.Slider
+	speedPending bool
 
 	keepShots, memory, saveText, shareDiag, login, tray widget.Bool
 
@@ -69,6 +132,22 @@ func (p *settingsPage) apply(fn func(*settings.Settings)) {
 
 // update turns widget events into settings writes.
 func (p *settingsPage) update(gtx layout.Context) {
+	if p.jump != nil {
+		if s, ok := p.jump(); ok {
+			p.section = s
+			p.list.Position = layout.Position{}
+		}
+	}
+	for i := range p.secBtns {
+		if p.secBtns[i].Clicked(gtx) && p.section != settingsSections[i] {
+			p.section = settingsSections[i]
+			p.list.Position = layout.Position{}
+		}
+	}
+	if i := p.secDD.Update(gtx, len(settingsSections)); i >= 0 {
+		p.section = settingsSections[i]
+		p.list.Position = layout.Position{}
+	}
 	if p.hotkey.Update(gtx) {
 		v := settings.HotkeyMode(p.hotkey.Value)
 		p.apply(func(s *settings.Settings) { s.Voice.HotkeyMode = v })
@@ -77,8 +156,8 @@ func (p *settingsPage) update(gtx layout.Context) {
 		v := settings.ScreenTarget(p.screenTarget.Value)
 		p.apply(func(s *settings.Settings) { s.Screen.Target = v })
 	}
-	if p.uiLang.Update(gtx) {
-		v := p.uiLang.Value
+	if i := p.uiLang.Update(gtx, len(i18n.Languages)); i >= 0 {
+		v := string(i18n.Languages[i].Code)
 		p.apply(func(s *settings.Settings) { s.UI.Language = v })
 	}
 	for _, b := range []struct {
@@ -97,23 +176,18 @@ func (p *settingsPage) update(gtx layout.Context) {
 			p.apply(func(s *settings.Settings) { set(s, v) })
 		}
 	}
-	if p.speed.Update(gtx) {
+	moved, steps := p.speed.Update(gtx)
+	if moved {
 		p.speedPending = true
 	}
 	// Persist a drag once it ends, not on every motion event.
-	if p.speedPending && !p.speed.Dragging() {
+	if p.speedPending && !p.speed.Float.Dragging() {
 		p.speedPending = false
-		v := speedFromSlider(p.speed.Value)
+		v := speedFromSlider(p.speed.Float.Value)
 		p.apply(func(s *settings.Settings) { s.Voice.TTSSpeed = v })
 	}
-	for _, b := range []struct {
-		w   *widget.Clickable
-		dir int
-	}{{&p.slower, -1}, {&p.faster, 1}} {
-		if b.w.Clicked(gtx) {
-			dir := b.dir
-			p.apply(func(s *settings.Settings) { s.Voice.TTSSpeed = stepSpeed(s.Voice.TTSSpeed, dir) })
-		}
+	if steps != 0 {
+		p.apply(func(s *settings.Settings) { s.Voice.TTSSpeed = stepSpeed(s.Voice.TTSSpeed, steps) })
 	}
 }
 
@@ -121,15 +195,14 @@ func (p *settingsPage) update(gtx layout.Context) {
 func (p *settingsPage) sync(s settings.Settings) {
 	p.hotkey.Value = string(s.Voice.HotkeyMode)
 	p.screenTarget.Value = string(s.Screen.Target)
-	p.uiLang.Value = s.UI.Language
 	p.keepShots.Value = s.Screen.KeepScreenshots
 	p.memory.Value = s.Memory.Enabled
 	p.saveText.Value = s.Privacy.SaveTranscripts
 	p.shareDiag.Value = s.Privacy.ShareDiagnostics
 	p.login.Value = s.Platform.LaunchAtLogin
 	p.tray.Value = s.Platform.TrayIcon
-	if !p.speed.Dragging() && !p.speedPending {
-		p.speed.Value = sliderFromSpeed(s.Voice.TTSSpeed)
+	if !p.speed.Float.Dragging() && !p.speedPending {
+		p.speed.Float.Value = sliderFromSpeed(s.Voice.TTSSpeed)
 	}
 }
 
@@ -138,108 +211,178 @@ func (p *settingsPage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layou
 	cur := p.store.Get()
 	p.sync(cur)
 
-	radio := func(e *widget.Enum, key, label string) layout.FlexChild {
-		return layout.Rigid(material.RadioButton(th.Theme, e, key, label).Layout)
-	}
-	check := func(b *widget.Bool, label string) layout.FlexChild {
-		return layout.Rigid(material.CheckBox(th.Theme, b, label).Layout)
-	}
-	label := func(txt string) layout.FlexChild { return layout.Rigid(body(th, txt).Layout) }
-	later := layout.Rigid(muted(th, T(l, "settings.later")).Layout)
-
-	speedNow := cur.Voice.TTSSpeed
-	if p.speedPending || p.speed.Dragging() {
-		speedNow = speedFromSlider(p.speed.Value)
-	}
-	lang := T(l, "voice.languageAuto")
-	if cur.Voice.Language != "auto" {
-		lang = cur.Voice.Language
-	}
-
-	groups := []struct {
-		key  string
-		rows []layout.FlexChild
-	}{
-		{"group.voice", []layout.FlexChild{
-			label(T(l, "voice.hotkeyMode")),
-			radio(&p.hotkey, string(settings.HotkeyHold), T(l, "voice.hold")),
-			radio(&p.hotkey, string(settings.HotkeyToggle), T(l, "voice.toggle")),
-			radio(&p.hotkey, string(settings.HotkeyHandsfree), T(l, "voice.handsfree")),
-			vspace(8),
-			label(Tf(l, "voice.language", lang)),
-		}},
-		{"group.models", p.modelRows(th, l, cur.Models)},
-		{"group.tts", []layout.FlexChild{
-			label(Tf(l, "tts.speed", speedNow)),
-			vspace(4),
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						return kit.SecondaryButton(gtx, th, &p.slower, T(l, "tts.slower"))
-					}),
-					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-						return layout.Inset{Left: 12, Right: 12}.Layout(gtx, material.Slider(th.Theme, &p.speed).Layout)
-					}),
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						return kit.SecondaryButton(gtx, th, &p.faster, T(l, "tts.faster"))
-					}),
-				)
-			}),
-		}},
-		{"group.screen", []layout.FlexChild{
-			label(T(l, "screen.target")),
-			radio(&p.screenTarget, string(settings.ScreenActive), T(l, "screen.active")),
-			radio(&p.screenTarget, string(settings.ScreenAll), T(l, "screen.all")),
-			check(&p.keepShots, T(l, "screen.keepShots")),
-		}},
-		{"group.memory", []layout.FlexChild{check(&p.memory, T(l, "memory.enabled"))}},
-		{"group.agents", []layout.FlexChild{later}},
-		{"group.integrations", []layout.FlexChild{later}},
-		{"group.privacy", []layout.FlexChild{
-			check(&p.saveText, T(l, "privacy.saveText")),
-			check(&p.shareDiag, T(l, "privacy.shareDiag")),
-		}},
-		{"group.platform", []layout.FlexChild{
-			label(T(l, "platform.uiLang")),
-			radio(&p.uiLang, string(LangRU), "Русский"),
-			radio(&p.uiLang, string(LangEN), "English"),
-			check(&p.login, T(l, "platform.login")),
-			check(&p.tray, T(l, "platform.tray")),
-		}},
-	}
-
+	var actions layout.Widget
 	var rows []layout.Widget
+	if p.section == secDiagnostics && p.diag != nil {
+		s := p.diag.update(gtx)
+		actions = p.diag.actions(th, l, s)
+		rows = p.diag.rows(th, l, s)
+	} else {
+		rows = p.sectionRows(th, l, cur)
+	}
+	title := T(l, p.section.key())
+	rows = append([]layout.Widget{kit.Title(th, title).Layout}, rows...)
 	if p.saveErr {
-		rows = append(rows, func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Bottom: 12}.Layout(gtx, th.StatusLabel(theme.StatusError, T(l, "settings.saveError")).Layout)
-		})
+		rows = append(rows[:1], append([]layout.Widget{func(gtx layout.Context) layout.Dimensions {
+			return kit.Alert(gtx, th, theme.StatusError, T(l, "settings.saveError"), T(l, "settings.saveError.d"))
+		}}, rows[1:]...)...)
 	}
-	for _, g := range groups {
-		rows = append(rows, func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Bottom: 12}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				gtx.Constraints.Min.X = gtx.Constraints.Max.X
-				return card(gtx, th, func(gtx layout.Context) layout.Dimensions {
-					rows := append([]layout.FlexChild{layout.Rigid(subheading(th, T(l, g.key)).Layout), vspace(8)}, g.rows...)
-					return layout.Flex{Axis: layout.Vertical}.Layout(gtx, rows...)
-				})
-			})
-		})
-	}
-	return pageScaffold(gtx, th, T(l, "settings.heading"), nil, &p.list, rows)
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return kit.PageHeader(gtx, th, kit.Breadcrumb(th, T(l, "settings.heading"), title), actions)
+		}),
+		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+			// A narrow page (small window, large text) has no room for the
+			// section list beside the panels; a select takes its place.
+			if gtx.Constraints.Max.X < gtx.Dp(th.Dp(196+520)) {
+				return p.content(gtx, th, append([]layout.Widget{p.sectionPicker(th, l)}, rows...))
+			}
+			return layout.Flex{}.Layout(gtx,
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions { return p.subnav(gtx, th, l) }),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.VDivider(gtx, th) }),
+				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return p.content(gtx, th, rows) }),
+			)
+		}),
+	)
 }
 
-func (p *settingsPage) modelRows(th *theme.Theme, l Lang, m settings.Models) []layout.FlexChild {
-	roles := []struct{ key, val string }{
-		{"models.talk", m.Talk}, {"models.vision", m.Vision}, {"models.agent", m.Agent},
-		{"models.cleanup", m.DictationCleanup}, {"models.fast", m.Fast}, {"models.deep", m.Deep},
-	}
-	rows := make([]layout.FlexChild, 0, len(roles)+1)
-	for _, r := range roles {
-		v := r.val
-		if v == "" {
-			v = T(l, "settings.notSet")
+// subnav lists the sections; it lines up with the main sidebar.
+func (p *settingsPage) subnav(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
+	w := gtx.Dp(th.Dp(196))
+	gtx.Constraints.Min.X, gtx.Constraints.Max.X = w, w
+	gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
+	items := make([]layout.Widget, len(settingsSections))
+	for i, s := range settingsSections {
+		items[i] = func(gtx layout.Context) layout.Dimensions {
+			return kit.NavItem(gtx, th, &p.secBtns[i], s.icon(), T(l, s.key()), s == p.section)
 		}
-		rows = append(rows, layout.Rigid(body(th, T(l, r.key)+": "+v).Layout))
 	}
-	return append(rows, vspace(4), layout.Rigid(muted(th, T(l, "settings.later")).Layout))
+	return layout.Inset{Top: th.Dp(12), Left: th.Dp(8), Right: th.Dp(8)}.Layout(gtx, kit.VStack(th, 2, items...))
+}
+
+// sectionPicker is the section list as a select.
+func (p *settingsPage) sectionPicker(th *theme.Theme, l Lang) layout.Widget {
+	names := make([]string, len(settingsSections))
+	sel := 0
+	for i, s := range settingsSections {
+		names[i] = T(l, s.key())
+		if s == p.section {
+			sel = i
+		}
+	}
+	return func(gtx layout.Context) layout.Dimensions {
+		return p.secDD.Layout(gtx, th, names, sel, names[sel])
+	}
+}
+
+// content is the section's scrolling column; ordinary sections keep the
+// prototype's reading width, Diagnostics uses the whole page for its
+// table.
+func (p *settingsPage) content(gtx layout.Context, th *theme.Theme, rows []layout.Widget) layout.Dimensions {
+	maxW := float32(760)
+	if p.section == secDiagnostics {
+		maxW = 1100
+	}
+	return material.List(th.Theme, &p.list).Layout(gtx, len(rows), func(gtx layout.Context, i int) layout.Dimensions {
+		side := kit.PageMargin(gtx, th, 32)
+		in := layout.Inset{Top: th.Dp(16), Left: side, Right: side}
+		if i == 0 {
+			in.Top = th.Dp(28)
+		}
+		if i == len(rows)-1 {
+			in.Bottom = th.Dp(28)
+		}
+		return in.Layout(gtx, kit.MaxWidth(th, maxW, func(gtx layout.Context) layout.Dimensions {
+			gtx.Constraints.Min.X = gtx.Constraints.Max.X
+			return rows[i](gtx)
+		}))
+	})
+}
+
+// setting is one row of a section panel.
+func setting(th *theme.Theme, l Lang, title, desc string, ready bool, ctl layout.Widget) layout.Widget {
+	r := kit.SettingRow{Title: T(l, title), Control: ctl}
+	if desc != "" {
+		r.Desc = T(l, desc)
+	}
+	if !ready {
+		r.Soon = T(l, "nav.soon")
+	}
+	return func(gtx layout.Context) layout.Dimensions { return r.Layout(gtx, th) }
+}
+
+func panelOf(th *theme.Theme, rows ...layout.Widget) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions { return kit.Rows(gtx, th, rows...) }
+}
+
+// sectionRows are a section's panels. ready marks what the app acts on
+// today; the rest is disabled and tagged.
+func (p *settingsPage) sectionRows(th *theme.Theme, l Lang, cur settings.Settings) []layout.Widget {
+	toggle := func(b *widget.Bool, desc string) layout.Widget {
+		return func(gtx layout.Context) layout.Dimensions { return kit.Toggle(gtx, th, b, T(l, desc)) }
+	}
+	switch p.section {
+	case secVoice:
+		lang := T(l, "voice.languageAuto")
+		if cur.Voice.Language != "auto" {
+			lang = cur.Voice.Language
+		}
+		speed := cur.Voice.TTSSpeed
+		if p.speedPending || p.speed.Float.Dragging() {
+			speed = speedFromSlider(p.speed.Float.Value)
+		}
+		return []layout.Widget{panelOf(th,
+			setting(th, l, "voice.hotkeyMode", "voice.hotkeyMode.d", false, func(gtx layout.Context) layout.Dimensions {
+				return kit.Segmented(gtx, th, &p.hotkey, []kit.Option{
+					{Key: string(settings.HotkeyHold), Label: T(l, "voice.hold")},
+					{Key: string(settings.HotkeyToggle), Label: T(l, "voice.toggle")},
+					{Key: string(settings.HotkeyHandsfree), Label: T(l, "voice.handsfree")},
+				})
+			}),
+			setting(th, l, "voice.language", "voice.language.d", false, func(gtx layout.Context) layout.Dimensions {
+				return kit.Text(th, 14, lang, th.Pal.Subtle).Layout(gtx)
+			}),
+			setting(th, l, "tts.speed", "", false, func(gtx layout.Context) layout.Dimensions {
+				gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(th.Dp(260)))
+				return kit.HStack(th, 12, func(gtx layout.Context) layout.Dimensions {
+					gtx.Constraints.Min.X = gtx.Dp(th.Dp(190))
+					gtx.Constraints.Max.X = gtx.Constraints.Min.X
+					return p.speed.Layout(gtx, th, T(l, "tts.speed"))
+				}, kit.Code(th, Tf(l, "tts.speedValue", speed)).Layout)(gtx)
+			}),
+		)}
+	case secScreen:
+		return []layout.Widget{panelOf(th,
+			setting(th, l, "screen.target", "screen.target.d", false, func(gtx layout.Context) layout.Dimensions {
+				return kit.Segmented(gtx, th, &p.screenTarget, []kit.Option{
+					{Key: string(settings.ScreenActive), Label: T(l, "screen.active")},
+					{Key: string(settings.ScreenAll), Label: T(l, "screen.all")},
+				})
+			}),
+			setting(th, l, "screen.keepShots", "screen.keepShots.d", false, toggle(&p.keepShots, "screen.keepShots")),
+		)}
+	case secPrivacy:
+		return []layout.Widget{panelOf(th,
+			setting(th, l, "privacy.saveText", "privacy.saveText.d", true, toggle(&p.saveText, "privacy.saveText")),
+			setting(th, l, "memory.enabled", "memory.enabled.d", false, toggle(&p.memory, "memory.enabled")),
+			setting(th, l, "privacy.shareDiag", "privacy.shareDiag.d", false, toggle(&p.shareDiag, "privacy.shareDiag")),
+		), kit.Small(th, T(l, "privacy.note")).Layout}
+	}
+	names := make([]string, len(i18n.Languages))
+	sel := 0
+	for i, lg := range i18n.Languages {
+		names[i] = lg.Native
+		if string(lg.Code) == cur.UI.Language {
+			sel = i
+		}
+	}
+	return []layout.Widget{panelOf(th,
+		setting(th, l, "platform.uiLang", "platform.uiLang.d", true, func(gtx layout.Context) layout.Dimensions {
+			gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(th.Dp(220)))
+			gtx.Constraints.Min.X = gtx.Constraints.Max.X
+			return p.uiLang.Layout(gtx, th, names, sel, names[sel])
+		}),
+		setting(th, l, "platform.tray", "platform.tray.d", true, toggle(&p.tray, "platform.tray")),
+		setting(th, l, "platform.login", "platform.login.d", false, toggle(&p.login, "platform.login")),
+	)}
 }

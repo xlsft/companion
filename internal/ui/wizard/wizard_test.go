@@ -126,7 +126,9 @@ func TestNoForbiddenActions(t *testing.T) {
 				t.Fatal(err)
 			}
 			h.eventually("failure shown", func() bool { return h.shows(i18n.T(lang, "wiz.result.failed")) })
-			h.w.stt.modelDD.open, h.w.stt.deviceDD.open = true, true
+			h.w.stt.modelDD.SetOpen(true)
+			h.w.stt.deviceDD.SetOpen(true)
+			h.w.langDD.SetOpen(true)
 			h.frame()
 			assertNoBypass(t, h, string(lang)+"/"+string(st)+"/failed")
 			if st == readiness.StepEndToEnd {
@@ -355,7 +357,7 @@ func TestSTTFlow(t *testing.T) {
 	h.click(ActDownload)
 	h.eventually("installed", func() bool { return h.shows("скачана") })
 	// Pick the second microphone and watch the level.
-	h.w.stt.deviceDD.options[2].Click()
+	h.w.stt.deviceDD.Pick(2)
 	h.frame()
 	h.click(ActMicTest)
 	h.eventually("meter", func() bool { return h.shows("дБFS") })
@@ -396,7 +398,8 @@ func TestLayoutAllSteps(t *testing.T) {
 				for i, st := range readiness.Steps {
 					h.eventually("step", func() bool { return h.view() == st })
 					h.frame()
-					h.w.stt.modelDD.open = true
+					h.w.stt.modelDD.SetOpen(true)
+					h.w.langDD.SetOpen(true)
 					h.frame()
 					if i < len(readiness.Steps)-1 {
 						h.pass(st)

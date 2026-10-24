@@ -1,8 +1,6 @@
 package wizard
 
 import (
-	"image/color"
-
 	"gioui.org/layout"
 
 	"github.com/xlsft/companion/internal/readiness"
@@ -41,65 +39,50 @@ func stageOf(s snapshot, stage string) (stageState, string) {
 	}
 }
 
-func (w *Wizard) e2eBody(th *theme.Theme, l i18n.Lang, s snapshot) stepBody {
-	cards := make([]layout.Widget, len(readiness.EndToEndStages))
-	for i, stage := range readiness.EndToEndStages {
-		cards[i] = w.stageCard(th, l, s, stage)
-	}
-	return stepBody{rows: []layout.Widget{func(gtx layout.Context) layout.Dimensions {
-		// Six across as in the prototype, three when the window is narrow.
-		cols := len(cards)
-		if gtx.Constraints.Max.X < gtx.Dp(th.Dp(780)) {
-			cols = 3
-		}
-		return grid(th, cols, 8, cards...)(gtx)
-	}}}
+// stageIcons are the tiles of the end-to-end stages.
+var stageIcons = map[string]icon.Name{
+	"speech": icon.Mic, "stt": icon.Voice, "capture": icon.Computer,
+	"llm": icon.Sparkles, "tts": icon.Volume, "pointing": icon.Aiming2,
 }
 
-func (w *Wizard) stageCard(th *theme.Theme, l i18n.Lang, s snapshot, stage string) layout.Widget {
+func (w *Wizard) e2eBody(th *theme.Theme, l i18n.Lang, s snapshot) stepBody {
+	rs := make([]layout.Widget, len(readiness.EndToEndStages))
+	for i, stage := range readiness.EndToEndStages {
+		rs[i] = w.stageRow(th, l, s, stage)
+	}
+	return stepBody{rows: []layout.Widget{rows(th, rs...)}}
+}
+
+// stageRow is one stage as a status row, like a permission: a failed
+// stage is tinted and shows its code in place of the description.
+func (w *Wizard) stageRow(th *theme.Theme, l i18n.Lang, s snapshot, stage string) layout.Widget {
 	st, code := stageOf(s, stage)
-	var (
-		word      string
-		col       color.NRGBA
-		ic        icon.Name
-		bg        = th.Pal.Surface
-		border    = th.Pal.Divider
-		nameCol   = th.Pal.Fg
-		detail    = i18n.T(l, "wiz.e2e."+stage+".d")
-		detailCol = th.Pal.Muted
-	)
+	r := kit.StatusRow{
+		Icon:    stageIcons[stage],
+		Title:   i18n.T(l, "wiz.e2e."+stage),
+		Caption: i18n.T(l, "wiz.e2e."+stage+".d"),
+	}
+	var word string
 	switch st {
 	case stageDone:
-		word, col, ic = "wiz.e2e.done", th.Pal.OK, icon.Check
+		word, r.Status = "wiz.e2e.done", theme.StatusOK
 	case stageFailed:
-		word, col, ic = "wiz.e2e.failed", th.Pal.Error, icon.Close
-		detail, detailCol = code, th.Pal.Error
+		word, r.Status, r.Tint = "wiz.e2e.failed", theme.StatusError, true
+		r.Caption = i18n.Tf(l, "wiz.result.status", code)
 	case stageRunning:
-		word, col, ic = "wiz.e2e.running", th.Pal.AccentText, icon.Loading3
-		bg, border = soft(th, th.Pal.AccentLine, 0.08), th.Pal.AccentLine
+		word, r.Status = "wiz.e2e.running", theme.StatusUnknown
 	case stageNotRun:
-		word, col, ic = "wiz.e2e.notRun", th.Pal.Subtle, icon.Time
-		bg, border, nameCol = transparent, th.Pal.Border, th.Pal.Fg2
+		word, r.Status, r.IconColor = "wiz.e2e.notRun", theme.StatusUnknown, th.Pal.Subtle
 	default:
-		word, col, ic = "wiz.e2e.waiting", th.Pal.Subtle, icon.Time
-		bg, border, nameCol = transparent, th.Pal.Border, th.Pal.Fg2
+		word, r.Status = "wiz.e2e.waiting", theme.StatusUnknown
 	}
-	name := i18n.T(l, "wiz.e2e."+stage)
-	wd := i18n.T(l, word)
-	line := name + " — " + wd
+	r.Badge = i18n.T(l, word)
+	line := r.Title + " — " + r.Badge
 	if code != "" {
 		line += " (" + code + ")"
 	}
 	w.frame.texts = append(w.frame.texts, line)
-	status := hstack(th, 6, iconW(th, ic, 14, col), label(th, 12, wd, col).Layout)
-	nm := medium(label(th, 14, name, nameCol))
-	dl := label(th, 12, detail, detailCol)
-	return func(gtx layout.Context) layout.Dimensions {
-		return box(gtx, th, 6, bg, border, func(gtx layout.Context) layout.Dimensions {
-			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return layout.UniformInset(th.Dp(14)).Layout(gtx, vstack(th, 10, status, nm.Layout, dl.Layout))
-		})
-	}
+	return w.statusRow(th, r)
 }
 
 func (w *Wizard) e2eFooter(th *theme.Theme, l i18n.Lang, s snapshot) footerSpec {

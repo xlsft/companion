@@ -69,8 +69,11 @@ func TestLayoutAllScreens(t *testing.T) {
 				h.sh.lang, h.sh.dark, h.sh.scale = langOf(lang), dark, scale
 				h.sh.mu.Unlock()
 				r := new(input.Router)
-				for _, route := range Routes {
-					m.navigate(route)
+				m.navigate(RouteHome)
+				frame(r, h.sh, th, m)
+				for _, sec := range settingsSections {
+					m.showSettings(sec)
+					frame(r, h.sh, th, m)
 					frame(r, h.sh, th, m)
 				}
 				m.about.show("t", "b")
@@ -83,7 +86,7 @@ func TestLayoutAllScreens(t *testing.T) {
 			}
 		}
 	}
-	if len(m.pages) != len(Routes) {
+	if len(m.pages) != len(NavRoutes()) {
 		t.Errorf("pages built = %d", len(m.pages))
 	}
 }
@@ -117,8 +120,9 @@ func TestShortcuts(t *testing.T) {
 		key.Event{Name: "=", Modifiers: key.ModShortcut, State: key.Press},
 		key.Event{Name: "-", Modifiers: key.ModShortcut, State: key.Press},
 		key.Event{Name: "0", Modifiers: key.ModShortcut, State: key.Press},
-		key.Event{Name: "3", Modifiers: key.ModShortcut, State: key.Press},
-		key.Event{Name: "3", State: key.Press}, // without Ctrl: ignored
+		key.Event{Name: "2", Modifiers: key.ModShortcut, State: key.Press},
+		key.Event{Name: "3", Modifiers: key.ModShortcut, State: key.Press}, // no third reachable section
+		key.Event{Name: "2", State: key.Press},                             // without Ctrl: ignored
 		key.Event{Name: "N", Modifiers: key.ModShortcut, State: key.Press},
 		key.Event{Name: "Q", Modifiers: key.ModShortcut, State: key.Press},
 	)
@@ -128,7 +132,7 @@ func TestShortcuts(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("Ctrl+Q did not quit")
 	}
-	if fmt.Sprint(rt.scale) != "[1 -1 0]" || fmt.Sprint(rt.nav) != "[3]" || rt.newChat != 1 {
+	if fmt.Sprint(rt.scale) != "[1 -1 0]" || fmt.Sprint(rt.nav) != "[2]" || rt.newChat != 1 {
 		t.Errorf("scale=%v nav=%v newChat=%d", rt.scale, rt.nav, rt.newChat)
 	}
 }
@@ -151,17 +155,19 @@ func TestTabOrderStartsWithNavigation(t *testing.T) {
 	if !r.Source().Focused(&m.newChatBtn) {
 		t.Fatal("Tab 2: New chat not focused")
 	}
-	for i := range Routes {
+	// Soon sections are skipped: only reachable ones take focus.
+	nav := NavRoutes()
+	for i, route := range nav {
 		r.MoveFocus(key.FocusForward)
 		frame(r, h.sh, th, m)
-		if !r.Source().Focused(&m.navBtns[i]) {
-			t.Fatalf("Tab %d: nav item %d not focused", i+3, i)
+		if !r.Source().Focused(m.navBtns[route]) {
+			t.Fatalf("Tab %d: nav item %d not focused", i+3, route)
 		}
 	}
 	// Enter activates the focused item like a click.
 	r.Queue(key.Event{Name: key.NameReturn, State: key.Press}, key.Event{Name: key.NameReturn, State: key.Release})
 	frame(r, h.sh, th, m)
-	if m.current() != Routes[len(Routes)-1] {
+	if m.current() != nav[len(nav)-1] {
 		t.Errorf("route after Enter = %v", m.current())
 	}
 }
@@ -196,7 +202,7 @@ func TestHeadlessRender(t *testing.T) {
 	h.sh.diag = newDiagModel(func(context.Context) (contracts.CapabilityReport, error) { return reportWithCaps(), nil }, func() {})
 	h.sh.diag.Refresh()
 	for _, running := true, true; running; {
-		_, _, running, _ = h.sh.diag.snapshot()
+		running = h.sh.diag.snapshot().running
 		time.Sleep(time.Millisecond)
 	}
 	m, _ := h.mainBuilt()
@@ -206,38 +212,61 @@ func TestHeadlessRender(t *testing.T) {
 		name    string
 		content surface
 		route   Route
+		section settingsSection
+		open    bool // the language select is open
+		diag    bool // the setup window shows Diagnostics
 	}{
-		{"wizard", wiz, 0},
-		{"home", m, RouteHome},
-		{"settings", m, RouteSettings},
-		{"diagnostics", m, RouteDiagnostics},
-		{"history", m, RouteHistory},
+		{"wizard", wiz, 0, 0, false, false},
+		{"wizard-diagnostics", wiz, 0, 0, false, true},
+		{"home", m, RouteHome, 0, false, false},
+		{"settings", m, RouteSettings, secGeneral, false, false},
+		{"settings-language", m, RouteSettings, secGeneral, true, false},
+		{"settings-voice", m, RouteSettings, secVoice, false, false},
+		{"diagnostics", m, RouteSettings, secDiagnostics, false, false},
 	}
 	dir := os.Getenv("OC_UI_SNAPSHOT_DIR")
-	for _, s := range shots {
-		m.navigate(s.route)
-		r := new(input.Router)
-		frame(r, h.sh, th, s.content)
-		ops := frame(r, h.sh, th, s.content) // second frame: lazily built pages settle
-		if err := w.Frame(ops); err != nil {
-			t.Fatalf("%s: frame: %v", s.name, err)
-		}
-		img := image.NewRGBA(image.Rectangle{Max: frameSize})
-		if err := w.Screenshot(img); err != nil {
-			t.Fatalf("%s: screenshot: %v", s.name, err)
-		}
-		if uniform(img) {
-			t.Errorf("%s: frame is a single colour", s.name)
-		}
-		if dir != "" {
-			f, err := os.Create(filepath.Join(dir, s.name+".png"))
-			if err != nil {
-				t.Fatal(err)
+	variants := []struct {
+		suffix string
+		dark   bool
+		scale  float32
+	}{{"", false, 1}, {"-dark-x2", true, theme.MaxScale}}
+	for _, v := range variants {
+		h.sh.mu.Lock()
+		h.sh.dark, h.sh.scale = v.dark, v.scale
+		h.sh.mu.Unlock()
+		for _, s := range shots {
+			s.name += v.suffix
+			m.navigate(s.route)
+			if s.route == RouteSettings {
+				m.showSettings(s.section)
 			}
-			if err := png.Encode(f, img); err != nil {
-				t.Fatal(err)
+			wiz.showDiagnostics(s.diag)
+			r := new(input.Router)
+			frame(r, h.sh, th, s.content)
+			if sp, ok := m.pages[RouteSettings].(*settingsPage); ok {
+				sp.uiLang.SetOpen(s.open)
 			}
-			f.Close()
+			ops := frame(r, h.sh, th, s.content) // second frame: lazily built pages settle
+			if err := w.Frame(ops); err != nil {
+				t.Fatalf("%s: frame: %v", s.name, err)
+			}
+			img := image.NewRGBA(image.Rectangle{Max: frameSize})
+			if err := w.Screenshot(img); err != nil {
+				t.Fatalf("%s: screenshot: %v", s.name, err)
+			}
+			if uniform(img) {
+				t.Errorf("%s: frame is a single colour", s.name)
+			}
+			if dir != "" {
+				f, err := os.Create(filepath.Join(dir, s.name+".png"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := png.Encode(f, img); err != nil {
+					t.Fatal(err)
+				}
+				f.Close()
+			}
 		}
 	}
 }

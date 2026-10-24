@@ -270,8 +270,29 @@ func TestMainModeIsLazy(t *testing.T) {
 	if len(m.pages) != 1 {
 		t.Errorf("pages = %d", len(m.pages))
 	}
-	if _, ok := m.page(RouteHistory).(placeholderPage); !ok {
-		t.Error("history should be a placeholder")
+}
+
+// Sections marked Soon are not reachable by any path, and there are no
+// placeholder pages behind them.
+func TestSoonRoutesUnreachable(t *testing.T) {
+	h := newHarness(t, ModeMain, &fakeTray{})
+	m, _ := h.mainBuilt()
+	for _, r := range []Route{RouteHistory, RouteAgents, RouteSkills} {
+		if r.Implemented() {
+			t.Errorf("route %d should be Soon", r)
+		}
+		h.sh.Navigate(r)
+		if m.current() != RouteHome {
+			t.Errorf("Navigate(%d) reached %v", r, m.current())
+		}
+		if _, ok := m.navBtns[r]; ok {
+			t.Errorf("route %d has a nav button", r)
+		}
+	}
+	for d := 1; d <= 9; d++ {
+		if r, ok := RouteForShortcut(d); ok && !r.Implemented() {
+			t.Errorf("Ctrl+%d reaches %d", d, r)
+		}
 	}
 }
 
@@ -295,8 +316,10 @@ func TestCloseWithTrayKeepsRunning(t *testing.T) {
 		t.Error("open on a visible window should raise it")
 	}
 	h.tray.click(TrayDiagnostics)
-	if m, _ := h.mainBuilt(); m.current() != RouteDiagnostics {
+	if m, _ := h.mainBuilt(); m.current() != RouteSettings {
 		t.Errorf("route = %v", m.current())
+	} else if s, ok := m.takeSection(); !ok || s != secDiagnostics {
+		t.Errorf("section = %v %v", s, ok)
 	}
 	h.tray.click(TrayQuit)
 	h.tray.click(TrayQuit)
@@ -370,7 +393,7 @@ func TestLanguageChangeRelabelsTray(t *testing.T) {
 
 func TestNavShortcutAndScale(t *testing.T) {
 	h := newHarness(t, ModeMain, nil)
-	h.sh.navShortcut(5)
+	h.sh.navShortcut(2)
 	if m, _ := h.mainBuilt(); m.current() != RouteSettings {
 		t.Errorf("route = %v", m.current())
 	}
