@@ -41,6 +41,24 @@ type Sigstore struct {
 	Identity Identity
 	// Root provides the trusted root; nil uses PublicGoodRoot.
 	Root func(ctx context.Context) (root.TrustedMaterial, error)
+	// NoSCT drops the certificate transparency requirement. Only a private
+	// test instance, which has no CT log, may set it.
+	NoSCT bool
+}
+
+// NewSigstoreTestRoot verifies against a private Sigstore instance's
+// trusted_root.json instead of the public-good one, for the local release
+// server (COMPANION_UPDATE_TRUSTED_ROOT). The identity stays pinned.
+func NewSigstoreTestRoot(rootJSON []byte) (*Sigstore, error) {
+	tr, err := root.NewTrustedRootFromJSON(rootJSON)
+	if err != nil {
+		return nil, err
+	}
+	return &Sigstore{
+		Identity: Identity{SANRegex: ReleaseIdentity, Issuer: ReleaseIssuer},
+		Root:     func(context.Context) (root.TrustedMaterial, error) { return tr, nil },
+		NoSCT:    true,
+	}, nil
 }
 
 // NewSigstore pins the release workflow identity; cacheDir holds the
@@ -80,11 +98,11 @@ func (s *Sigstore) VerifyDigest(ctx context.Context, bundleJSON, digest []byte) 
 	}
 	// The public-good instance: certificates carry SCTs and every
 	// signature is in Rekor, timed by the log or a timestamp authority.
-	v, err := verify.NewVerifier(tm,
-		verify.WithSignedCertificateTimestamps(1),
-		verify.WithTransparencyLog(1),
-		verify.WithObserverTimestamps(1),
-	)
+	opts := []verify.VerifierOption{verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1)}
+	if !s.NoSCT {
+		opts = append(opts, verify.WithSignedCertificateTimestamps(1))
+	}
+	v, err := verify.NewVerifier(tm, opts...)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrBadSignature, err)
 	}

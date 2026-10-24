@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/xlsft/companion/internal/settings"
+	"github.com/xlsft/companion/internal/update/updatetest"
 )
 
 type memPrefs struct {
@@ -69,6 +70,7 @@ type fakeRelease struct {
 	tarball []byte
 	sums    string
 	noSig   bool
+	sig     []byte // the bundle served; "{}" when nil
 }
 
 func newFakeRelease(t *testing.T, v string, tarball []byte) *fakeRelease {
@@ -83,13 +85,19 @@ func newFakeRelease(t *testing.T, v string, tarball []byte) *fakeRelease {
 			{"name": ChecksumsName, "size": len(f.sums), "browser_download_url": f.srv.URL + "/dl/sums"},
 		}
 		if !f.noSig {
-			assets = append(assets, map[string]any{"name": SignatureName, "size": 2, "browser_download_url": f.srv.URL + "/dl/sig"})
+			assets = append(assets, map[string]any{"name": SignatureName, "size": 0, "browser_download_url": f.srv.URL + "/dl/sig"})
 		}
 		json.NewEncoder(w).Encode(map[string]any{"tag_name": "v" + v, "html_url": f.srv.URL + "/notes", "assets": assets})
 	})
 	mux.HandleFunc("/dl/tarball", func(w http.ResponseWriter, r *http.Request) { w.Write(f.tarball) })
 	mux.HandleFunc("/dl/sums", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(f.sums)) })
-	mux.HandleFunc("/dl/sig", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("{}")) })
+	mux.HandleFunc("/dl/sig", func(w http.ResponseWriter, r *http.Request) {
+		if f.sig == nil {
+			w.Write([]byte("{}"))
+			return
+		}
+		w.Write(f.sig)
+	})
 	f.srv = httptest.NewServer(mux)
 	t.Cleanup(f.srv.Close)
 	return f
@@ -262,5 +270,54 @@ func TestServiceManaged(t *testing.T) {
 		if got := s.State().Managed; got != tt.want {
 			t.Errorf("%s: Managed = %q, want %q", tt.name, got, tt.want)
 		}
+	}
+}
+
+// The whole path with the real verifier: a release signed by the release
+// workflow on a private Sigstore instance installs; the same release
+// signed by any other identity does not.
+func TestServiceInstallSigned(t *testing.T) {
+	signer, err := updatetest.NewSigner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootJSON, err := signer.TrustedRootJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name, identity string
+		want           string
+	}{
+		{"release workflow", releaseWorkflow, "new core"},
+		{"someone else", "https://github.com/evil/companion/.github/workflows/release.yml@refs/tags/v0.2.0", "old core"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rel := newFakeRelease(t, "0.2.0", tarballBytes(t, "new core", "new sidecar"))
+			if rel.sig, err = signer.SignBundle(tt.identity, ReleaseIssuer, []byte(rel.sums)); err != nil {
+				t.Fatal(err)
+			}
+			v, err := NewSigstoreTestRoot(rootJSON)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := installDir(t)
+			s := NewService(Config{
+				Checker:    &Checker{Client: rel.srv.Client(), Feed: rel.srv.URL},
+				Downloader: &Downloader{Client: rel.srv.Client()},
+				Verifier:   v,
+				Installer:  &Installer{Dir: dir, Names: []string{"companion", "stt-sidecar"}},
+				Prefs:      newPrefs(), Current: "0.0.1", WorkDir: t.TempDir(), GOOS: "linux", GOARCH: "amd64",
+			})
+			s.Start(context.Background())
+			defer s.Stop(context.Background())
+			waitFor(t, s, "release", func(st State) bool { return st.Latest != nil })
+			s.Install()
+			st := waitFor(t, s, "install end", func(st State) bool { return !st.Busy() })
+			if got := readFile(t, filepath.Join(dir, "companion")); got != tt.want {
+				t.Errorf("core = %q (phase %v, err %q)", got, st.Phase, st.Err)
+			}
+		})
 	}
 }

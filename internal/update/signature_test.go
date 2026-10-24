@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/sigstore/sigstore-go/pkg/root"
+
+	"github.com/xlsft/companion/internal/update/updatetest"
 )
 
 // cosign v3.1.4's own release bundle for cosign-linux-amd64, recorded from
@@ -61,6 +63,76 @@ func TestSigstoreRecordedBundle(t *testing.T) {
 				t.Fatalf("err = %v, want %v", err, tt.want)
 			}
 		})
+	}
+}
+
+const releaseWorkflow = "https://github.com/xlsft/companion/.github/workflows/release.yml@refs/tags/v0.2.0"
+
+// A private Sigstore instance signs like the release workflow, so the
+// identity pin and the digest binding are exercised with real
+// certificates, logs and timestamps.
+func TestSigstoreReleaseIdentity(t *testing.T) {
+	signer, err := updatetest.NewSigner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootJSON, err := signer.TrustedRootJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sums := []byte("abc  companion-0.2.0-linux-x86_64.tar.gz\n")
+	sign := func(identity, issuer string, artifact []byte) []byte {
+		b, err := signer.SignBundle(identity, issuer, artifact)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	other, err := updatetest.NewSigner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreign, err := other.SignBundle(releaseWorkflow, ReleaseIssuer, sums)
+	if err != nil {
+		t.Fatal(err)
+	}
+	good := sign(releaseWorkflow, ReleaseIssuer, sums)
+	tests := []struct {
+		name   string
+		bundle []byte
+		sums   []byte
+		want   error
+	}{
+		{"release workflow", good, sums, nil},
+		{"checksums changed after signing", good, append([]byte("x"), sums...), ErrBadSignature},
+		{"another workflow", sign("https://github.com/xlsft/companion/.github/workflows/ci.yml@refs/tags/v0.2.0", ReleaseIssuer, sums), sums, ErrBadSignature},
+		{"a branch, not a tag", sign("https://github.com/xlsft/companion/.github/workflows/release.yml@refs/heads/main", ReleaseIssuer, sums), sums, ErrBadSignature},
+		{"a fork", sign("https://github.com/evil/companion/.github/workflows/release.yml@refs/tags/v0.2.0", ReleaseIssuer, sums), sums, ErrBadSignature},
+		{"another issuer", sign(releaseWorkflow, "https://accounts.google.com", sums), sums, ErrBadSignature},
+		{"another Sigstore instance", foreign, sums, ErrBadSignature},
+		{"missing", nil, sums, ErrNoSignature},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v, err := NewSigstoreTestRoot(rootJSON)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = v.VerifyChecksums(context.Background(), tt.bundle, tt.sums)
+			if tt.want == nil && err != nil {
+				t.Fatalf("err = %v", err)
+			}
+			if tt.want != nil && !errors.Is(err, tt.want) {
+				t.Fatalf("err = %v, want %v", err, tt.want)
+			}
+		})
+	}
+	// Production settings demand certificate transparency, which a
+	// private instance cannot provide: the same bundle is refused.
+	strict := &Sigstore{Identity: Identity{SANRegex: ReleaseIdentity, Issuer: ReleaseIssuer},
+		Root: func(context.Context) (root.TrustedMaterial, error) { return signer.TrustedRoot(), nil }}
+	if err := strict.VerifyChecksums(context.Background(), good, sums); !errors.Is(err, ErrBadSignature) {
+		t.Errorf("without SCTs: err = %v", err)
 	}
 }
 
