@@ -20,6 +20,7 @@ import (
 
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -90,11 +91,13 @@ type Wizard struct {
 	stepCancel context.CancelFunc
 
 	// UI goroutine only.
-	entered  readiness.Step
-	btns     map[Action]*widget.Clickable
-	stepBtns [6]widget.Clickable
-	list     widget.List
-	frame    frameRecord
+	entered   readiness.Step
+	btns      map[Action]*widget.Clickable
+	stepBtns  [6]widget.Clickable
+	langDD    kit.Dropdown
+	list      widget.List
+	asideList widget.List
+	frame     frameRecord
 
 	perm permState
 	byok byokState
@@ -124,6 +127,7 @@ func New(cfg Config) *Wizard {
 	ctx, cancel := context.WithCancel(context.Background())
 	w := &Wizard{cfg: cfg, ctx: ctx, cancel: cancel, btns: map[Action]*widget.Clickable{}}
 	w.list.Axis = layout.Vertical
+	w.langDD.Up = true // it sits at the bottom of the aside
 	w.prog = cfg.Gate.Progress()
 	w.stepCtx, w.stepCancel = context.WithCancel(ctx)
 	w.byok.init()

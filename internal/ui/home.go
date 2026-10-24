@@ -221,7 +221,7 @@ func (p *homePage) userMessage(gtx layout.Context, th *theme.Theme, l Lang, m ch
 		gtx.Constraints.Min.X = 0
 		return layout.Flex{Axis: layout.Vertical, Alignment: layout.End}.Layout(gtx,
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				return kit.Bubble(gtx, th, kit.Over(th.Pal.Bg, kit.Tint(th.Pal.AccentSoft, 1.5)), func(gtx layout.Context) layout.Dimensions {
+				return kit.Bubble(gtx, th, th.Pal.AccentStrong, func(gtx layout.Context) layout.Dimensions {
 					b := kit.Body(th, m.Text)
 					b.State = sel
 					return b.Layout(gtx)
@@ -247,7 +247,7 @@ func (p *homePage) pendingVoice(gtx layout.Context, th *theme.Theme, l Lang, v c
 					return layout.Dimensions{}
 				}
 				return layout.Inset{Bottom: th.Dp(6)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					return kit.Bubble(gtx, th, kit.Over(th.Pal.Bg, th.Pal.AccentSoft), func(gtx layout.Context) layout.Dimensions {
+					return kit.Bubble(gtx, th, th.Pal.AccentSoft, func(gtx layout.Context) layout.Dimensions {
 						b := kit.Body(th, v.Partial)
 						b.Color = th.Pal.Fg2
 						return b.Layout(gtx)
@@ -289,20 +289,11 @@ func (p *homePage) reply(gtx layout.Context, th *theme.Theme, l Lang, m chat.Mes
 				extra(func(gtx layout.Context) layout.Dimensions { return p.statusRow(gtx, th, l, phase) })
 			case m.Failed:
 				extra(func(gtx layout.Context) layout.Dimensions {
-					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							return kit.Badge(gtx, th, theme.StatusError, T(l, "chat.failed"))
-						}),
-						kit.HSpace(th.Dp(8)),
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							if m.Code == "" {
-								return layout.Dimensions{}
-							}
-							c := kit.Code(th, Tf(l, "chat.failedCode", m.Code))
-							c.Color = th.Pal.Muted
-							return c.Layout(gtx)
-						}),
-					)
+					code := ""
+					if m.Code != "" {
+						code = Tf(l, "chat.failedCode", m.Code)
+					}
+					return kit.Alert(gtx, th, theme.StatusError, T(l, "chat.failed"), code)
 				})
 			case m.Interrupted:
 				extra(func(gtx layout.Context) layout.Dimensions {
@@ -386,7 +377,7 @@ func (p *homePage) composer(gtx layout.Context, th *theme.Theme, l Lang, v chat.
 						return layout.Dimensions{}
 					}
 					return layout.Inset{Bottom: th.Dp(8)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-						return kit.Badge(gtx, th, theme.StatusError, T(l, failKey))
+						return kit.Alert(gtx, th, theme.StatusError, T(l, failKey), "")
 					})
 				}),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -409,7 +400,7 @@ func (p *homePage) composer(gtx layout.Context, th *theme.Theme, l Lang, v chat.
 									e.LineHeightScale = 1.5
 									e.Color = th.Pal.Fg
 									e.HintColor = th.Pal.Subtle
-									e.SelectionColor = th.Pal.AccentSoft
+									e.SelectionColor = th.Pal.Selected
 									return e.Layout(gtx)
 								})
 							}),

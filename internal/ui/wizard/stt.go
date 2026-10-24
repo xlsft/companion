@@ -12,6 +12,7 @@ import (
 	"github.com/xlsft/companion/internal/models/hw"
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/kit"
 )
 
 const meterRefresh = 50 * time.Millisecond
@@ -19,7 +20,7 @@ const meterRefresh = 50 * time.Millisecond
 // sttState is the model and microphone step. Dropdowns are UI-goroutine
 // only; everything else is guarded by Wizard.mu.
 type sttState struct {
-	modelDD, deviceDD dropdown
+	modelDD, deviceDD kit.Dropdown
 
 	loaded      bool
 	loadErr     string
@@ -85,12 +86,12 @@ func (t *sttState) update(w *Wizard, gtx layout.Context, s snapshot, l i18n.Lang
 	w.mu.Lock()
 	cat, devs := t.catalog, t.devices
 	w.mu.Unlock()
-	if i := t.modelDD.update(gtx, len(cat)); i >= 0 {
+	if i := t.modelDD.Update(gtx, len(cat)); i >= 0 {
 		w.mu.Lock()
 		t.selected, t.installErr = cat[i].ID, ""
 		w.mu.Unlock()
 	}
-	if i := t.deviceDD.update(gtx, len(devs)+1); i >= 0 {
+	if i := t.deviceDD.Update(gtx, len(devs)+1); i >= 0 {
 		id := ""
 		if i > 0 {
 			id = devs[i-1].ID

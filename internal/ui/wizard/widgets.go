@@ -3,111 +3,90 @@ package wizard
 import (
 	"gioui.org/layout"
 	"gioui.org/widget"
+	"gioui.org/widget/material"
 
-	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
 )
 
-// dropdown is the prototypes' select box that expands into the option
-// list; Gio has no native select widget. UI goroutine only.
-type dropdown struct {
-	open    bool
-	toggle  widget.Clickable
-	options []widget.Clickable
+// The wizard draws only kit components; these wrappers add what the
+// wizard needs on top: every shown text and offered action is recorded
+// for the frame, so tests can assert there is no bypass and no secret or
+// environment name on screen.
+
+// text records a label for the frame and returns its widget.
+func (w *Wizard) text(l material.LabelStyle) layout.Widget {
+	w.frame.texts = append(w.frame.texts, l.Text)
+	return l.Layout
 }
 
-// update returns the index chosen since the last frame, or -1.
-func (d *dropdown) update(gtx layout.Context, n int) int {
-	if d.toggle.Clicked(gtx) {
-		d.open = !d.open
-	}
-	if len(d.options) < n {
-		d.options = append(d.options, make([]widget.Clickable, n-len(d.options))...)
-	}
-	for i := range n {
-		if d.options[i].Clicked(gtx) {
-			d.open = false
-			return i
+// field is a captioned kit.Field.
+func field(w *Wizard, th *theme.Theme, cap, hint string, ed *widget.Editor, enabled bool) layout.Widget {
+	w.frame.texts = append(w.frame.texts, cap)
+	return kit.Labeled(th, cap, func(gtx layout.Context) layout.Dimensions {
+		if !enabled {
+			gtx = gtx.Disabled()
 		}
-	}
-	return -1
+		return kit.Field(gtx, th, ed, hint)
+	})
 }
 
-// layout draws the dropdown; labels[sel] is the current value (sel may be
-// -1 for none, then placeholder is shown).
-func (d *dropdown) layout(w *Wizard, gtx layout.Context, th *theme.Theme, labels []string, sel int, placeholder string, enabled bool) layout.Dimensions {
+// dropdown lays out a kit.Dropdown as a choice of the step.
+func (w *Wizard) dropdown(gtx layout.Context, th *theme.Theme, d *kit.Dropdown, labels []string, sel int, placeholder string, enabled bool) layout.Dimensions {
 	w.frame.actions = append(w.frame.actions, ActChoose)
 	cur := placeholder
 	if sel >= 0 && sel < len(labels) {
 		cur = labels[sel]
 	}
 	w.frame.texts = append(w.frame.texts, cur)
-	if !enabled || len(labels) == 0 {
+	if d.Opened() {
+		w.frame.texts = append(w.frame.texts, labels...)
+	}
+	if !enabled {
 		gtx = gtx.Disabled()
-		d.open = false
 	}
-	if len(d.options) < len(labels) {
-		d.options = append(d.options, make([]widget.Clickable, len(labels)-len(d.options))...)
+	return d.Layout(gtx, th, labels, sel, placeholder)
+}
+
+// alert is an inline kit.Alert; detail may be empty.
+func alert(w *Wizard, th *theme.Theme, s theme.Status, title, detail string) layout.Widget {
+	w.frame.texts = append(w.frame.texts, title)
+	if detail != "" {
+		w.frame.texts = append(w.frame.texts, detail)
 	}
-	fg := th.Pal.Fg
-	if !gtx.Enabled() {
-		fg = th.Pal.Subtle
-	}
-	gtx.Constraints.Min.X = gtx.Constraints.Max.X
-	head := func(gtx layout.Context) layout.Dimensions {
-		return kit.FocusRing(gtx, th, gtx.Focused(&d.toggle), func(gtx layout.Context) layout.Dimensions {
-			return d.toggle.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				border := th.Pal.Divider
-				if d.open {
-					border = th.Pal.AccentLine
-				}
-				bg := th.Pal.Bg
-				if d.toggle.Hovered() && gtx.Enabled() {
-					bg = th.Pal.Hover
-				}
-				return box(gtx, th, 4, bg, border, func(gtx layout.Context) layout.Dimensions {
-					return layout.Inset{Left: th.Dp(10), Right: th.Dp(10)}.Layout(gtx, fixedH(th, 36, func(gtx layout.Context) layout.Dimensions {
-						arrow := icon.Down
-						if d.open {
-							arrow = icon.Up
-						}
-						return spread(func(gtx layout.Context) layout.Dimensions {
-							l := label(th, 14, cur, fg)
-							l.MaxLines = 1
-							return l.Layout(gtx)
-						}, iconW(th, arrow, 14, th.Pal.Muted))(gtx)
-					}))
-				})
-			})
-		})
-	}
-	if !d.open {
-		return head(gtx)
-	}
-	opts := make([]layout.Widget, len(labels))
-	for i, lbl := range labels {
-		w.frame.texts = append(w.frame.texts, lbl)
-		opts[i] = func(gtx layout.Context) layout.Dimensions {
-			o := &d.options[i]
-			return kit.FocusRing(gtx, th, gtx.Focused(o), func(gtx layout.Context) layout.Dimensions {
-				return o.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					gtx.Constraints.Min.X = gtx.Constraints.Max.X
-					if o.Hovered() {
-						fillRect(gtx, th.Pal.Hover)
-					}
-					// The chosen option carries a check, not only a tint.
-					mark := layout.Spacer{Width: th.Dp(14), Height: th.Dp(14)}.Layout
-					if i == sel {
-						mark = iconW(th, icon.Check, 14, th.Pal.AccentText)
-					}
-					return layout.Inset{Left: th.Dp(10), Right: th.Dp(10)}.Layout(gtx, fixedH(th, 34,
-						hstack(th, 8, mark, label(th, 14, lbl, th.Pal.Fg).Layout)))
-				})
-			})
+	return func(gtx layout.Context) layout.Dimensions { return kit.Alert(gtx, th, s, title, detail) }
+}
+
+// statusRow records a kit.StatusRow.
+func (w *Wizard) statusRow(th *theme.Theme, r kit.StatusRow) layout.Widget {
+	for _, s := range []string{r.Title, r.Caption, r.Detail, r.Badge} {
+		if s != "" {
+			w.frame.texts = append(w.frame.texts, s)
 		}
 	}
-	return vstack(th, 4, head, func(gtx layout.Context) layout.Dimensions {
-		return kit.Rows(gtx, th, opts...)
-	})(gtx)
+	return func(gtx layout.Context) layout.Dimensions { return r.Layout(gtx, th) }
+}
+
+// changed drains the editor's events and reports whether its text changed.
+func changed(gtx layout.Context, ed *widget.Editor) bool {
+	ch := false
+	for {
+		ev, ok := ed.Update(gtx)
+		if !ok {
+			return ch
+		}
+		if _, isChange := ev.(widget.ChangeEvent); isChange {
+			ch = true
+		}
+	}
+}
+
+// rows is a full-width kit.Rows.
+func rows(th *theme.Theme, rs ...layout.Widget) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions { return kit.Rows(gtx, th, rs...) }
+}
+
+// card is a kit.Card.
+func card(th *theme.Theme, w layout.Widget) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions { return kit.Card(gtx, th, w) }
 }

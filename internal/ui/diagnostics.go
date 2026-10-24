@@ -98,7 +98,9 @@ func (p *diagPage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Di
 		// names no desktop environment or display protocol.
 		rows = append(rows, body(th, Tf(l, "diag.system", strings.TrimSpace(report.OS+" "+report.OSVersion))).Layout)
 	}
-	rows = append(rows, kit.CapabilityRows(th, l, report, nil)...)
+	if have {
+		rows = append(rows, kit.CapabilityTable(th, l, report, nil))
+	}
 	return pageScaffold(gtx, th, T(l, "diag.heading"), func(gtx layout.Context) layout.Dimensions {
 		if running {
 			gtx = gtx.Disabled()

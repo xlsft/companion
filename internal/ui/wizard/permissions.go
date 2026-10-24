@@ -70,23 +70,19 @@ func permStatus(v string) (theme.Status, string) {
 
 func (p *permState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) stepBody {
 	r, have := s.result(readiness.StepPermissions)
-	rows := make([]layout.Widget, 0, len(permissionCaps))
+	rs := make([]layout.Widget, 0, len(permissionCaps))
 	for _, c := range permissionCaps {
 		code := ""
 		if have {
 			code = r.Detail[string(c)]
 		}
-		rows = append(rows, p.row(w, th, l, c, code, have))
+		rs = append(rs, p.row(w, th, l, c, code, have))
 	}
-	return stepBody{maxW: 728, rows: []layout.Widget{func(gtx layout.Context) layout.Dimensions {
-		gtx.Constraints.Min.X = gtx.Constraints.Max.X
-		return kit.Rows(gtx, th, rows...)
-	}}}
+	return stepBody{rows: []layout.Widget{rows(th, rs...)}}
 }
 
-// row is one permission: icon tile, name and caption, status badge. A
-// permission that needs the user gets a tinted row and, for the hotkey,
-// the shortcut to add.
+// row is one permission as a status row. A permission that needs the user
+// is tinted and, for the hotkey, carries the shortcut to add.
 func (p *permState) row(w *Wizard, th *theme.Theme, l i18n.Lang, c contracts.Capability, code string, have bool) layout.Widget {
 	ds, key := permStatus(code)
 	word := i18n.T(l, key)
@@ -101,43 +97,22 @@ func (p *permState) row(w *Wizard, th *theme.Theme, l i18n.Lang, c contracts.Cap
 	case have && code != "" && !readiness.PermissionOK(code):
 		why = i18n.Tf(l, "wiz.result.fix", fixText(l, code))
 	}
-	title := w.text(medium(label(th, 14, i18n.T(l, "wiz.perm."+string(c)), th.Pal.Fg)))
-	sub := w.text(kit.Muted(th, why))
-	w.frame.texts = append(w.frame.texts, word)
-	tileCol, bg := th.Pal.AccentText, color.NRGBA{}
-	// Only a row that needs the user is tinted; a fallback already works.
+	// Only a row that needs the user is tinted; a fallback already works
+	// and only shows its state in the tile.
 	needsUser := code != "" && !readiness.PermissionOK(code)
-	switch {
-	case ds == theme.StatusWarn && !needsUser:
-		tileCol = th.Pal.Warn
-	case ds == theme.StatusWarn:
-		tileCol, bg = th.Pal.Warn, soft(th, th.Pal.Warn, 0.04)
-	case ds == theme.StatusError:
-		tileCol, bg = th.Pal.Error, soft(th, th.Pal.Error, 0.04)
+	var ic color.NRGBA
+	if ds == theme.StatusWarn {
+		ic = th.Pal.Warn
 	}
-	head := func(gtx layout.Context) layout.Dimensions {
-		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.IconTile(gtx, th, permissionIcons[c], tileCol) }),
-			kit.HSpace(th.Dp(16)),
-			layout.Flexed(1, vstack(th, 2, title, sub)),
-			kit.HSpace(th.Dp(16)),
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.Badge(gtx, th, ds, word) }),
-		)
+	row := kit.StatusRow{
+		Icon: permissionIcons[c], IconColor: ic,
+		Title: i18n.T(l, "wiz.perm."+string(c)), Caption: why,
+		Status: ds, Badge: word, Tint: needsUser,
 	}
-	var extra layout.Widget
 	if binding {
-		extra = p.binding(w, th, l)
+		row.Body = p.binding(w, th, l)
 	}
-	return func(gtx layout.Context) layout.Dimensions {
-		return layout.Background{}.Layout(gtx,
-			func(gtx layout.Context) layout.Dimensions {
-				fillRect(gtx, bg)
-				return layout.Dimensions{Size: gtx.Constraints.Min}
-			},
-			func(gtx layout.Context) layout.Dimensions {
-				return layout.Inset{Top: th.Dp(16), Bottom: th.Dp(16), Left: th.Dp(20), Right: th.Dp(20)}.Layout(gtx, vstack(th, 14, head, extra))
-			})
-	}
+	return w.statusRow(th, row)
 }
 
 // binding is the shortcut to add in the system settings, with Copy. The
@@ -154,18 +129,12 @@ func (p *permState) binding(w *Wizard, th *theme.Theme, l i18n.Lang) layout.Widg
 	if p.copied {
 		copyB.Label, copyB.Icon = i18n.T(l, "wiz.perm.copied"), icon.Check
 	}
-	return func(gtx layout.Context) layout.Dimensions {
-		// Aligned with the row text: the 40px tile plus its 16px gap.
-		return layout.Inset{Left: th.Dp(56)}.Layout(gtx, vstack(th, 8,
-			func(gtx layout.Context) layout.Dimensions {
-				gtx.Constraints.Min.X = gtx.Constraints.Max.X
-				return kit.CodeBlock(gtx, th, txt)
-			},
-			hstack(th, 8, func(gtx layout.Context) layout.Dimensions {
-				return w.btn(gtx, th, ActCopy, copyB, txt != "")
-			}, mode),
-		))
-	}
+	return kit.VStack(th, 8,
+		func(gtx layout.Context) layout.Dimensions { return kit.CodeBlock(gtx, th, txt) },
+		kit.HStack(th, 8, func(gtx layout.Context) layout.Dimensions {
+			return w.btn(gtx, th, ActCopy, copyB, txt != "")
+		}, mode),
+	)
 }
 
 func (p *permState) footer(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) footerSpec {

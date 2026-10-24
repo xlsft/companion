@@ -1,7 +1,9 @@
-// Package kit holds the widgets shared by the shell windows and the setup
-// wizard, drawn after the design prototypes: type styles, buttons with a
-// visible focus ring, bordered panels, full-width dividers, status badges
-// and the capability report rows of the Diagnostics view.
+// Package kit is the one component set of the UI, shared by the setup
+// wizard and the main window and drawn after the design prototypes: type
+// styles, buttons with a visible focus ring, panels and rows, status rows
+// and badges, alerts, form controls (field, select, segmented control,
+// toggle, slider, radio card), layout helpers and the capability table.
+// The same concept is drawn by the same function everywhere.
 //
 // Sizes are the prototypes' CSS pixels scaled with the user's text scale
 // (theme.Theme.Dp), so the layout keeps its proportions at every zoom.
@@ -35,6 +37,11 @@ func label(th *theme.Theme, size float32, txt string, col color.NRGBA) material.
 	return l
 }
 
+// Text is a label at a prototype pixel size in col.
+func Text(th *theme.Theme, size float32, txt string, col color.NRGBA) material.LabelStyle {
+	return label(th, size, txt, col)
+}
+
 // Heading is a page title: Unbounded, as in the prototypes.
 func Heading(th *theme.Theme, txt string) material.LabelStyle {
 	l := label(th, 26, txt, th.Pal.Fg)
@@ -42,7 +49,7 @@ func Heading(th *theme.Theme, txt string) material.LabelStyle {
 	return l
 }
 
-// Title is a smaller display heading for panels and dialogs.
+// Title is a smaller display heading for sections, panels and dialogs.
 func Title(th *theme.Theme, txt string) material.LabelStyle {
 	l := label(th, 17, txt, th.Pal.Fg)
 	l.Font = font.Font{Typeface: theme.Display, Weight: font.SemiBold}
@@ -72,6 +79,17 @@ func Lead(th *theme.Theme, txt string) material.LabelStyle {
 // Muted is a caption under a row title.
 func Muted(th *theme.Theme, txt string) material.LabelStyle {
 	return label(th, 12, txt, th.Pal.Muted)
+}
+
+// Caption is the 11.5px label above a field or a table column.
+func Caption(th *theme.Theme, txt string) material.LabelStyle {
+	return label(th, 11.5, txt, th.Pal.Muted)
+}
+
+// Medium returns l in medium weight, for row and card titles.
+func Medium(l material.LabelStyle) material.LabelStyle {
+	l.Font.Weight = font.Medium
+	return l
 }
 
 // Small is the least prominent text: versions, timestamps, hints.
@@ -111,6 +129,11 @@ func Logo(gtx layout.Context, th *theme.Theme, size float32) layout.Dimensions {
 // Icon draws a MingCute icon at a prototype pixel size.
 func Icon(gtx layout.Context, th *theme.Theme, n icon.Name, size float32, col color.NRGBA) layout.Dimensions {
 	return icon.Layout(gtx, n, th.Dp(size), col)
+}
+
+// IconW is Icon as a widget.
+func IconW(th *theme.Theme, n icon.Name, size float32, col color.NRGBA) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions { return Icon(gtx, th, n, size, col) }
 }
 
 // VCenter lays w out at its natural height and centres it vertically in
@@ -161,6 +184,26 @@ func FocusRing(gtx layout.Context, th *theme.Theme, focused bool, w layout.Widge
 		return w(gtx)
 	}
 	return widget.Border{Color: th.Pal.AccentLine, Width: 2, CornerRadius: th.Dp(4)}.Layout(gtx, w)
+}
+
+// Box draws w on a rounded fill with a 1px outline; radius is in
+// prototype pixels and a zero colour leaves that part out. It is the
+// primitive under buttons, fields, chips and the composer.
+func Box(gtx layout.Context, th *theme.Theme, bg, border color.NRGBA, radius float32, w layout.Widget) layout.Dimensions {
+	r := th.Dp(radius)
+	return layout.Background{}.Layout(gtx,
+		func(gtx layout.Context) layout.Dimensions {
+			d := layout.Dimensions{Size: gtx.Constraints.Min}
+			if bg.A != 0 {
+				d = rrect(gtx, gtx.Dp(r), bg)
+			}
+			if border.A != 0 {
+				widget.Border{Color: border, Width: 1, CornerRadius: r}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					return layout.Dimensions{Size: gtx.Constraints.Min}
+				})
+			}
+			return d
+		}, w)
 }
 
 // ButtonKind picks a button's look.
@@ -217,39 +260,26 @@ func (b ButtonStyle) Layout(gtx layout.Context, th *theme.Theme, c *widget.Click
 	return FocusRing(gtx, th, gtx.Focused(c), func(gtx layout.Context) layout.Dimensions {
 		return c.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Min.Y = gtx.Dp(th.Dp(h))
-			r := gtx.Dp(th.Dp(4))
-			return layout.Background{}.Layout(gtx,
-				func(gtx layout.Context) layout.Dimensions {
-					d := rrect(gtx, r, bg)
-					if border.A != 0 {
-						widget.Border{Color: border, Width: 1, CornerRadius: th.Dp(4)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-							return layout.Dimensions{Size: gtx.Constraints.Min}
-						})
-					}
-					return d
-				},
-				func(gtx layout.Context) layout.Dimensions {
-					return layout.Inset{Left: th.Dp(pad), Right: th.Dp(pad)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-						return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-							layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-								if b.Icon == "" {
-									return layout.Dimensions{}
-								}
-								return layout.Inset{Right: th.Dp(6)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-									return Icon(gtx, th, b.Icon, size, fg)
-								})
-							}),
-							layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-								return VCenter(gtx, gtx.Dp(th.Dp(h)), func(gtx layout.Context) layout.Dimensions {
-									l := label(th, size, b.Label, fg)
-									l.Font.Weight = font.Medium
-									l.MaxLines = 1
-									return l.Layout(gtx)
-								})
-							}),
-						)
-					})
+			return Box(gtx, th, bg, border, 4, func(gtx layout.Context) layout.Dimensions {
+				return layout.Inset{Left: th.Dp(pad), Right: th.Dp(pad)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							if b.Icon == "" {
+								return layout.Dimensions{}
+							}
+							return layout.Inset{Right: th.Dp(6)}.Layout(gtx, IconW(th, b.Icon, size, fg))
+						}),
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							return VCenter(gtx, gtx.Dp(th.Dp(h)), func(gtx layout.Context) layout.Dimensions {
+								l := label(th, size, b.Label, fg)
+								l.Font.Weight = font.Medium
+								l.MaxLines = 1
+								return l.Layout(gtx)
+							})
+						}),
+					)
 				})
+			})
 		})
 	})
 }
@@ -277,46 +307,58 @@ func IconButton(gtx layout.Context, th *theme.Theme, c *widget.Clickable, n icon
 				rrect(gtx, gtx.Dp(th.Dp(4)), th.Pal.Hover)
 				col = th.Pal.Fg
 			}
-			return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return Icon(gtx, th, n, 16, col)
-			})
+			return layout.Center.Layout(gtx, IconW(th, n, 16, col))
 		})
 	})
 }
 
-// Panel is a bordered, rounded group of rows with no inner padding, so the
-// rows' own dividers reach its edges.
+// Panel is the one bordered surface of the UI: a rounded box on the
+// Surface fill that spans its column, with no inner padding so the rows'
+// dividers reach its edges. Wizard cards, the permission list, tables and
+// the settings sections are all Panels.
 func Panel(gtx layout.Context, th *theme.Theme, w layout.Widget) layout.Dimensions {
+	return panel(gtx, th, th.Pal.Surface, w)
+}
+
+func panel(gtx layout.Context, th *theme.Theme, bg color.NRGBA, w layout.Widget) layout.Dimensions {
+	gtx.Constraints.Min.X = gtx.Constraints.Max.X
 	r := th.Dp(6)
 	m := op.Record(gtx.Ops)
-	dims := func() layout.Dimensions {
-		defer clip.UniformRRect(image.Rectangle{Max: gtx.Constraints.Max}, gtx.Dp(r)).Push(gtx.Ops).Pop()
-		return w(gtx)
-	}()
+	dims := w(gtx)
 	call := m.Stop()
-	gtx.Constraints = layout.Exact(dims.Size)
-	defer clip.UniformRRect(image.Rectangle{Max: dims.Size}, gtx.Dp(r)).Push(gtx.Ops).Pop()
+	size := image.Pt(gtx.Constraints.Max.X, dims.Size.Y)
+	shape := clip.UniformRRect(image.Rectangle{Max: size}, gtx.Dp(r))
+	paint.FillShape(gtx.Ops, bg, shape.Op(gtx.Ops))
+	st := shape.Push(gtx.Ops)
 	call.Add(gtx.Ops)
+	st.Pop()
+	gtx.Constraints = layout.Exact(size)
 	widget.Border{Color: th.Pal.Divider, Width: 1, CornerRadius: r}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return layout.Dimensions{Size: dims.Size}
+		return layout.Dimensions{Size: size}
 	})
-	return dims
+	return layout.Dimensions{Size: size, Baseline: dims.Baseline}
 }
+
+// CardPad is the inner padding of a Card, in prototype pixels.
+const CardPad = 18
 
 // Card is a padded Panel for free-form content.
 func Card(gtx layout.Context, th *theme.Theme, w layout.Widget) layout.Dimensions {
 	return Panel(gtx, th, func(gtx layout.Context) layout.Dimensions {
-		return layout.UniformInset(th.Dp(16)).Layout(gtx, w)
+		return layout.UniformInset(th.Dp(CardPad)).Layout(gtx, w)
 	})
 }
 
 // Rows lays rows out vertically inside a Panel with full-width dividers
-// between them.
+// between them; nil rows are left out.
 func Rows(gtx layout.Context, th *theme.Theme, rows ...layout.Widget) layout.Dimensions {
 	return Panel(gtx, th, func(gtx layout.Context) layout.Dimensions {
 		children := make([]layout.FlexChild, 0, 2*len(rows))
-		for i, r := range rows {
-			if i > 0 {
+		for _, r := range rows {
+			if r == nil {
+				continue
+			}
+			if len(children) > 0 {
 				children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions { return Divider(gtx, th) }))
 			}
 			children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -333,37 +375,54 @@ func IconTile(gtx layout.Context, th *theme.Theme, n icon.Name, col color.NRGBA)
 	s := gtx.Dp(th.Dp(40))
 	gtx.Constraints = layout.Exact(image.Pt(s, s))
 	rrect(gtx, gtx.Dp(th.Dp(6)), th.Pal.Raised)
-	return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return Icon(gtx, th, n, 18, col)
-	})
+	return layout.Center.Layout(gtx, IconW(th, n, 18, col))
+}
+
+// softOf is the badge fill of a status.
+func softOf(p theme.Palette, s theme.Status) color.NRGBA {
+	switch s {
+	case theme.StatusOK:
+		return p.OKSoft
+	case theme.StatusWarn:
+		return p.WarnSoft
+	case theme.StatusError:
+		return p.ErrSoft
+	}
+	return p.Raised
+}
+
+// tintOf is the row tint of a status that needs the user; others stay on
+// the panel's Surface.
+func tintOf(p theme.Palette, s theme.Status) color.NRGBA {
+	switch s {
+	case theme.StatusWarn:
+		return p.WarnTint
+	case theme.StatusError:
+		return p.ErrTint
+	}
+	return p.Surface
 }
 
 // Badge shows a status as an icon and a word on a soft tint, so the state
 // never depends on colour alone (NFR-005).
 func Badge(gtx layout.Context, th *theme.Theme, s theme.Status, txt string) layout.Dimensions {
-	fg, bg := th.Pal.Color(s), th.Pal.Raised
-	switch s {
-	case theme.StatusOK:
-		bg = th.Pal.OKSoft
-	case theme.StatusWarn:
-		bg = th.Pal.WarnSoft
-	case theme.StatusError:
-		bg = th.Pal.ErrSoft
-	}
-	return layout.Background{}.Layout(gtx,
-		func(gtx layout.Context) layout.Dimensions { return rrect(gtx, gtx.Dp(th.Dp(4)), bg) },
-		func(gtx layout.Context) layout.Dimensions {
-			gtx.Constraints.Min.Y = gtx.Dp(th.Dp(24))
-			return layout.Inset{Left: th.Dp(10), Right: th.Dp(10)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions { return Icon(gtx, th, StatusIcon(s), 12, fg) }),
-					HSpace(th.Dp(6)),
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						return VCenter(gtx, gtx.Dp(th.Dp(24)), label(th, 12, txt, fg).Layout)
-					}),
-				)
-			})
+	fg := th.Pal.Color(s)
+	h := gtx.Dp(th.Dp(24))
+	gtx.Constraints.Min = image.Point{} // a badge hugs its word, even in a table cell
+	return Box(gtx, th, softOf(th.Pal, s), color.NRGBA{}, 4, func(gtx layout.Context) layout.Dimensions {
+		gtx.Constraints.Min.Y = h
+		return layout.Inset{Left: th.Dp(10), Right: th.Dp(10)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(IconW(th, StatusIcon(s), 12, fg)),
+				HSpace(th.Dp(6)),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					l := label(th, 12, txt, fg)
+					l.MaxLines = 1
+					return VCenter(gtx, h, l.Layout)
+				}),
+			)
 		})
+	})
 }
 
 // StatusIcon is the shape cue for a status.
@@ -379,32 +438,34 @@ func StatusIcon(s theme.Status) icon.Name {
 	return icon.Time
 }
 
-// Progress is the 4px rounded progress track; frac is clamped to [0, 1].
+// Progress is the 4px rounded progress track of the wizard header; frac
+// is clamped to [0, 1].
 func Progress(gtx layout.Context, th *theme.Theme, frac float32) layout.Dimensions {
+	return ProgressBar(gtx, th, 4, frac)
+}
+
+// ProgressBar is a rounded progress track h prototype pixels tall.
+func ProgressBar(gtx layout.Context, th *theme.Theme, h float32, frac float32) layout.Dimensions {
 	frac = min(max(frac, 0), 1)
-	h := gtx.Dp(th.Dp(4))
-	size := image.Pt(gtx.Constraints.Max.X, h)
-	defer clip.UniformRRect(image.Rectangle{Max: size}, h/2).Push(gtx.Ops).Pop()
+	hp := gtx.Dp(th.Dp(h))
+	size := image.Pt(gtx.Constraints.Max.X, hp)
+	defer clip.UniformRRect(image.Rectangle{Max: size}, hp/2).Push(gtx.Ops).Pop()
 	paint.FillShape(gtx.Ops, th.Pal.Hover, clip.Rect{Max: size}.Op())
-	paint.FillShape(gtx.Ops, th.Pal.AccentLine, clip.Rect{Max: image.Pt(int(float32(size.X)*frac), h)}.Op())
+	paint.FillShape(gtx.Ops, th.Pal.AccentLine, clip.Rect{Max: image.Pt(int(float32(size.X)*frac), hp)}.Op())
 	return layout.Dimensions{Size: size}
 }
 
 // CodeBlock is a bordered monospace block; lines keep their indentation.
 func CodeBlock(gtx layout.Context, th *theme.Theme, src string) layout.Dimensions {
-	r := th.Dp(4)
-	return widget.Border{Color: th.Pal.Divider, Width: 1, CornerRadius: r}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		gtx.Constraints.Min.X = gtx.Constraints.Max.X
-		return layout.Background{}.Layout(gtx,
-			func(gtx layout.Context) layout.Dimensions { return rrect(gtx, gtx.Dp(r), th.Pal.Code) },
-			func(gtx layout.Context) layout.Dimensions {
-				return layout.Inset{Top: th.Dp(12), Bottom: th.Dp(12), Left: th.Dp(14), Right: th.Dp(14)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					l := Code(th, src)
-					l.Color = th.Pal.Fg2
-					l.WrapPolicy = text.WrapGraphemes
-					return l.Layout(gtx)
-				})
-			})
+	gtx.Constraints.Min.X = gtx.Constraints.Max.X
+	return Box(gtx, th, th.Pal.Code, th.Pal.Divider, 4, func(gtx layout.Context) layout.Dimensions {
+		return layout.Inset{Top: th.Dp(12), Bottom: th.Dp(12), Left: th.Dp(14), Right: th.Dp(14)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			gtx.Constraints.Min.X = gtx.Constraints.Max.X
+			l := Code(th, src)
+			l.Color = th.Pal.Fg2
+			l.WrapPolicy = text.WrapGraphemes
+			return l.Layout(gtx)
+		})
 	})
 }
 
@@ -415,27 +476,22 @@ func Field(gtx layout.Context, th *theme.Theme, ed *widget.Editor, hint string) 
 	if gtx.Focused(ed) {
 		border = th.Pal.AccentLine
 	}
-	r := th.Dp(4)
-	return widget.Border{Color: border, Width: 1, CornerRadius: r}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		gtx.Constraints.Min.X = gtx.Constraints.Max.X
-		gtx.Constraints.Min.Y = gtx.Dp(th.Dp(36))
-		return layout.Background{}.Layout(gtx,
-			func(gtx layout.Context) layout.Dimensions { return rrect(gtx, gtx.Dp(r), th.Pal.Raised) },
-			func(gtx layout.Context) layout.Dimensions {
-				return layout.Inset{Left: th.Dp(12), Right: th.Dp(12)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					return VCenter(gtx, gtx.Dp(th.Dp(36)), func(gtx layout.Context) layout.Dimensions {
-						e := material.Editor(th.Theme, ed, hint)
-						e.TextSize = px(th, 14)
-						e.Color = th.Pal.Fg
-						e.HintColor = th.Pal.Subtle
-						e.SelectionColor = th.Pal.AccentSoft
-						if ed.Mask != 0 {
-							e.Font.Typeface = theme.Mono
-						}
-						return e.Layout(gtx)
-					})
-				})
+	gtx.Constraints.Min.X = gtx.Constraints.Max.X
+	gtx.Constraints.Min.Y = gtx.Dp(th.Dp(36))
+	return Box(gtx, th, th.Pal.Raised, border, 4, func(gtx layout.Context) layout.Dimensions {
+		return layout.Inset{Left: th.Dp(12), Right: th.Dp(12)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			return VCenter(gtx, gtx.Dp(th.Dp(36)), func(gtx layout.Context) layout.Dimensions {
+				e := material.Editor(th.Theme, ed, hint)
+				e.TextSize = px(th, 14)
+				e.Color = th.Pal.Fg
+				e.HintColor = th.Pal.Subtle
+				e.SelectionColor = th.Pal.Selected
+				if ed.Mask != 0 {
+					e.Font.Typeface = theme.Mono
+				}
+				return e.Layout(gtx)
 			})
+		})
 	})
 }
 

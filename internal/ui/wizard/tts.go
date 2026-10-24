@@ -11,6 +11,7 @@ import (
 
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/tts"
+	"github.com/xlsft/companion/internal/ui/kit"
 )
 
 // ttsState is the speech-output form. Widgets are UI-goroutine only; the
@@ -18,8 +19,8 @@ import (
 type ttsState struct {
 	provider  widget.Enum
 	key       widget.Editor
-	speed     widget.Float
-	voiceBtns []widget.Clickable
+	speed     kit.Slider
+	voiceEnum widget.Enum
 	dirty     bool
 	replacing bool // the key editor is shown over a stored key
 
@@ -38,7 +39,7 @@ type ttsState struct {
 func (t *ttsState) init() {
 	t.provider.Value = TTSOpenAI
 	t.key.SingleLine, t.key.Mask = true, '•'
-	t.speed.Value = speedToSlider(tts.DefaultSpeed)
+	t.speed.Float.Value = speedToSlider(tts.DefaultSpeed)
 }
 
 func speedToSlider(s float64) float32 {
@@ -97,13 +98,13 @@ func (t *ttsState) loadVoices(w *Wizard) {
 
 func (t *ttsState) update(w *Wizard, gtx layout.Context, s snapshot) {
 	w.mu.Lock()
-	cfg, prefill, voices := t.cfg, t.prefill, t.voices
+	cfg, prefill := t.cfg, t.prefill
 	t.prefill = false
 	w.mu.Unlock()
 	if prefill {
 		t.provider.Value = cfg.Provider
 		if cfg.Speed > 0 {
-			t.speed.Value = speedToSlider(cfg.Speed)
+			t.speed.Float.Value = speedToSlider(cfg.Speed)
 		}
 		t.dirty = false
 	}
@@ -116,19 +117,19 @@ func (t *ttsState) update(w *Wizard, gtx layout.Context, s snapshot) {
 	if changed(gtx, &t.key) {
 		t.dirty = true
 	}
-	if t.speed.Update(gtx) {
+	if moved, steps := t.speed.Update(gtx); moved || steps != 0 {
+		if steps != 0 {
+			// Keyboard steps move by the slider's 0.05 snap.
+			s := sliderToSpeed(t.speed.Float.Value) + float64(steps)*0.05
+			t.speed.Float.Value = speedToSlider(sliderToSpeed(speedToSlider(s)))
+		}
 		t.dirty = true
 	}
-	if len(t.voiceBtns) < len(voices) {
-		t.voiceBtns = append(t.voiceBtns, make([]widget.Clickable, len(voices)-len(t.voiceBtns))...)
-	}
-	for i := range voices {
-		if t.voiceBtns[i].Clicked(gtx) {
-			w.mu.Lock()
-			t.voice = voices[i].ID
-			w.mu.Unlock()
-			t.dirty = true
-		}
+	if t.voiceEnum.Update(gtx) {
+		w.mu.Lock()
+		t.voice = t.voiceEnum.Value
+		w.mu.Unlock()
+		t.dirty = true
 	}
 	if w.clicked(gtx, ActReplaceKey) {
 		t.replacing = true
@@ -154,7 +155,7 @@ func (t *ttsState) save(w *Wizard, gtx layout.Context) {
 		return
 	}
 	providerChanged := t.cfg.Provider != t.provider.Value
-	cfg := TTSConfig{Provider: t.provider.Value, Voice: t.voice, Speed: sliderToSpeed(t.speed.Value)}
+	cfg := TTSConfig{Provider: t.provider.Value, Voice: t.voice, Speed: sliderToSpeed(t.speed.Float.Value)}
 	t.saving, t.err = true, ""
 	w.mu.Unlock()
 	apiKey := strings.TrimSpace(t.key.Text())

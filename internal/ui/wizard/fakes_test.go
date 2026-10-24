@@ -21,6 +21,7 @@ import (
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
 	"github.com/xlsft/companion/pkg/contracts"
 )
@@ -297,7 +298,7 @@ func (h *harness) frame() *op.Ops {
 		Constraints: layout.Exact(h.size),
 	}
 	gtx.Constraints.Min = h.size
-	fillRect(gtx, h.th.Pal.Bg) // the shell's window paints the background
+	kit.Fill(gtx, h.th.Pal.Bg) // the shell's window paints the background
 	h.w.Layout(gtx, h.th, h.lang)
 	h.r.Frame(ops)
 	return ops
