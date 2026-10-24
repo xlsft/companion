@@ -370,5 +370,17 @@
   "wiz.tts.speed": "Tempo",
   "wiz.tts.voice": "Stimme",
   "wizard.back": "Zurück zur Einrichtung",
-  "wizard.title": "Companion einrichten"
+  "wizard.title": "Companion einrichten",
+  "wiz.fix.not_configured": "Wähle einen Sprachdienst, gib seinen Schlüssel ein und speichere.",
+  "wiz.fix.rate_limit": "Der Dienst begrenzt Anfragen. Warte eine Minute und prüfe erneut.",
+  "wiz.fix.bad_request": "Der Dienst hat die Anfrage abgelehnt. Prüfe den Modell- oder Stimmennamen.",
+  "wiz.fix.stt_unavailable": "Die Spracherkennung ist nicht gestartet. Starte Companion neu; Details unter Diagnose.",
+  "wiz.fix.stt_failed": "Die Spracherkennung ist fehlgeschlagen. Versuche es erneut oder wähle ein kleineres Modell.",
+  "wiz.fix.capture_failed": "Der Screenshot ist fehlgeschlagen. Erlaube die Bildschirmaufnahme und prüfe erneut.",
+  "wiz.fix.no_provider": "Richte zuerst in Schritt 2 ein Sprachmodell ein.",
+  "wiz.fix.empty_reply": "Das Modell hat eine leere Antwort geliefert. Prüfe den Modellnamen und versuche es erneut.",
+  "wiz.fix.overlay_failed": "Hinweise konnten nicht über Fenstern angezeigt werden. Prüfe erneut; Details unter Diagnose.",
+  "wiz.fix.stale": "Die Bildschirme haben sich während der Prüfung geändert. Starte sie erneut.",
+  "wiz.fix.hotkey_conflict": "Eine andere App nutzt dieses Kürzel bereits. Gib es frei oder lege ein anderes fest.",
+  "wiz.fix.detect_failed": "Die Systemprüfung wurde nicht abgeschlossen. Starte sie erneut."
 }

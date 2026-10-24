@@ -370,5 +370,17 @@
   "wiz.tts.speed": "Velocità",
   "wiz.tts.voice": "Voce",
   "wizard.back": "Torna alla configurazione",
-  "wizard.title": "Configurazione di Companion"
+  "wizard.title": "Configurazione di Companion",
+  "wiz.fix.not_configured": "Scegli un servizio vocale, inserisci la chiave e salva.",
+  "wiz.fix.rate_limit": "Il servizio sta limitando le richieste. Attendi un minuto e ricontrolla.",
+  "wiz.fix.bad_request": "Il servizio ha rifiutato la richiesta. Controlla il nome del modello o della voce.",
+  "wiz.fix.stt_unavailable": "Il riconoscimento vocale non è partito. Riavvia Companion; i dettagli sono in Diagnostica.",
+  "wiz.fix.stt_failed": "Il riconoscimento vocale non è riuscito. Riprova o scegli un modello più piccolo.",
+  "wiz.fix.capture_failed": "Lo screenshot non è riuscito. Consenti la cattura dello schermo e ricontrolla.",
+  "wiz.fix.no_provider": "Configura prima un modello linguistico nel passaggio 2.",
+  "wiz.fix.empty_reply": "Il modello ha restituito una risposta vuota. Controlla il nome del modello e riprova.",
+  "wiz.fix.overlay_failed": "Non è stato possibile mostrare suggerimenti sopra le finestre. Ricontrolla; i dettagli sono in Diagnostica.",
+  "wiz.fix.stale": "Gli schermi sono cambiati durante il controllo. Eseguilo di nuovo.",
+  "wiz.fix.hotkey_conflict": "Un’altra app usa già questa scorciatoia. Liberala o assegnane un’altra.",
+  "wiz.fix.detect_failed": "Il controllo del sistema non è terminato. Eseguilo di nuovo."
 }

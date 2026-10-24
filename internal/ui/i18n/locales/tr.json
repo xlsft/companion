@@ -370,5 +370,17 @@
   "wiz.tts.speed": "Hız",
   "wiz.tts.voice": "Ses",
   "wizard.back": "Kuruluma dön",
-  "wizard.title": "Companion kurulumu"
+  "wizard.title": "Companion kurulumu",
+  "wiz.fix.not_configured": "Bir ses hizmeti seçin, anahtarını girin ve kaydedin.",
+  "wiz.fix.rate_limit": "Hizmet istekleri sınırlıyor. Bir dakika bekleyip yeniden kontrol edin.",
+  "wiz.fix.bad_request": "Hizmet isteği reddetti. Model veya ses adını kontrol edin.",
+  "wiz.fix.stt_unavailable": "Konuşma tanıma başlamadı. Companion'ı yeniden başlatın; ayrıntılar Tanılama'da.",
+  "wiz.fix.stt_failed": "Konuşma tanıma başarısız oldu. Yeniden deneyin veya daha küçük bir model seçin.",
+  "wiz.fix.capture_failed": "Ekran görüntüsü alınamadı. Ekran yakalamaya izin verin ve yeniden kontrol edin.",
+  "wiz.fix.no_provider": "Önce 2. adımda bir dil modeli ayarlayın.",
+  "wiz.fix.empty_reply": "Model boş bir yanıt döndürdü. Model adını kontrol edip yeniden deneyin.",
+  "wiz.fix.overlay_failed": "Pencerelerin üzerinde ipucu gösterilemedi. Yeniden kontrol edin; ayrıntılar Tanılama'da.",
+  "wiz.fix.stale": "Kontrol sırasında ekranlar değişti. Yeniden çalıştırın.",
+  "wiz.fix.hotkey_conflict": "Bu kısayolu başka bir uygulama kullanıyor. Serbest bırakın veya başka bir tane atayın.",
+  "wiz.fix.detect_failed": "Sistem kontrolü tamamlanmadı. Yeniden çalıştırın."
 }

@@ -370,5 +370,17 @@
   "wiz.tts.speed": "Velocidade",
   "wiz.tts.voice": "Voz",
   "wizard.back": "Voltar à configuração",
-  "wizard.title": "Configuração do Companion"
+  "wizard.title": "Configuração do Companion",
+  "wiz.fix.not_configured": "Escolha um serviço de voz, insira a chave e salve.",
+  "wiz.fix.rate_limit": "O serviço está limitando as solicitações. Aguarde um minuto e verifique de novo.",
+  "wiz.fix.bad_request": "O serviço recusou a solicitação. Verifique o nome do modelo ou da voz.",
+  "wiz.fix.stt_unavailable": "O reconhecimento de fala não iniciou. Reinicie o Companion; o Diagnóstico mostra os detalhes.",
+  "wiz.fix.stt_failed": "O reconhecimento de fala falhou. Tente de novo ou escolha um modelo menor.",
+  "wiz.fix.capture_failed": "A captura de tela falhou. Permita a captura de tela e verifique de novo.",
+  "wiz.fix.no_provider": "Primeiro configure um modelo de linguagem na etapa 2.",
+  "wiz.fix.empty_reply": "O modelo retornou uma resposta vazia. Verifique o nome do modelo e tente de novo.",
+  "wiz.fix.overlay_failed": "Não foi possível desenhar dicas sobre as janelas. Verifique de novo; o Diagnóstico mostra os detalhes.",
+  "wiz.fix.stale": "As telas mudaram durante a verificação. Execute-a de novo.",
+  "wiz.fix.hotkey_conflict": "Outro app já usa este atalho. Libere-o ou defina outro.",
+  "wiz.fix.detect_failed": "A verificação do sistema não terminou. Execute-a de novo."
 }

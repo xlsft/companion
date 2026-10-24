@@ -370,5 +370,17 @@
   "wiz.tts.speed": "Szybkość",
   "wiz.tts.voice": "Głos",
   "wizard.back": "Wróć do konfiguracji",
-  "wizard.title": "Konfiguracja Companion"
+  "wizard.title": "Konfiguracja Companion",
+  "wiz.fix.not_configured": "Wybierz usługę głosu, wpisz jej klucz i zapisz.",
+  "wiz.fix.rate_limit": "Usługa ogranicza liczbę zapytań. Poczekaj minutę i sprawdź ponownie.",
+  "wiz.fix.bad_request": "Usługa odrzuciła zapytanie. Sprawdź nazwę modelu lub głosu.",
+  "wiz.fix.stt_unavailable": "Rozpoznawanie mowy się nie uruchomiło. Uruchom ponownie Companion; szczegóły w Diagnostyce.",
+  "wiz.fix.stt_failed": "Rozpoznawanie mowy nie powiodło się. Spróbuj ponownie lub wybierz mniejszy model.",
+  "wiz.fix.capture_failed": "Zrzut ekranu się nie udał. Zezwól na przechwytywanie ekranu i sprawdź ponownie.",
+  "wiz.fix.no_provider": "Najpierw skonfiguruj model językowy w kroku 2.",
+  "wiz.fix.empty_reply": "Model zwrócił pustą odpowiedź. Sprawdź nazwę modelu i spróbuj ponownie.",
+  "wiz.fix.overlay_failed": "Nie udało się wyświetlić wskazówek nad oknami. Sprawdź ponownie; szczegóły w Diagnostyce.",
+  "wiz.fix.stale": "Ekrany zmieniły się podczas sprawdzania. Uruchom je ponownie.",
+  "wiz.fix.hotkey_conflict": "Inna aplikacja używa już tego skrótu. Zwolnij go lub ustaw inny.",
+  "wiz.fix.detect_failed": "Sprawdzanie systemu nie zakończyło się. Uruchom je ponownie."
 }

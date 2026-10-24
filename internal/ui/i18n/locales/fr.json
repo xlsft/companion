@@ -370,5 +370,17 @@
   "wiz.tts.speed": "Vitesse",
   "wiz.tts.voice": "Voix",
   "wizard.back": "Retour à la configuration",
-  "wizard.title": "Configuration de Companion"
+  "wizard.title": "Configuration de Companion",
+  "wiz.fix.not_configured": "Choisissez un service vocal, saisissez sa clé et enregistrez.",
+  "wiz.fix.rate_limit": "Le service limite les requêtes. Patientez une minute et vérifiez à nouveau.",
+  "wiz.fix.bad_request": "Le service a refusé la requête. Vérifiez le nom du modèle ou de la voix.",
+  "wiz.fix.stt_unavailable": "La reconnaissance vocale n’a pas démarré. Redémarrez Companion ; le Diagnostic donne les détails.",
+  "wiz.fix.stt_failed": "La reconnaissance vocale a échoué. Réessayez ou choisissez un modèle plus petit.",
+  "wiz.fix.capture_failed": "La capture d’écran a échoué. Autorisez la capture d’écran et vérifiez à nouveau.",
+  "wiz.fix.no_provider": "Configurez d’abord un modèle de langage à l’étape 2.",
+  "wiz.fix.empty_reply": "Le modèle a renvoyé une réponse vide. Vérifiez le nom du modèle et réessayez.",
+  "wiz.fix.overlay_failed": "Impossible d’afficher des indications au-dessus des fenêtres. Vérifiez à nouveau ; le Diagnostic donne les détails.",
+  "wiz.fix.stale": "Les écrans ont changé pendant la vérification. Relancez-la.",
+  "wiz.fix.hotkey_conflict": "Une autre app utilise déjà ce raccourci. Libérez-le ou choisissez-en un autre.",
+  "wiz.fix.detect_failed": "La vérification du système n’a pas abouti. Relancez-la."
 }
