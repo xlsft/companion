@@ -39,21 +39,21 @@ func TestEnergy(t *testing.T) {
 	}{
 		{"silence", silence(ms(1000)), nil},
 		{"quiet noise below threshold", tone(ms(1000), -60), nil},
-		{"click shorter than attack", concat(silence(ms(200)), tone(ms(40), -20), silence(ms(500))), nil},
+		{"click shorter than attack", concat(silence(ms(200)), tone(ms(40), -20), silence(ms(900))), nil},
 		{
 			"speech then long silence",
-			concat(silence(ms(200)), tone(ms(500), -20), silence(ms(600))),
+			concat(silence(ms(200)), tone(ms(500), -20), silence(ms(900))),
 			[]Event{{Speech: true, At: ms(200)}, {Speech: false, At: ms(700)}},
 		},
 		{
 			"pause shorter than hangover stays one run",
-			concat(tone(ms(300), -20), silence(ms(200)), tone(ms(300), -20)),
+			concat(tone(ms(300), -20), silence(ms(500)), tone(ms(300), -20)),
 			[]Event{{Speech: true, At: 0}},
 		},
 		{
 			"two runs",
-			concat(tone(ms(300), -20), silence(ms(500)), tone(ms(300), -20)),
-			[]Event{{Speech: true, At: 0}, {Speech: false, At: ms(300)}, {Speech: true, At: ms(800)}},
+			concat(tone(ms(300), -20), silence(ms(900)), tone(ms(300), -20)),
+			[]Event{{Speech: true, At: 0}, {Speech: false, At: ms(300)}, {Speech: true, At: ms(1200)}},
 		},
 	}
 	for _, tt := range tests {
@@ -68,7 +68,7 @@ func TestEnergy(t *testing.T) {
 
 // Feeding odd-sized chunks must give the same events as one big buffer.
 func TestEnergyChunkingInvariant(t *testing.T) {
-	audio := concat(silence(ms(130)), tone(ms(470), -25), silence(ms(800)), tone(ms(90), -25))
+	audio := concat(silence(ms(130)), tone(ms(470), -25), silence(ms(900)), tone(ms(150), -25))
 	whole := NewEnergy(DefaultConfig()).Process(audio)
 
 	v := NewEnergy(DefaultConfig())
@@ -91,7 +91,7 @@ func TestEnergyChunkingInvariant(t *testing.T) {
 func TestEnergyThresholdConfigurable(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.ThresholdDB = -70
-	if got := NewEnergy(cfg).Process(tone(ms(500), -60)); len(got) != 1 || !got[0].Speech {
+	if got := NewEnergy(cfg).Process(concat(silence(ms(300)), tone(ms(500), -60))); len(got) != 1 || !got[0].Speech {
 		t.Fatalf("lower threshold should detect quiet tone, got %v", got)
 	}
 }

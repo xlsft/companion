@@ -15,6 +15,21 @@ type Partial struct {
 	Stable bool
 }
 
+// Endpoint reasons carried by EndpointEvent.
+const (
+	EndpointSilence     = protocol.EndpointSilence
+	EndpointNoSpeech    = protocol.EndpointNoSpeech
+	EndpointMaxDuration = protocol.EndpointMaxDuration
+)
+
+// EndpointEvent says hands-free capture should stop. The core normally
+// reacts with Finish; the session stays valid until then.
+type EndpointEvent struct {
+	Reason string
+	// At is the position in session audio of the decision.
+	At time.Duration
+}
+
 type Segment struct {
 	Start, End time.Duration
 	Text       string
@@ -40,6 +55,7 @@ type Session struct {
 	id        string
 	partials  chan Partial
 	speech    chan bool
+	endpoint  chan EndpointEvent
 	cancelled chan struct{}
 
 	// wmu orders audio chunks; it is separate from mu so a Write blocked on
@@ -64,6 +80,12 @@ func (s *Session) Partials() <-chan Partial { return s.partials }
 // Speech yields VAD transitions (true = speech started) and is closed when
 // the session ends. Best effort: older events are dropped if not consumed.
 func (s *Session) Speech() <-chan bool { return s.speech }
+
+// Endpoint yields at most one event, only for sessions started with
+// WithVAD, and is closed when the session ends. A partial transcript never
+// implies an endpoint: only silence, a leading-silence timeout or the
+// duration cap produce one.
+func (s *Session) Endpoint() <-chan EndpointEvent { return s.endpoint }
 
 // Write sends 16 kHz mono samples.
 func (s *Session) Write(pcm []int16) error {
@@ -164,6 +186,16 @@ func (s *Session) end() {
 	s.ended = true
 	close(s.partials)
 	close(s.speech)
+	close(s.endpoint)
+}
+
+func (s *Session) deliverEndpoint(e EndpointEvent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.ended || s.finishing {
+		return
+	}
+	pushLatest(s.endpoint, e)
 }
 
 func (s *Session) deliverPartial(p Partial) {

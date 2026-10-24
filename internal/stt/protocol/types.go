@@ -10,9 +10,10 @@ const (
 	MethodSessionFinish = "session.finish"
 	MethodSessionCancel = "session.cancel"
 
-	MethodSessionPartial = "session.partial" // N, sidecar → core
-	MethodSessionVAD     = "session.vad"     // N, sidecar → core
-	MethodLog            = "log"             // N, sidecar → core
+	MethodSessionPartial  = "session.partial"  // N, sidecar → core
+	MethodSessionVAD      = "session.vad"      // N, sidecar → core
+	MethodSessionEndpoint = "session.endpoint" // N, sidecar → core
+	MethodLog             = "log"              // N, sidecar → core
 )
 
 // Audio format accepted by session.start. Only one format exists so the
@@ -60,7 +61,33 @@ type SessionStartParams struct {
 	Partials   bool   `json:"partials"`
 	// Language overrides the initialize default for this session.
 	Language string `json:"language,omitempty"`
+	// VAD enables endpointing for the session (hands-free). Absent means
+	// the sidecar never emits session.endpoint for it.
+	VAD *VADOptions `json:"vad,omitempty"`
 }
+
+// VADOptions are the per-session endpointing parameters; zero or absent
+// fields take the sidecar defaults.
+type VADOptions struct {
+	// EndSilenceMS is the silence after speech that ends the utterance (800).
+	EndSilenceMS int `json:"end_silence_ms,omitempty"`
+	// MaxLeadingSilenceMS is how long to wait for speech to start (5000).
+	MaxLeadingSilenceMS int `json:"max_leading_silence_ms,omitempty"`
+	// MinSpeechMS is the shortest burst that counts as speech (120).
+	MinSpeechMS int `json:"min_speech_ms,omitempty"`
+	// MarginDB is the level above the noise floor that counts as speech (12).
+	MarginDB float64 `json:"margin_db,omitempty"`
+	// MaxDurationMS ends the session at this audio length; 0 uses the
+	// sidecar's per-session audio limit.
+	MaxDurationMS int `json:"max_duration_ms,omitempty"`
+}
+
+// Endpoint reasons.
+const (
+	EndpointSilence     = "silence"
+	EndpointNoSpeech    = "no_speech_timeout"
+	EndpointMaxDuration = "max_duration"
+)
 
 type SessionAudioParams struct {
 	SessionID string `json:"session_id"`
@@ -108,6 +135,16 @@ type VADParams struct {
 	SessionID string `json:"session_id"`
 	Speech    bool   `json:"speech"`
 	// AtMS is the transition position in session audio.
+	AtMS int64 `json:"at_ms"`
+}
+
+// EndpointParams is sent at most once per session, only when session.start
+// carried vad options. The core decides what to do (usually session.finish);
+// audio and finish stay valid afterwards.
+type EndpointParams struct {
+	SessionID string `json:"session_id"`
+	Reason    string `json:"reason"`
+	// AtMS is the session audio position of the decision.
 	AtMS int64 `json:"at_ms"`
 }
 
