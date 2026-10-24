@@ -20,7 +20,7 @@ type STTSession interface {
 	Finish(ctx context.Context) (stt.Final, error)
 	Cancel()
 	Partials() <-chan stt.Partial
-	Speech() <-chan bool
+	Endpoint() <-chan stt.EndpointEvent
 }
 
 // STT starts recognition sessions.
@@ -72,7 +72,9 @@ func (r *MicRecorder) Start(ctx context.Context, ref contracts.SessionRef, emit 
 	if r.Device != nil {
 		device = r.Device()
 	}
-	opts := []stt.SessionOption{stt.WithPartials(true)}
+	// The sidecar's endpointer decides when hands-free speech has ended;
+	// the session manager ignores UtteranceEnd in other modes.
+	opts := []stt.SessionOption{stt.WithPartials(true), stt.WithVAD(stt.VADOptions{})}
 	if r.Language != "" {
 		opts = append(opts, stt.WithLanguage(r.Language))
 	}
@@ -129,9 +131,8 @@ func (r *MicRecorder) Start(ctx context.Context, ref contracts.SessionRef, emit 
 // relay forwards partial transcripts and the end of speech for hands-free
 // mode. Partials are display-only and never trigger actions (FR-STT-008).
 func relay(ctx context.Context, sess STTSession, emit session.Emitter) {
-	heard := false
-	partials, speech := sess.Partials(), sess.Speech()
-	for partials != nil || speech != nil {
+	partials, endpoint := sess.Partials(), sess.Endpoint()
+	for partials != nil || endpoint != nil {
 		select {
 		case <-ctx.Done():
 			return
@@ -141,16 +142,12 @@ func relay(ctx context.Context, sess STTSession, emit session.Emitter) {
 				continue
 			}
 			emit(session.TranscriptPartial{Text: p.Text})
-		case on, ok := <-speech:
+		case _, ok := <-endpoint:
 			if !ok {
-				speech = nil
+				endpoint = nil
 				continue
 			}
-			if on {
-				heard = true
-			} else if heard {
-				emit(session.UtteranceEnd{})
-			}
+			emit(session.UtteranceEnd{})
 		}
 	}
 }
