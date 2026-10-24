@@ -48,7 +48,7 @@ jobs:
         with:
           version: v2.15.0
       - name: govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -tags novulkan ./...
+        run: .github/scripts/govulncheck.sh
       - name: shellcheck
         run: shellcheck install.sh packaging/install.sh packaging/dist-linux.sh .github/scripts/*.sh
 
