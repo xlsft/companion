@@ -1,6 +1,6 @@
 # STT sidecar protocol
 
-- Tickets: OC-28 (protocol), OC-29 (whisper.cpp runtime)
+- Tickets: OC-28 (protocol), OC-29 (whisper.cpp runtime), OC-35 (VAD and endpointing)
 - Code: `internal/stt/protocol` (wire types, codec), `internal/stt` (core client), `internal/stt/server` + `cmd/stt-sidecar` (sidecar)
 - Protocol version: `1` (returned by `initialize`; bump on incompatible change)
 
@@ -67,6 +67,17 @@ Result:
 | `format` | string | Must be `"pcm_s16le"`, else `-32009`. |
 | `partials` | bool | Emit `session.partial` while audio streams. |
 | `language` | string, optional | Overrides the `initialize` language. |
+| `vad` | object, optional | Turns on endpointing (hands-free), see below. Absent: the sidecar never sends `session.endpoint` for this session. |
+
+`vad` fields, all optional (0 or absent = default); out-of-range values fail with `-32602` detail `vad`:
+
+| Field | Default | Range | Meaning |
+|---|---|---|---|
+| `end_silence_ms` | 800 | 0..60000 | Silence after speech that ends the utterance. Also the detector hangover, so shorter pauses never split speech. |
+| `max_leading_silence_ms` | 5000 | 0..600000 | How long to wait for speech to start. |
+| `min_speech_ms` | 120 | 0..5000 | Shortest voiced burst that counts as speech (attack); rejects clicks. |
+| `margin_db` | 12 | 0..60 | Level above the tracked noise floor that counts as speech. |
+| `max_duration_ms` | sidecar `-max-utterance` | >= 0 | Session audio length that ends the session; capped by `-max-utterance`. |
 
 Result: `{}`. Duplicate id → `-32008`.
 
@@ -101,6 +112,12 @@ The session is removed when the response is sent. If `session.cancel` arrives du
 ### `session.vad` (notification, sidecar → core)
 
 `{session_id, speech, at_ms}` on every speech/silence transition of the sidecar VAD (energy-based, `internal/stt/vad`).
+
+### `session.endpoint` (notification, sidecar → core)
+
+`{session_id, reason, at_ms}`, sent at most once per session and only when `session.start` carried `vad`. `reason` is `silence` (speech was heard, then `end_silence_ms` of silence), `no_speech_timeout` (no speech within `max_leading_silence_ms`) or `max_duration`. `at_ms` is the audio position of the decision. It is advisory: the sidecar keeps accepting audio and `session.finish` works whether or not an endpoint was sent, and an endpoint followed by `finish` is the normal hands-free path. Manual end (hotkey or command) is simply `session.finish` without an endpoint. Partials never produce an endpoint, so no irreversible action is ever triggered by interim text (FR-STT-008).
+
+Endpointing details (`internal/stt/vad`): the energy VAD tracks the background level as the minimum frame RMS over a 2 s window (smoothed: fast down, about 2 s up), so steady noise such as a fan becomes the floor and falls under `floor + margin_db`; the threshold never drops below `-vad-threshold-db` (default -45 dBFS), so a quiet room is not speech. The first 200 ms calibrate the initial floor (clamped to -35 dBFS, so speech from the first frame is not learned as noise). Frames with a zero-crossing rate above 0.42 (hiss, white noise) are never voiced; this is a cheap stand-in for spectral flatness. Limit: loud non-hiss noise present from the first frame can count as speech until the floor adapts (about 3 s).
 
 ### `log` (notification, sidecar → core)
 
@@ -149,7 +166,7 @@ The session is removed when the response is sent. If `session.cancel` arrives du
 ## Client semantics (`internal/stt`)
 
 - `stt.Start(ctx, cfg)` spawns the sidecar with `exec.CommandContext` and runs `initialize`; `stt.NewClient(r, w)` speaks the protocol over any pipe pair (tests, in-process).
-- `Client.StartSession(ctx, opts...)` → `*Session` with `Write([]int16)`, `Partials() <-chan Partial`, `Speech() <-chan bool`, `Finish(ctx) (Final, error)`, `Cancel()`.
+- `Client.StartSession(ctx, opts...)` → `*Session` with `Write([]int16)`, `Partials() <-chan Partial`, `Speech() <-chan bool`, `Endpoint() <-chan EndpointEvent`, `Finish(ctx) (Final, error)`, `Cancel()`. `stt.WithVAD(stt.VADOptions{...})` enables endpointing; without it `Endpoint()` never yields.
 - After `Cancel()` or `Finish` returns, late notifications for that session are dropped and the channels are closed.
 - `Partials()` keeps only the newest partials if the consumer falls behind (each partial supersedes the previous one).
 - If the sidecar exits or its stdout breaks, every pending call fails with `stt.ErrSidecarExited` (wrapping the exit status) and all sessions end. Restarting is the supervisor's job (OC-36).
@@ -162,8 +179,8 @@ The session is removed when the response is sent. If `session.cancel` arrives du
 | `-partial-interval` | `700ms` | new audio between partial decodes |
 | `-partial-window` | `10s` | audio decoded per partial |
 | `-max-utterance` | `5m` | per-session audio limit |
-| `-vad-threshold-db` | `-45` | frame RMS in dBFS counted as speech |
-| `-vad-hangover` | `400ms` | silence before speech→silence transition |
+| `-vad-threshold-db` | `-45` | absolute minimum threshold in dBFS; the adaptive threshold is `max(this, floor + margin)` |
+| `-vad-hangover` | `800ms` | silence before speech→silence transition (per-session `end_silence_ms` overrides it when `vad` is sent) |
 | `-vad` | `true` | `false` treats all audio as speech |
 
 ## whisper.cpp build
