@@ -35,7 +35,7 @@ Per `wl_output`, one surface:
 - no opaque region
 - buffers: `memfd` + `wl_shm_pool`, ARGB8888, up to 3 in flight, recycled on `wl_buffer.release`
 - scale: when `wp_fractional_scale_manager_v1` + `wp_viewporter` exist, buffer is native pixels and `wp_viewport.set_destination(logical)`; otherwise `wl_surface.set_buffer_scale(round(native/logical))` from `wl_output.scale`
-- `DisplayID` = `wl:<wl_output.name>` (e.g. `wl:DP-2`), stable across reconnects (wl_output v4)
+- `DisplayID` = `<wl_output.name>` (e.g. `DP-2`), the same IDs as `internal/platform/linuxwayland/displays`, stable across reconnects (wl_output v4)
 - `New` returns `contracts.CapabilityError{CapOverlayClickThrough, ErrUnsupported}` when the compositor has no `zwlr_layer_shell_v1`
 - `layer_surface.closed` (output unplugged) marks the surface closed; `Present` then fails and the caller reopens on the new topology
 
