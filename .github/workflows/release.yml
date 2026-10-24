@@ -64,7 +64,7 @@ jobs:
           sudo apt-get install -y -qq --no-install-recommends \
             libwayland-dev libx11-dev libx11-xcb-dev libxkbcommon-x11-dev \
             libgles2-mesa-dev libegl1-mesa-dev libffi-dev libxcursor-dev \
-            libxfixes-dev libvulkan-dev libpipewire-0.3-dev pkg-config \
+            libxfixes-dev libvulkan-dev libpipewire-0.3-dev libspa-0.2-dev pkg-config \
             cmake ninja-build ccache squashfs-tools
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
