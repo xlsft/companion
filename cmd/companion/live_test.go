@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xlsft/companion/internal/audio/playback"
 	"github.com/xlsft/companion/internal/llm"
 	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/providers"
@@ -46,6 +47,30 @@ type fakeAPI struct {
 	sawTool   bool
 	speeches  int
 	firstByte time.Duration
+
+	// hold keeps the answer after the tool round streaming and the speech
+	// playing for many seconds, so a test can interrupt both mid-way.
+	hold bool
+	// gone lists the held responses ("chat", "speech") whose client went
+	// away before the end.
+	gone []string
+}
+
+func (f *fakeAPI) abandoned(kind string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, g := range f.gone {
+		if g == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *fakeAPI) markGone(kind string) {
+	f.mu.Lock()
+	f.gone = append(f.gone, kind)
+	f.mu.Unlock()
 }
 
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +78,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case strings.HasSuffix(r.URL.Path, "/chat/completions"):
 		f.chat(w, r)
 	case strings.HasSuffix(r.URL.Path, "/audio/speech"):
-		f.speech(w)
+		f.speech(w, r)
 	default:
 		http.NotFound(w, r)
 	}
@@ -69,6 +94,9 @@ func (f *fakeAPI) chat(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.Unmarshal(body, &req)
 	toolRound := false
+	// The barge-in request gets a short plain answer, so the hints the
+	// test watches can only come from the interrupted generation.
+	followUp := len(req.Messages) > 0 && strings.Contains(string(req.Messages[len(req.Messages)-1].Content), bargeText)
 	f.mu.Lock()
 	f.chats++
 	for _, m := range req.Messages {
@@ -93,6 +121,24 @@ func (f *fakeAPI) chat(w http.ResponseWriter, r *http.Request) {
 	delta := func(d map[string]any) map[string]any {
 		return map[string]any{"choices": []any{map[string]any{"index": 0, "delta": d}}}
 	}
+	if followUp {
+		send(delta(map[string]any{"content": "Хорошо."}))
+		send(map[string]any{"choices": []any{map[string]any{"index": 0, "delta": map[string]any{}, "finish_reason": "stop"}}})
+		fmt.Fprint(w, "data: [DONE]\n\n")
+		fl.Flush()
+		return
+	}
+	if toolRound && f.hold {
+		for i := 0; ; i++ {
+			select {
+			case <-r.Context().Done():
+				f.markGone("chat")
+				return
+			case <-time.After(200 * time.Millisecond):
+			}
+			send(delta(map[string]any{"content": fmt.Sprintf("часть %d ", i)}))
+		}
+	}
 	if toolRound {
 		for _, part := range []string{"Готово, ", "я показал её ", "на экране."} {
 			send(delta(map[string]any{"content": part}))
@@ -108,36 +154,58 @@ func (f *fakeAPI) chat(w http.ResponseWriter, r *http.Request) {
 	fl.Flush()
 }
 
-// speech answers with 0.4 s of a quiet 440 Hz tone, 24 kHz mono PCM16.
-func (f *fakeAPI) speech(w http.ResponseWriter) {
+// speech answers with 0.4 s of a quiet 440 Hz tone, 24 kHz mono PCM16;
+// held, it streams 20 s of it in real time.
+func (f *fakeAPI) speech(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	f.speeches++
+	hold := f.hold
 	f.mu.Unlock()
-	const rate, dur = 24000, 0.4
+	dur := 0.4
+	if hold {
+		dur = 20
+	}
+	const rate = 24000
 	buf := make([]byte, 2*int(rate*dur))
 	for i := range len(buf) / 2 {
 		v := int16(0.04 * math.MaxInt16 * math.Sin(2*math.Pi*440*float64(i)/rate))
 		binary.LittleEndian.PutUint16(buf[2*i:], uint16(v))
 	}
 	w.Header().Set("Content-Type", "audio/pcm")
-	_, _ = w.Write(buf)
+	if !hold {
+		_, _ = w.Write(buf)
+		return
+	}
+	fl := w.(http.Flusher)
+	const chunk = 2 * rate / 20 // 50 ms
+	for off := 0; off < len(buf); off += chunk {
+		if _, err := w.Write(buf[off:min(off+chunk, len(buf))]); err != nil {
+			f.markGone("speech")
+			return
+		}
+		fl.Flush()
+		select {
+		case <-r.Context().Done():
+			f.markGone("speech")
+			return
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
 }
 
-func TestLiveTalk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-	defer cancel()
+// liveCore builds the real core against api and starts it.
+func liveCore(t *testing.T, ctx context.Context, api *fakeAPI, wrap func(playback.Player) playback.Player) *core {
+	t.Helper()
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-
-	api := &fakeAPI{}
 	srv := httptest.NewServer(api)
-	defer srv.Close()
+	t.Cleanup(srv.Close)
 
 	dir := t.TempDir()
 	db, err := store.Open(ctx, filepath.Join(dir, "companion.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	svc, err := settings.NewService(ctx, store.NewKV(db))
 	if err != nil {
 		t.Fatal(err)
@@ -151,6 +219,9 @@ func TestLiveTalk(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("capture=%v overlay=%v", c.captureErr, c.overlayErr)
+	if wrap != nil {
+		c.player = wrap(c.player)
+	}
 
 	if _, err := c.providers.Create(ctx, providers.Input{
 		Name: "local stand-in", Kind: llm.KindOpenAI, BaseURL: srv.URL + "/v1", Model: "stand-in",
@@ -172,7 +243,15 @@ func TestLiveTalk(t *testing.T) {
 	if err := c.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer c.Stop(context.Background())
+	t.Cleanup(func() { c.Stop(context.Background()) })
+	return c
+}
+
+func TestLiveTalk(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	api := &fakeAPI{}
+	c := liveCore(t, ctx, api, nil)
 
 	snaps, unsub := c.talk.Subscribe()
 	defer unsub()
@@ -223,4 +302,168 @@ done:
 	if api.speeches == 0 {
 		t.Error("reply was not spoken")
 	}
+}
+
+// bargeText marks the request that interrupts the held answer.
+const bargeText = "and now?"
+
+// watchedPlayer remembers every playback so the test can see them end.
+type watchedPlayer struct {
+	playback.Player
+	mu    sync.Mutex
+	plays []playback.Playback
+}
+
+func (w *watchedPlayer) Play(ctx context.Context, src playback.ChunkSource, f playback.Format) (playback.Playback, error) {
+	pb, err := w.Player.Play(ctx, src, f)
+	if err == nil {
+		w.mu.Lock()
+		w.plays = append(w.plays, pb)
+		w.mu.Unlock()
+	}
+	return pb, err
+}
+
+// playing counts the first n playbacks that have not ended.
+func (w *watchedPlayer) playing(n int) int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	busy := 0
+	for _, pb := range w.plays[:min(n, len(w.plays))] {
+		select {
+		case <-pb.Done():
+		default:
+			busy++
+		}
+	}
+	return busy
+}
+
+func (w *watchedPlayer) count() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return len(w.plays)
+}
+
+// TestLiveTalkInterrupt interrupts an answer that is still streaming and
+// speaking, with its hint on screen, and checks that the speaker and the
+// overlay stop within the budget and the model and speech requests are
+// abandoned (OC-65):
+//
+//	go test -tags=novulkan,live -run TestLiveTalkInterrupt -v ./cmd/companion
+func TestLiveTalkInterrupt(t *testing.T) {
+	tests := []struct {
+		name string
+		act  func(ctx context.Context, c *core) error
+	}{
+		{"escape", func(_ context.Context, c *core) error { return c.ctl.Post(session.Cancel{}) }},
+		{"chat stop", func(ctx context.Context, c *core) error { return c.chat.Stop(ctx) }},
+		{"new request", func(ctx context.Context, c *core) error { return c.chat.Send(ctx, bargeText) }},
+	}
+	const budget = 100 * time.Millisecond
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			api := &fakeAPI{hold: true}
+			var player *watchedPlayer
+			c := liveCore(t, ctx, api, func(p playback.Player) playback.Player {
+				player = &watchedPlayer{Player: p}
+				return player
+			})
+			snaps, unsub := c.talk.Subscribe()
+			defer unsub()
+			if err := c.ctl.Post(session.SubmitText{Text: "где кнопка?"}); err != nil {
+				t.Fatal(err)
+			}
+			var old session.Snapshot
+			for old.State != session.StateSpeaking {
+				select {
+				case old = <-snaps:
+					if old.State == session.StateFailed {
+						t.Fatalf("failed: %s %v", old.Reason, old.Err)
+					}
+				case <-ctx.Done():
+					t.Fatal("never spoke")
+				}
+			}
+			hints := c.overlay != nil && hintShown(c)
+			t.Logf("speaking; hint on screen: %v", hints)
+
+			// Let the tone be audible for a moment before interrupting it.
+			time.Sleep(300 * time.Millisecond)
+			n := player.count()
+			t0 := time.Now()
+			if err := tt.act(ctx, c); err != nil {
+				t.Fatal(err)
+			}
+			wait := func(what string, cond func() bool) time.Duration {
+				for !cond() {
+					if time.Since(t0) > 3*time.Second {
+						t.Fatalf("%s: not after 3s", what)
+					}
+					time.Sleep(time.Millisecond)
+				}
+				return time.Since(t0)
+			}
+			silent := wait("speaker stopped", func() bool { return player.playing(n) == 0 })
+			var cleared time.Duration
+			if hints {
+				cleared = wait("overlay cleared", func() bool { return c.overlay.Shown() == 0 })
+			}
+			chatGone := wait("model stream abandoned", func() bool { return api.abandoned("chat") })
+			speechGone := wait("speech stream abandoned", func() bool { return api.abandoned("speech") })
+			t.Logf("speaker silent after %v, overlay cleared after %v, model stream gone after %v, speech stream gone after %v",
+				silent, cleared, chatGone, speechGone)
+			if silent > budget || cleared > budget {
+				t.Errorf("interruption too slow: speaker %v, overlay %v (budget %v)", silent, cleared, budget)
+			}
+
+			// Nothing of the interrupted generation after its end.
+			ended := false
+			for settled := false; !settled; {
+				select {
+				case s := <-snaps:
+					switch {
+					case s.Ref == old.Ref && (s.State == session.StateCancelled || s.State == session.StateInterrupted):
+						ended = true
+					case s.Ref == old.Ref && s.State == session.StateIdle && ended:
+						settled = true
+					case s.Ref == old.Ref && ended:
+						t.Fatalf("interrupted generation published %s", s.State)
+					case s.Ref != old.Ref:
+						if !ended {
+							t.Fatalf("new generation before the old one ended")
+						}
+						settled = true
+					}
+				case <-ctx.Done():
+					t.Fatal("did not settle")
+				}
+			}
+			if hints && c.overlay.Shown() != 0 {
+				t.Error("hint of the interrupted generation came back")
+			}
+			// The barge-in request is answered and spoken; stop it too.
+			_ = c.ctl.Post(session.Cancel{})
+			for s := c.talk.Current(); s.State != session.StateIdle; s = c.talk.Current() {
+				if ctx.Err() != nil {
+					t.Fatal("not idle after the final cancel")
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+		})
+	}
+}
+
+// hintShown waits briefly for the point_at hint to be on screen.
+func hintShown(c *core) bool {
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if c.overlay.Shown() > 0 {
+			return true
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return false
 }

@@ -183,6 +183,10 @@ func (o *Orchestrator) converse(ctx context.Context, p llm.Provider, ref contrac
 		}
 		msgs = append(msgs, assistant)
 		for _, call := range res.calls {
+			// A cancelled generation must not start another action.
+			if err := ctx.Err(); err != nil {
+				return "", err
+			}
 			msgs = append(msgs, o.runTool(ctx, ref, capture, call))
 		}
 	}

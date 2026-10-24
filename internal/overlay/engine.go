@@ -68,7 +68,15 @@ type Engine struct {
 	// while the frame loop runs. The loop only runs while hints are shown.
 	motion    bool
 	animating bool
+	// ended are generations that were cancelled or interrupted, newest
+	// last; a late command of one must not bring its hints back, even
+	// when it belongs to another session ID than the current one.
+	ended []contracts.SessionRef
 }
+
+// maxEnded bounds the remembered ended generations; a late command can only
+// come from the few generations just before the current one.
+const maxEnded = 16
 
 func NewEngine(host contracts.OverlayHost, topology TopologyFunc) *Engine {
 	return &Engine{
@@ -146,6 +154,13 @@ func (e *Engine) Apply(ctx context.Context, cmd Command) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	// Checked under the lock: EndSession runs after the generation's ctx
+	// is cancelled, so a hint either lands before the clear and is removed
+	// by it, or sees its ctx done here (FR-VOICE-006). Removing stays
+	// allowed: it can only make the screen emptier.
+	if err := ctx.Err(); err != nil && cmd.Op == OpShow {
+		return err
+	}
 	if e.isStale(cmd.Session) {
 		return nil
 	}
@@ -223,6 +238,30 @@ func (e *Engine) Clear(ctx context.Context) {
 	clear(e.captures)
 }
 
+// EndSession removes the hints of a generation that was cancelled,
+// interrupted or failed, and drops its later commands. Hints of a newer
+// generation or of another session stay.
+func (e *Engine) EndSession(ctx context.Context, ref contracts.SessionRef) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if !slices.Contains(e.ended, ref) {
+		if len(e.ended) == maxEnded {
+			e.ended = slices.Delete(e.ended, 0, 1)
+		}
+		e.ended = append(e.ended, ref)
+	}
+	if e.current.ID == ref.ID && e.current.Generation <= ref.Generation {
+		e.clearLocked(ctx)
+	}
+}
+
+// Shown is the number of hints on screen, for diagnostics and tests.
+func (e *Engine) Shown() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return len(e.annotations)
+}
+
 // ForgetCapture drops metadata of a capture that is no longer referenced.
 func (e *Engine) ForgetCapture(id contracts.CaptureID) {
 	e.mu.Lock()
@@ -232,7 +271,7 @@ func (e *Engine) ForgetCapture(id contracts.CaptureID) {
 
 // isStale reports whether ref belongs to the current session's past.
 func (e *Engine) isStale(ref contracts.SessionRef) bool {
-	return ref.ID == e.current.ID && ref.Generation < e.current.Generation
+	return (ref.ID == e.current.ID && ref.Generation < e.current.Generation) || slices.Contains(e.ended, ref)
 }
 
 func (e *Engine) expire(ref contracts.SessionRef, id string) {

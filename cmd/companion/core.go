@@ -93,6 +93,9 @@ type core struct {
 
 	talk *session.Manager
 	orch *talk.Orchestrator
+	// ctl is the input path of hotkeys and chat: it adds the overlay
+	// clearing that cancel and barge-in need (OC-65).
+	ctl  *talk.Control
 	chat *chat.Service
 
 	runCtx context.Context // lives from Start to Stop
@@ -158,8 +161,12 @@ func newCore(ctx context.Context, log *slog.Logger, dataDir string, db *store.DB
 		c.orch.Overlay = c.overlay
 	}
 	c.talk = session.New(c.orch, session.Config{Settings: sessionSettings(svc.Get())})
+	c.ctl = &talk.Control{Session: c.talk}
+	if c.overlay != nil {
+		c.ctl.Scene = c.overlay
+	}
 	c.chat = chat.New(chat.Config{
-		Talk:     c.talk,
+		Talk:     c.ctl,
 		History:  c.history,
 		Save:     func() bool { return c.settings.Get().Privacy.SaveTranscripts },
 		Caps:     c.caps,
@@ -199,6 +206,11 @@ func (c *core) Start(ctx context.Context) error {
 		c.stt.Start(ctx)
 	}
 	c.startHotkeys(ctx)
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		c.ctl.Run(ctx)
+	}()
 	ch, unsub := c.settings.Subscribe()
 	c.wg.Add(1)
 	go func() {
@@ -294,7 +306,7 @@ func (c *core) startHotkeys(ctx context.Context) {
 				continue // setup is not finished: Talk does not exist yet
 			}
 			if e, ok := session.FromHotkey(ev, control.TalkID, control.CancelID); ok {
-				if err := c.talk.Post(e); err != nil {
+				if err := c.ctl.Post(e); err != nil {
 					return
 				}
 			}

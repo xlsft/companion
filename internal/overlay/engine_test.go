@@ -266,3 +266,57 @@ func TestAnimationLoopRunsOnlyWhileShown(t *testing.T) {
 		t.Error("surface left open after Clear")
 	}
 }
+
+func TestEndSession(t *testing.T) {
+	s2 := contracts.SessionRef{ID: "s1", Generation: 2}
+	other := contracts.SessionRef{ID: "s9", Generation: 1}
+	tests := []struct {
+		name     string
+		shown    contracts.SessionRef // generation whose hint is on screen
+		ended    contracts.SessionRef
+		wantOpen int
+	}{
+		{"current generation is cleared", s1, s1, 0},
+		{"ending a newer generation clears an older scene", s1, s2, 0},
+		{"older generation leaves the newer scene", s2, s1, 1},
+		{"other session leaves the scene", s1, other, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			topo := contracts.Topology{Version: 1, Displays: []contracts.Display{dispA}}
+			e, host, _ := newTestEngine(&topo)
+			ctx := context.Background()
+			if err := e.Apply(ctx, ring("r", tt.shown, "cap-a")); err != nil {
+				t.Fatal(err)
+			}
+			e.EndSession(ctx, tt.ended)
+			if n := e.Shown(); n != tt.wantOpen {
+				t.Fatalf("%d hints shown, want %d", n, tt.wantOpen)
+			}
+			if n := len(host.open()); n != tt.wantOpen {
+				t.Fatalf("%d surfaces open, want %d", n, tt.wantOpen)
+			}
+			// A late command of the ended generation must not draw again,
+			// even one of another session ID that would replace the scene.
+			if err := e.Apply(ctx, ring("late", tt.ended, "cap-a")); err != nil {
+				t.Fatal(err)
+			}
+			if n := len(host.open()); n != tt.wantOpen {
+				t.Fatalf("late command of an ended generation changed the scene: %d open", n)
+			}
+		})
+	}
+}
+
+func TestApplyWithDoneContextDrawsNothing(t *testing.T) {
+	topo := contracts.Topology{Version: 1, Displays: []contracts.Display{dispA}}
+	e, host, _ := newTestEngine(&topo)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := e.Apply(ctx, ring("r", s1, "cap-a")); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Apply = %v, want context.Canceled", err)
+	}
+	if len(host.open()) != 0 {
+		t.Fatal("a cancelled generation drew a hint")
+	}
+}
