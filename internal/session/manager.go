@@ -109,6 +109,7 @@ type generation struct {
 	speechRequested bool
 	speechDone      bool
 	speechErr       error // TTS failed; the reply is shown as text only
+	requestShown    bool  // Request was published
 }
 
 // Manager owns at most one active Talk session. All state is touched only
@@ -650,7 +651,13 @@ func (m *Manager) end(state State, reason string, cause, err error) {
 }
 
 func (m *Manager) setState(s State, text string) {
-	m.publish(Snapshot{Ref: m.g.ref, State: s, Mode: m.g.mode, Text: text})
+	snap := Snapshot{Ref: m.g.ref, State: s, Mode: m.g.mode, Text: text}
+	// The first state after the input became final (Capturing or
+	// Reasoning) carries it, see Snapshot.Request.
+	if g := m.g; g.transcribed && !g.requestShown {
+		snap.Request, g.requestShown = g.text, true
+	}
+	m.publish(snap)
 }
 
 func (m *Manager) publishText(text string) {
