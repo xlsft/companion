@@ -131,6 +131,26 @@ func T(l Lang, key string) string {
 	return s[0]
 }
 
+// Translated reports whether a JSON-catalogue language has its own text
+// for key (English and Russian live with the code and always do).
+func Translated(l Lang, key string) bool {
+	if l == EN || l == RU {
+		return true
+	}
+	localesOnce.Do(loadLocales)
+	return locales[l][key] != ""
+}
+
+// LocaleKeys returns the keys a JSON-catalogue language translates.
+func LocaleKeys(l Lang) []string {
+	localesOnce.Do(loadLocales)
+	keys := make([]string, 0, len(locales[l]))
+	for k := range locales[l] {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // Tf is T with fmt.Sprintf arguments.
 func Tf(l Lang, key string, args ...any) string { return fmt.Sprintf(T(l, key), args...) }
 

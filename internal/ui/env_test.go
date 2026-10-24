@@ -70,7 +70,6 @@ var verbRe = regexp.MustCompile(`%[-+# 0]*[0-9]*(\.[0-9]+)?[a-zA-Z%]`)
 
 // Russian text must keep the English format verbs, or Tf prints garbage.
 func TestCatalogVerbsMatch(t *testing.T) {
-	verbs := func(s string) string { return strings.Join(verbRe.FindAllString(s, -1), " ") }
 	for k, en := range i18n.Keys() {
 		if ru := i18n.T(i18n.RU, k); verbs(ru) != verbs(en) {
 			t.Errorf("%s: ru verbs %q, en %q", k, verbs(ru), verbs(en))

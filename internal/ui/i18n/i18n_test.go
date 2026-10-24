@@ -59,8 +59,10 @@ func TestLanguagesMatchSettings(t *testing.T) {
 	}
 }
 
-// Locale files may only translate registered keys and must keep the
-// English text's format verbs, or Tf would print %!(EXTRA…) garbage.
+// Locale entries must keep the English text's format verbs, or Tf would
+// print %!(EXTRA…) garbage. Only the keys of this package's tests are
+// registered here; internal/ui checks the full catalogue, unknown keys
+// included.
 func TestLocaleEntriesAreValid(t *testing.T) {
 	Register(map[string][2]string{"test.fmt": {"%d of %s", "%d из %s"}})
 	localesOnce.Do(loadLocales)
@@ -68,9 +70,6 @@ func TestLocaleEntriesAreValid(t *testing.T) {
 		for k, v := range m {
 			en, ok := catalog[k]
 			if !ok {
-				if !strings.HasPrefix(k, "test.") {
-					t.Errorf("%s: unknown key %s", l, k)
-				}
 				continue
 			}
 			if verbs(v) != verbs(en[0]) {
