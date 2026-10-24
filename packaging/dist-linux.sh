@@ -46,8 +46,10 @@ done
 # in, it is only a dead search path after $ORIGIN.
 sidecar() {
 	install -m 755 bin/stt-sidecar "$1/"
+	# shellcheck disable=SC2086 # sherpa_libs is a list of paths without spaces
 	install -m 644 $sherpa_libs "$1/"
 	if command -v patchelf >/dev/null; then
+		# shellcheck disable=SC2016 # $ORIGIN is for the dynamic loader, not the shell
 		patchelf --set-rpath '$ORIGIN' "$1/stt-sidecar"
 	fi
 }
