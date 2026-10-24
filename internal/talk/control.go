@@ -25,19 +25,28 @@ type Scene interface {
 // overlay is a separate scene, so Control clears it as well: at once on
 // Escape, and for every generation that ends cancelled, interrupted by a
 // new request or failed. A finished answer keeps its hints for their
-// lifetime.
+// lifetime. Escape also stops a walkthrough in progress.
 type Control struct {
 	Session Session
 	Scene   Scene // nil without an overlay
+	Guide   Stopper
 }
+
+// Stopper ends a walkthrough in progress and removes its hints.
+type Stopper interface{ Stop(ctx context.Context) }
 
 // Post forwards ev to the session. Cancel aimed at whatever is active
 // also clears the overlay even when no session runs, so Escape always
 // removes what is on screen.
 func (c *Control) Post(ev session.Event) error {
 	err := c.Session.Post(ev)
-	if cv, ok := ev.(session.Cancel); ok && cv.Ref == (contracts.SessionRef{}) && c.Scene != nil {
-		c.Scene.Clear(context.Background())
+	if cv, ok := ev.(session.Cancel); ok && cv.Ref == (contracts.SessionRef{}) {
+		if c.Guide != nil {
+			c.Guide.Stop(context.Background())
+		}
+		if c.Scene != nil {
+			c.Scene.Clear(context.Background())
+		}
 	}
 	return err
 }

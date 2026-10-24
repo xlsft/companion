@@ -38,6 +38,7 @@ import (
 	"github.com/xlsft/companion/internal/talk"
 	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui/wizard"
+	"github.com/xlsft/companion/internal/walkthrough"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -97,6 +98,8 @@ type core struct {
 	// clearing that cancel and barge-in need (OC-65).
 	ctl  *talk.Control
 	chat *chat.Service
+	// guide runs walkthroughs (OC-68); their progress outlives a restart.
+	guide *walkthrough.Service
 
 	runCtx context.Context // lives from Start to Stop
 	cancel context.CancelFunc
@@ -162,9 +165,14 @@ func newCore(ctx context.Context, log *slog.Logger, dataDir string, db *store.DB
 	}
 	c.talk = session.New(c.orch, session.Config{Settings: sessionSettings(svc.Get())})
 	c.ctl = &talk.Control{Session: c.talk}
+	presenter := &talk.Presenter{Orch: c.orch}
 	if c.overlay != nil {
 		c.ctl.Scene = c.overlay
+		presenter.Scene = c.overlay
 	}
+	c.guide = walkthrough.New(walkthrough.Config{Presenter: presenter, Store: walkthrough.NewKVStore(store.NewKV(db)), Log: log})
+	c.orch.Guide = c.guide
+	c.ctl.Guide = c.guide
 	c.chat = chat.New(chat.Config{
 		Talk:     c.ctl,
 		History:  c.history,
@@ -206,6 +214,9 @@ func (c *core) Start(ctx context.Context) error {
 		c.stt.Start(ctx)
 	}
 	c.startHotkeys(ctx)
+	if err := c.guide.Restore(ctx); err != nil {
+		c.log.Warn("walkthrough progress not restored", "err", err)
+	}
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
@@ -236,6 +247,9 @@ func (c *core) Stop(ctx context.Context) error {
 		c.cancel()
 	}
 	var errs []error
+	// First, so no step speaks or draws while the rest shuts down; the
+	// progress stays stored.
+	c.guide.Close()
 	c.chat.Close()
 	errs = append(errs, c.talk.Close())
 	if c.hotkeys != nil {

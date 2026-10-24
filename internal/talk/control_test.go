@@ -54,8 +54,8 @@ func TestControlPostClearsOnEscape(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sc, ss := &fakeScene{}, &fakeSession{}
-			c := &Control{Session: ss, Scene: sc}
+			sc, ss, g := &fakeScene{}, &fakeSession{}, &fakeGuide{}
+			c := &Control{Session: ss, Scene: sc, Guide: g}
 			if err := c.Post(tt.ev); err != nil {
 				t.Fatal(err)
 			}
@@ -64,6 +64,10 @@ func TestControlPostClearsOnEscape(t *testing.T) {
 			}
 			if sc.clears != tt.clears {
 				t.Errorf("clears %d, want %d", sc.clears, tt.clears)
+			}
+			// Escape ends a walkthrough together with what is on screen.
+			if g.stops != tt.clears {
+				t.Errorf("walkthrough stops %d, want %d", g.stops, tt.clears)
 			}
 		})
 	}

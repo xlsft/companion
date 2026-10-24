@@ -29,12 +29,16 @@ import (
 
 	"github.com/xlsft/companion/internal/audio/playback"
 	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/overlay"
 	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/providers"
 	"github.com/xlsft/companion/internal/secrets"
 	"github.com/xlsft/companion/internal/session"
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/store"
+	"github.com/xlsft/companion/internal/talk"
+	"github.com/xlsft/companion/internal/walkthrough"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // fakeAPI is an OpenAI-compatible model that points at the screen centre
@@ -54,6 +58,13 @@ type fakeAPI struct {
 	// gone lists the held responses ("chat", "speech") whose client went
 	// away before the end.
 	gone []string
+
+	// walk makes the model plan a walkthrough and mark its steps.
+	walk bool
+	// spoken are the texts sent to the speech endpoint, in order.
+	spoken []string
+	// marked lists the steps (1-based) the model re-marked.
+	marked []int
 }
 
 func (f *fakeAPI) abandoned(kind string) bool {
@@ -108,6 +119,7 @@ func (f *fakeAPI) chat(w http.ResponseWriter, r *http.Request) {
 			f.sawImage = true
 		}
 	}
+	walk := f.walk
 	f.mu.Unlock()
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -120,6 +132,13 @@ func (f *fakeAPI) chat(w http.ResponseWriter, r *http.Request) {
 	}
 	delta := func(d map[string]any) map[string]any {
 		return map[string]any{"choices": []any{map[string]any{"index": 0, "delta": d}}}
+	}
+	if walk {
+		f.walkChat(body, toolRound, send, delta)
+		send(map[string]any{"choices": []any{map[string]any{"index": 0, "delta": map[string]any{}, "finish_reason": "stop"}}})
+		fmt.Fprint(w, "data: [DONE]\n\n")
+		fl.Flush()
+		return
 	}
 	if followUp {
 		send(delta(map[string]any{"content": "Хорошо."}))
@@ -157,7 +176,13 @@ func (f *fakeAPI) chat(w http.ResponseWriter, r *http.Request) {
 // speech answers with 0.4 s of a quiet 440 Hz tone, 24 kHz mono PCM16;
 // held, it streams 20 s of it in real time.
 func (f *fakeAPI) speech(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Input string `json:"input"`
+	}
+	body, _ := io.ReadAll(r.Body)
+	_ = json.Unmarshal(body, &in)
 	f.mu.Lock()
+	f.spoken = append(f.spoken, in.Input)
 	f.speeches++
 	hold := f.hold
 	f.mu.Unlock()
@@ -466,4 +491,199 @@ func hintShown(c *core) bool {
 		time.Sleep(5 * time.Millisecond)
 	}
 	return false
+}
+
+// walkSteps is the walkthrough the fake model plans, and walkMarks where
+// it marks each step: the first on the plan's own screenshot, the others
+// when they are shown again on a new one.
+var (
+	walkSteps = []string{"Шаг один: выделите фрейм.", "Шаг два: откройте экспорт.", "Шаг три: нажмите «Экспорт»."}
+	walkMarks = [][2]float64{{0.3, 0.4}, {0.6, 0.5}, {0.7, 0.6}}
+)
+
+// walkChat answers the request with start_walkthrough, and a request to
+// mark step n on a new screenshot with an annotate call.
+func (f *fakeAPI) walkChat(req []byte, toolRound bool, send func(any), delta func(map[string]any) map[string]any) {
+	call := func(id, name string, args any) {
+		b, _ := json.Marshal(args)
+		send(delta(map[string]any{"tool_calls": []any{map[string]any{"index": 0, "id": id,
+			"function": map[string]any{"name": name, "arguments": string(b)}}}}))
+	}
+	for n := range walkSteps {
+		if !strings.Contains(string(req), fmt.Sprintf("step %d of %d", n+1, len(walkSteps))) {
+			continue
+		}
+		if toolRound {
+			return // marked; nothing more to say
+		}
+		f.mu.Lock()
+		f.marked = append(f.marked, n+1)
+		f.mu.Unlock()
+		m := walkMarks[n]
+		call(fmt.Sprintf("mark_%d", n+1), "annotate", map[string]any{"shapes": []any{
+			map[string]any{"kind": "brackets", "points": [][]float64{{m[0] - 0.05, m[1] - 0.03}, {m[0] + 0.05, m[1] + 0.03}}},
+		}})
+		return
+	}
+	var steps []any
+	for i, say := range walkSteps {
+		st := map[string]any{"title": fmt.Sprintf("Шаг %d", i+1), "say": say}
+		if i == 0 {
+			st["shapes"] = []any{map[string]any{"kind": "ring", "points": [][]float64{{walkMarks[0][0], walkMarks[0][1]}}}}
+		}
+		steps = append(steps, st)
+	}
+	send(delta(map[string]any{"content": "Давайте по шагам. "}))
+	call("walk_1", "start_walkthrough", map[string]any{"goal": "Экспорт в PNG", "steps": steps})
+}
+
+func (f *fakeAPI) spokenCount(text string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, s := range f.spoken {
+		if s == text {
+			n++
+		}
+	}
+	return n
+}
+
+// drawLog records what reaches the overlay, so the test can tell which
+// step drew which hint.
+type drawLog struct {
+	talk.Overlay
+	mu   sync.Mutex
+	cmds []overlay.Command
+}
+
+func (d *drawLog) Apply(ctx context.Context, c overlay.Command) error {
+	d.mu.Lock()
+	d.cmds = append(d.cmds, c)
+	d.mu.Unlock()
+	return d.Overlay.Apply(ctx, c)
+}
+
+// lastShow is the centre of the newest hint drawn for a walkthrough.
+func (d *drawLog) lastShow() (contracts.Point, bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for i := len(d.cmds) - 1; i >= 0; i-- {
+		c := d.cmds[i]
+		if c.Op != overlay.OpShow || !strings.HasPrefix(string(c.Session.ID), "walkthrough-") {
+			continue
+		}
+		if len(c.Points) == 2 {
+			return contracts.Point{X: (c.Points[0].X + c.Points[1].X) / 2, Y: (c.Points[0].Y + c.Points[1].Y) / 2}, true
+		}
+		return c.Points[0], true
+	}
+	return contracts.Point{}, false
+}
+
+// TestLiveWalkthrough has the model start a three-step walkthrough and
+// drives it by voice intent, from the card and with Escape, checking the
+// hint and the speech of every step and the stored progress (OC-68):
+//
+//	go test -tags=novulkan,live -run TestLiveWalkthrough -v ./cmd/companion
+func TestLiveWalkthrough(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	api := &fakeAPI{walk: true}
+	c := liveCore(t, ctx, api, nil)
+	var draws *drawLog
+	if c.orch.Overlay != nil {
+		draws = &drawLog{Overlay: c.orch.Overlay}
+		c.orch.Overlay = draws
+	}
+	t0 := time.Now()
+	waitFor := func(what string, cond func() bool) {
+		t.Helper()
+		for !cond() {
+			if ctx.Err() != nil {
+				t.Fatalf("%s: timed out", what)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	idle := func() {
+		t.Helper()
+		waitFor("session idle", func() bool { return c.talk.Current().State == session.StateIdle })
+	}
+	// step waits until step n (0-based) is on the card, marked where the
+	// model put it, and spoken for the times-th time.
+	step := func(how string, n, times int) {
+		t.Helper()
+		waitFor(how+": card", func() bool { v := c.guide.View(); return v.Active() && v.Index == n && !v.Preparing })
+		waitFor(how+": speech", func() bool { return api.spokenCount(walkSteps[n]) >= times })
+		hint := "no overlay"
+		if draws != nil {
+			want := walkMarks[n]
+			waitFor(how+": hint", func() bool {
+				p, ok := draws.lastShow()
+				return ok && math.Abs(p.X-want[0]) < 1e-6 && math.Abs(p.Y-want[1]) < 1e-6
+			})
+			waitFor(how+": hint on screen", func() bool { return c.overlay.Shown() > 0 })
+			hint = fmt.Sprintf("hint at %.2f,%.2f, %d on screen", want[0], want[1], c.overlay.Shown())
+		}
+		v := c.guide.View()
+		t.Logf("%7s %-16s step %d/%d %q, %s, spoken", time.Since(t0).Round(time.Millisecond), how, v.Index+1, v.Total, v.Title, hint)
+	}
+
+	if err := c.ctl.Post(session.SubmitText{Text: "как экспортировать фрейм в PNG?"}); err != nil {
+		t.Fatal(err)
+	}
+	step("planned", 0, 1)
+	idle()
+	if v := c.guide.View(); v.Goal != "Экспорт в PNG" || v.Total != 3 {
+		t.Fatalf("view %+v", v)
+	}
+
+	// By voice: the intent never reaches the model as a question.
+	if err := c.ctl.Post(session.SubmitText{Text: "Дальше."}); err != nil {
+		t.Fatal(err)
+	}
+	step("voice next", 1, 1)
+	idle()
+	// From the card.
+	if err := c.guide.Do(ctx, walkthrough.CmdNext); err != nil {
+		t.Fatal(err)
+	}
+	step("card next", 2, 1)
+	stored, ok, err := walkthrough.NewKVStore(store.NewKV(c.db)).Load(ctx)
+	if err != nil || !ok || stored.Index != 2 || stored.Status != walkthrough.StatusRunning {
+		t.Fatalf("stored progress %+v ok %v err %v", stored, ok, err)
+	}
+	if err := c.guide.Do(ctx, walkthrough.CmdPrev); err != nil {
+		t.Fatal(err)
+	}
+	step("card previous", 1, 2)
+
+	// A restart finds the walkthrough where it was, paused.
+	again := walkthrough.New(walkthrough.Config{Presenter: &talk.Presenter{Orch: c.orch}, Store: walkthrough.NewKVStore(store.NewKV(c.db))})
+	if err := again.Restore(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if v := again.View(); v.Status != walkthrough.StatusPaused || v.Index != 1 {
+		t.Errorf("restored %+v, want paused at step 2", v)
+	}
+	again.Close()
+
+	// Escape stops it and takes its hints off the screen.
+	if err := c.ctl.Post(session.Cancel{}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor("stopped", func() bool { return !c.guide.View().Active() })
+	if c.overlay != nil {
+		waitFor("hints cleared", func() bool { return c.overlay.Shown() == 0 })
+	}
+	if _, ok, _ := walkthrough.NewKVStore(store.NewKV(c.db)).Load(ctx); ok {
+		t.Error("stopped walkthrough still stored")
+	}
+	api.mu.Lock()
+	defer api.mu.Unlock()
+	t.Logf("model rounds %d, steps re-marked on new screenshots %v, speech requests %d", api.chats, api.marked, api.speeches)
+	if c.captureErr == nil && c.overlayErr == nil && fmt.Sprint(api.marked) != "[2 3 2]" {
+		t.Errorf("re-marked steps %v, want [2 3 2]", api.marked)
+	}
 }

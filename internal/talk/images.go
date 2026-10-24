@@ -17,6 +17,11 @@ import (
 // overlay and encodes it. The first capture is the one tools draw on. The
 // chat is told what was attached; it gets pixels only if the user opted in.
 func (o *Orchestrator) prepareCaptures(ref contracts.SessionRef, caps []*contracts.Capture) ([]llm.Image, contracts.CaptureID, error) {
+	return o.prepare(ref, caps, true)
+}
+
+// prepare is prepareCaptures; notify false keeps the chat out of it.
+func (o *Orchestrator) prepare(ref contracts.SessionRef, caps []*contracts.Capture, notify bool) ([]llm.Image, contracts.CaptureID, error) {
 	maxSide := o.MaxModelSide
 	if maxSide <= 0 {
 		maxSide = defaultMaxModelSide
@@ -25,7 +30,7 @@ func (o *Orchestrator) prepareCaptures(ref contracts.SessionRef, caps []*contrac
 		images  []llm.Image
 		primary contracts.CaptureID
 		shots   []contracts.ScreenAttachment
-		keep    = o.KeepScreenshots != nil && o.KeepScreenshots()
+		keep    = notify && o.KeepScreenshots != nil && o.KeepScreenshots()
 	)
 	for _, c := range caps {
 		if c == nil || c.Image == nil {
@@ -51,7 +56,7 @@ func (o *Orchestrator) prepareCaptures(ref contracts.SessionRef, caps []*contrac
 			primary = meta.ID
 		}
 	}
-	if o.Attachments != nil && len(shots) > 0 {
+	if notify && o.Attachments != nil && len(shots) > 0 {
 		o.Attachments.ScreenAttached(ref, shots)
 	}
 	return images, primary, nil
