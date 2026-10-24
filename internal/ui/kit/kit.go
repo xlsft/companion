@@ -45,14 +45,14 @@ func Text(th *theme.Theme, size float32, txt string, col color.NRGBA) material.L
 // Heading is a page title: Unbounded, as in the prototypes.
 func Heading(th *theme.Theme, txt string) material.LabelStyle {
 	l := label(th, 26, txt, th.Pal.Fg)
-	l.Font = font.Font{Typeface: theme.Display, Weight: font.SemiBold}
+	l.Font = font.Font{Typeface: th.Display(), Weight: font.SemiBold}
 	return l
 }
 
 // Title is a smaller display heading for sections, panels and dialogs.
 func Title(th *theme.Theme, txt string) material.LabelStyle {
 	l := label(th, 17, txt, th.Pal.Fg)
-	l.Font = font.Font{Typeface: theme.Display, Weight: font.SemiBold}
+	l.Font = font.Font{Typeface: th.Display(), Weight: font.SemiBold}
 	return l
 }
 
@@ -100,7 +100,7 @@ func Small(th *theme.Theme, txt string) material.LabelStyle {
 // Code is monospace text for snippets and technical values.
 func Code(th *theme.Theme, txt string) material.LabelStyle {
 	l := label(th, 12.5, txt, th.Pal.Fg)
-	l.Font.Typeface = theme.Mono
+	l.Font.Typeface = th.Mono()
 	l.LineHeightScale = 1.7
 	return l
 }
@@ -116,9 +116,9 @@ func HSpace(dp unit.Dp) layout.FlexChild {
 // Logo is the ↖ mark and the word "companion", both Unbounded.
 func Logo(gtx layout.Context, th *theme.Theme, size float32) layout.Dimensions {
 	mark := label(th, size*1.2, "↖", th.Pal.AccentLine)
-	mark.Font = font.Font{Typeface: theme.Display, Weight: font.SemiBold}
+	mark.Font = font.Font{Typeface: th.Display(), Weight: font.SemiBold}
 	word := label(th, size, "companion", th.Pal.Fg)
-	word.Font = font.Font{Typeface: theme.Display, Weight: font.SemiBold}
+	word.Font = font.Font{Typeface: th.Display(), Weight: font.SemiBold}
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(mark.Layout),
 		HSpace(th.Dp(size*0.6)),
@@ -511,7 +511,7 @@ func Field(gtx layout.Context, th *theme.Theme, ed *widget.Editor, hint string) 
 				e.HintColor = th.Pal.Subtle
 				e.SelectionColor = th.Pal.Selected
 				if ed.Mask != 0 {
-					e.Font.Typeface = theme.Mono
+					e.Font.Typeface = th.Mono()
 				}
 				return e.Layout(gtx)
 			})

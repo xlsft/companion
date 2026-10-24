@@ -185,7 +185,7 @@ func Avatar(gtx layout.Context, th *theme.Theme, active bool) layout.Dimensions 
 	rrect(gtx, gtx.Dp(th.Dp(6)), bg)
 	return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		l := label(th, 15, "↖", fg)
-		l.Font = font.Font{Typeface: theme.Display, Weight: font.Bold}
+		l.Font = font.Font{Typeface: th.Display(), Weight: font.Bold}
 		return l.Layout(gtx)
 	})
 }

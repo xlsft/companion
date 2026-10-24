@@ -181,7 +181,7 @@ func Kbd(gtx layout.Context, th *theme.Theme, chord string) layout.Dimensions {
 	return Box(gtx, th, th.Pal.Raised, th.Pal.Border, 4, func(gtx layout.Context) layout.Dimensions {
 		return layout.Inset{Top: th.Dp(2), Bottom: th.Dp(2), Left: th.Dp(6), Right: th.Dp(6)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			l := label(th, 11.5, chord, th.Pal.Fg)
-			l.Font.Typeface = theme.Mono
+			l.Font.Typeface = th.Mono()
 			l.MaxLines = 1
 			return l.Layout(gtx)
 		})
