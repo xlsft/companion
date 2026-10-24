@@ -67,7 +67,9 @@ func NumberDisc(th *theme.Theme, d float32, num string, fg, bg, border color.NRG
 		digit := float32(gtx.Sp(px(th, size))) * digitHeight
 		top := dims.Size.Y - dims.Baseline // line top to baseline
 		y := int((float32(s.Y)+digit)/2+0.5) - top
-		x := (s.X - dims.Size.X) / 2
+		// Rounded, not floored: a digit is a few pixels wide, and the
+		// floor put every odd-width one a pixel left of the middle.
+		x := (s.X - dims.Size.X + 1) / 2
 		st := op.Offset(image.Pt(x, y)).Push(gtx.Ops)
 		call.Add(gtx.Ops)
 		st.Pop()
