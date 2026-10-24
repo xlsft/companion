@@ -82,6 +82,7 @@ func (g *gioWindow) Close() { go g.w.Perform(system.ActionClose) }
 func renderFrame(gtx layout.Context, th *theme.Theme, sh *Shell, content surface) layout.Dimensions {
 	lang, dark, scale := sh.look()
 	th.Apply(dark, scale)
+	th.SetLanguage(string(lang))
 	fill(gtx, th.Pal.Bg, gtx.Constraints.Max)
 	handleShortcuts(gtx, sh)
 	return content.Layout(gtx, th, lang)

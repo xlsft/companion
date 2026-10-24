@@ -41,6 +41,7 @@ stage() { # stage DIR: fills DIR with the files common to both formats
 	install -m 644 packaging/companion.metainfo.xml "$d/share/metainfo/"
 	install -m 644 packaging/companion.svg "$d/share/icons/hicolor/scalable/apps/"
 	install -m 644 packaging/companion.png "$d/share/icons/hicolor/256x256/apps/"
+	install -m 644 LICENSE.md "$d/LICENSE.md"
 	install -m 644 packaging/NOTICE "$d/NOTICE"
 	install -m 644 internal/assets/fonts/OFL.txt "$d/licenses/OFL.txt"
 	install -m 644 internal/ui/icon/LICENSE.mingcute "$d/licenses/LICENSE.mingcute"

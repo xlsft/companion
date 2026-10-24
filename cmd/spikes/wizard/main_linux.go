@@ -8,7 +8,7 @@
 // provider, model downloads and voices are stand-ins that never touch the
 // network.
 //
-//	wizard -step 3 -state failed -dark -lang ru
+//	wizard -step 3 -state failed -theme dark -lang ru
 package main
 
 import (
@@ -32,6 +32,7 @@ import (
 	"github.com/xlsft/companion/internal/llm"
 	"github.com/xlsft/companion/internal/models"
 	"github.com/xlsft/companion/internal/models/hw"
+	"github.com/xlsft/companion/internal/platform/appearance"
 	paudio "github.com/xlsft/companion/internal/platform/audio"
 	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/providers"
@@ -47,7 +48,7 @@ import (
 func main() {
 	step := flag.Int("step", 1, "step to show, 1…6")
 	state := flag.String("state", "fresh", "fresh (not checked yet) or failed (a typical failure)")
-	dark := flag.Bool("dark", true, "dark theme")
+	themeMode := flag.String("theme", "auto", "auto (follow the system), dark or light")
 	lang := flag.String("lang", "ru", "interface language (ru, en)")
 	flag.Parse()
 	if *step < 1 || *step > len(readiness.Steps) || *state != "fresh" && *state != "failed" {
@@ -55,14 +56,19 @@ func main() {
 		os.Exit(2)
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	if err := run(*step, *state == "failed", *dark, *lang, log); err != nil {
+	if err := run(*step, *state == "failed", *themeMode, *lang, log); err != nil {
 		log.Error("wizard spike", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run(step int, failed, dark bool, lang string, log *slog.Logger) error {
+func run(step int, failed bool, themeMode, lang string, log *slog.Logger) error {
+	scheme, err := appearance.Choose(themeMode)
+	if err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	_ = scheme.Start(ctx) // Unsupported keeps the light theme
 	dir, err := os.MkdirTemp("", "wizard-spike")
 	if err != nil {
 		return err
@@ -117,7 +123,7 @@ func run(step int, failed, dark bool, lang string, log *slog.Logger) error {
 	}
 	diagnose := func(ctx context.Context) (contracts.CapabilityReport, error) { return detect.New().Detect(ctx) }
 	shell := ui.New(ui.Options{Mode: ui.ModeSetup, Settings: svc, Gate: gate, Setup: backends,
-		Diagnose: diagnose, Quit: stop, Log: log, Dark: dark, Version: buildinfo.Version})
+		Diagnose: diagnose, Quit: stop, Log: log, Appearance: scheme, Version: buildinfo.Version})
 	go func() {
 		if err := app.New(log, shell).Run(ctx); err != nil {
 			log.Error("spike exited with error", "err", err)

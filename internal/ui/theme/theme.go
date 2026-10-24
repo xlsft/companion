@@ -150,23 +150,73 @@ const (
 	Display font.Typeface = "Unbounded"
 )
 
+// CJK typefaces, one per language: Han characters are drawn differently
+// in Chinese, Japanese and Korean, so each UI language falls back to its
+// own face rather than a shared one.
+const (
+	cjkSC font.Typeface = "Noto Sans CJK SC"
+	cjkJP font.Typeface = "Noto Sans CJK JP"
+	cjkKR font.Typeface = "Noto Sans CJK KR"
+)
+
+// cjkFor maps a UI language code to its CJK face. Other languages use the
+// Chinese one, so a CJK name in a Latin UI (the language picker lists all
+// three) still has glyphs.
+func cjkFor(lang string) font.Typeface {
+	switch lang {
+	case "ja":
+		return cjkJP
+	case "ko":
+		return cjkKR
+	}
+	return cjkSC
+}
+
+// withFallback is a typeface list: Gio treats a comma-separated Typeface
+// as a family list tried in order, per rune.
+func withFallback(base, fallback font.Typeface) font.Typeface { return base + ", " + fallback }
+
 // Theme is per window: Gio text shapers must not be shared between windows.
 type Theme struct {
 	*material.Theme
 	Pal   Palette
 	Dark  bool
 	Scale float32
+
+	// Typeface lists with the CJK fallback, rebuilt only on a language change.
+	lang                string
+	sans, mono, display font.Typeface
 }
 
 // New returns a theme with its own shaper over the bundled fonts.
 func New(dark bool, scale float32) *Theme {
 	m := material.NewTheme()
 	m.Shaper = text.NewShaper(text.WithCollection(Collection()))
-	m.Face = Sans
 	t := &Theme{Theme: m}
+	t.SetLanguage("")
 	t.Apply(dark, scale)
 	return t
 }
+
+// SetLanguage picks the CJK fallback face for a UI language code; call it
+// once per frame with the current language, it is cheap.
+func (t *Theme) SetLanguage(lang string) {
+	if t.sans != "" && t.lang == lang {
+		return
+	}
+	cjk := cjkFor(lang)
+	t.lang = lang
+	t.sans, t.mono, t.display = withFallback(Sans, cjk), withFallback(Mono, cjk), withFallback(Display, cjk)
+	t.Face = t.sans
+}
+
+// Sans, Mono and Display are the bundled typefaces followed by the CJK
+// face of the UI language: Latin and Cyrillic stay in the Latin face and
+// only runes it lacks fall to the CJK one. Use these, not the bare
+// constants, for anything that shows translated or user text.
+func (t *Theme) Sans() font.Typeface    { return t.sans }
+func (t *Theme) Mono() font.Typeface    { return t.mono }
+func (t *Theme) Display() font.Typeface { return t.display }
 
 // Apply switches palette and text scale in place; cheap enough per frame.
 func (t *Theme) Apply(dark bool, scale float32) {

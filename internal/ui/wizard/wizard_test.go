@@ -286,14 +286,16 @@ func TestBYOKTestSteps(t *testing.T) {
 		{Capability: llm.CapVision, OK: false, ErrCode: "wrong_answer"}, {Capability: llm.CapTools, OK: true},
 	}}}
 	h.checks.set(readiness.StepBYOK, readiness.Result{Status: readiness.Passed, Detail: tr.Detail()})
-	h.eventually("prefilled", func() bool { return h.view() == readiness.StepBYOK && h.w.byok.baseURL.Text() != "" })
+	// A stored provider is tested on arrival, without a click.
+	h.eventually("tested", func() bool { return h.view() == readiness.StepSTT })
+	if n := h.checks.count(readiness.StepBYOK); n != 1 {
+		t.Errorf("BYOK checks = %d, want 1", n)
+	}
+	h.w.stepBtns[1].Click()
+	h.eventually("back to byok", func() bool { return h.view() == readiness.StepBYOK && h.w.byok.baseURL.Text() != "" })
 	if h.w.byok.kind.Value != string(llm.KindAnthropic) || h.w.byok.dirty {
 		t.Errorf("prefill kind=%s dirty=%v", h.w.byok.kind.Value, h.w.byok.dirty)
 	}
-	h.click(ActTest)
-	h.eventually("tested", func() bool { return h.view() == readiness.StepSTT })
-	h.w.stepBtns[1].Click()
-	h.eventually("back to byok", func() bool { return h.view() == readiness.StepBYOK })
 	for _, want := range []string{"Connection — The endpoint answers.", "Key and model — The key is accepted",
 		"Text — yes", "Streaming — yes", "Vision — no", "Tools — yes"} {
 		if !h.shows(want) {
@@ -407,5 +409,81 @@ func TestLayoutAllSteps(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// TestAutoChecks: arriving at a step starts its check without a click, and
+// only the steps that need nothing from the user do so.
+func TestAutoChecks(t *testing.T) {
+	h := newHarness(t)
+	h.eventually("permissions auto-run", func() bool { return h.checks.count(readiness.StepPermissions) >= 1 && h.idle() })
+	n := h.checks.count(readiness.StepPermissions)
+	for range 5 {
+		h.frame()
+	}
+	if got := h.checks.count(readiness.StepPermissions); got != n {
+		t.Errorf("permissions ran %d times across idle frames, want %d", got, n)
+	}
+
+	h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Passed})
+	h.click(ActRecheck)
+	h.eventually("byok", func() bool { return h.view() == readiness.StepBYOK })
+	// No provider saved: nothing to test yet.
+	for range 3 {
+		h.frame()
+	}
+	if c := h.checks.count(readiness.StepBYOK); c != 0 {
+		t.Errorf("BYOK ran %d times without a saved provider", c)
+	}
+
+	h.pass(readiness.StepBYOK)
+	h.eventually("stt", func() bool { return h.view() == readiness.StepSTT })
+	for range 5 {
+		h.frame()
+	}
+	if c := h.checks.count(readiness.StepSTT); c != 0 {
+		t.Errorf("STT recorded by itself %d times", c)
+	}
+	if h.has(ActRecheck) && !h.w.snap().prog.Results[readiness.StepSTT].At.IsZero() {
+		t.Error("STT has a result before the user started")
+	}
+
+	h.pass(readiness.StepSTT)
+	h.eventually("tts", func() bool { return h.view() == readiness.StepTTS })
+	for range 3 {
+		h.frame()
+	}
+	if c := h.checks.count(readiness.StepTTS); c != 0 {
+		t.Errorf("TTS played %d times before Save", c)
+	}
+	h.click(ActSave)
+	h.eventually("tts auto after save", func() bool { return h.checks.count(readiness.StepTTS) == 1 && h.idle() })
+
+	h.pass(readiness.StepTTS)
+	h.eventually("platform", func() bool { return h.view() == readiness.StepPlatform })
+	h.eventually("platform auto", func() bool { return h.checks.count(readiness.StepPlatform) >= 1 })
+	h.pass(readiness.StepPlatform)
+	h.eventually("e2e", func() bool { return h.view() == readiness.StepEndToEnd })
+	for range 5 {
+		h.frame()
+	}
+	if c := h.checks.count(readiness.StepEndToEnd); c != 0 {
+		t.Errorf("end-to-end ran by itself %d times", c)
+	}
+}
+
+// TestPermissionsRetryWhileFailing: a failing permissions check repeats on
+// its own so a fix in the system settings turns the row green.
+func TestPermissionsRetryWhileFailing(t *testing.T) {
+	h := newHarness(t)
+	h.eventually("first run", func() bool { return h.checks.count(readiness.StepPermissions) == 1 && h.idle() })
+	h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Passed})
+	// Pretend the last run was long ago instead of sleeping.
+	rec := h.w.auto[readiness.StepPermissions]
+	rec.at = rec.at.Add(-2 * autoRetry)
+	h.w.auto[readiness.StepPermissions] = rec
+	h.eventually("advance after the fix", func() bool { return h.view() == readiness.StepBYOK })
+	if c := h.checks.count(readiness.StepPermissions); c != 2 {
+		t.Errorf("permissions ran %d times, want 2", c)
 	}
 }

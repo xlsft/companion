@@ -98,7 +98,7 @@ func (t *sttState) modelCard(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot
 	var title layout.Widget
 	if shown.ID != "" {
 		name := kit.Text(th, 20, shown.Name, th.Pal.Fg)
-		name.Font = font.Font{Typeface: theme.Display, Weight: font.SemiBold}
+		name.Font = font.Font{Typeface: th.Display(), Weight: font.SemiBold}
 		title = kit.VStack(th, 4, w.text(name), w.text(kit.Text(th, 13, size(l, shown.Size)+" · "+langsOf(l, shown), th.Pal.Muted)))
 	}
 

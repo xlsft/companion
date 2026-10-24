@@ -27,6 +27,9 @@ const (
 	TR Lang = "tr"
 	UK Lang = "uk"
 	RU Lang = "ru"
+	ZH Lang = "zh"
+	JA Lang = "ja"
+	KO Lang = "ko"
 )
 
 // Language is a selectable UI language.
@@ -42,6 +45,7 @@ type Language struct {
 var Languages = []Language{
 	{EN, "English"}, {ES, "Español"}, {PT, "Português"}, {FR, "Français"}, {DE, "Deutsch"},
 	{IT, "Italiano"}, {PL, "Polski"}, {TR, "Türkçe"}, {UK, "Українська"}, {RU, "Русский"},
+	{ZH, "中文"}, {JA, "日本語"}, {KO, "한국어"},
 }
 
 var (

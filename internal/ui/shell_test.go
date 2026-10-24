@@ -133,6 +133,11 @@ func (m *memProgress) Save(_ context.Context, d []byte) error {
 
 func newHarness(t *testing.T, mode Mode, tray *fakeTray) *harness {
 	t.Helper()
+	return newHarnessWith(t, mode, tray, nil)
+}
+
+func newHarnessWith(t *testing.T, mode Mode, tray *fakeTray, mut func(*Options)) *harness {
+	t.Helper()
 	h := &harness{wins: &fakeWindows{}, tray: tray}
 	checks := map[readiness.Step]readiness.Check{}
 	for _, st := range readiness.Steps {
@@ -159,6 +164,9 @@ func newHarness(t *testing.T, mode Mode, tray *fakeTray) *harness {
 	}
 	if tray != nil {
 		opts.Tray = tray
+	}
+	if mut != nil {
+		mut(&opts)
 	}
 	h.sh = newShell(opts, h.wins.factory)
 	if err := h.sh.Start(context.Background()); err != nil {
@@ -457,5 +465,56 @@ func TestStartRequiresSettings(t *testing.T) {
 	sh := newShell(Options{}, (&fakeWindows{}).factory)
 	if err := sh.Start(context.Background()); err == nil {
 		t.Error("expected error")
+	}
+}
+
+type fakeScheme struct {
+	mu   sync.Mutex
+	dark bool
+	ch   chan struct{}
+}
+
+func (f *fakeScheme) Start(context.Context) error { return nil }
+func (f *fakeScheme) Dark() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.dark
+}
+func (f *fakeScheme) Changes() <-chan struct{} { return f.ch }
+func (f *fakeScheme) flip(dark bool) {
+	f.mu.Lock()
+	f.dark = dark
+	f.mu.Unlock()
+	f.ch <- struct{}{}
+}
+
+// TestFollowsSystemScheme: the shell starts in the system scheme and
+// repaints its windows when it changes, with no restart.
+func TestFollowsSystemScheme(t *testing.T) {
+	src := &fakeScheme{dark: true, ch: make(chan struct{}, 1)}
+	h := newHarnessWith(t, ModeMain, nil, func(o *Options) { o.Appearance = src })
+	if _, dark, _ := h.sh.look(); !dark {
+		t.Fatal("did not start dark")
+	}
+	w := h.wins.all()[0]
+	before := w.invalidated.Load()
+	src.flip(false)
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		_, dark, _ := h.sh.look()
+		if !dark && w.invalidated.Load() > before {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("shell did not follow the scheme change")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestNoAppearanceIsLight(t *testing.T) {
+	h := newHarness(t, ModeMain, nil)
+	if _, dark, _ := h.sh.look(); dark {
+		t.Error("dark without a source")
 	}
 }

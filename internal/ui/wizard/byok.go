@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 
 	"gioui.org/io/key"
@@ -31,6 +32,8 @@ type byokState struct {
 	info    *providers.Info
 	saving  bool
 	saveErr string
+	keyGen  string // changes when a new key was stored
+	keyN    int
 }
 
 func (b *byokState) init() {
@@ -186,6 +189,10 @@ func (b *byokState) save(w *Wizard, gtx layout.Context) {
 			return
 		}
 		b.info = info
+		if in.APIKey != "" {
+			b.keyN++
+			b.keyGen = strconv.Itoa(b.keyN)
+		}
 	})
 	b.dirty = false
 }
@@ -202,4 +209,17 @@ func saveErrCode(err error) string {
 		return k
 	}
 	return "save_failed"
+}
+
+// autoSig identifies the saved provider the check should cover; ok is false
+// until one is saved and the form has no unsaved edits. A changed saved
+// provider changes the signature and so re-runs the check.
+func (b *byokState) autoSig(w *Wizard) (string, bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if b.info == nil || b.saving || b.dirty || !b.info.HasKey {
+		return "", false
+	}
+	in := b.info.Input
+	return strings.Join([]string{b.info.ID, string(in.Kind), in.BaseURL, in.Model, formatHeaders(in.Headers), b.keyGen}, "\x00"), true
 }
