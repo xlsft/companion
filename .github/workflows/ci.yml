@@ -50,7 +50,7 @@ jobs:
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -tags novulkan ./...
       - name: shellcheck
-        run: shellcheck install.sh packaging/install.sh packaging/dist-linux.sh
+        run: shellcheck install.sh packaging/install.sh packaging/dist-linux.sh .github/scripts/*.sh
 
   test:
     name: Test

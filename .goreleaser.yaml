@@ -31,6 +31,28 @@ signs:
     signature: "${artifact}.sigstore.json"
     args: ["sign-blob", "--yes", "--bundle=${signature}", "${artifact}"]
 
+# Homebrew is not configured here: GoReleaser's homebrew_casks/brews only
+# package archives it built itself, and these binaries are cgo builds made
+# by make dist-linux. The Release workflow writes the tap's formula from
+# checksums.txt instead (.github/scripts/homebrew-formula.sh).
+
+# Scoop is Windows-only, and GoReleaser refuses a scoops block without a
+# Windows archive (even with skip_upload), so it stays commented out until a
+# Windows build ships; then uncomment it and drop skip_upload.
+# scoops:
+#   - name: companion
+#     repository:
+#       owner: xlsft
+#       name: scoop-bucket
+#       token: '{{ envOrDefault "COMPANION_PACKAGES_TOKEN" "" }}'
+#     homepage: https://github.com/xlsft/companion
+#     description: Voice and screen assistant with local speech recognition
+#     license: FSL-1.1-ALv2
+#     commit_author:
+#       name: github-actions[bot]
+#       email: 41898282+github-actions[bot]@users.noreply.github.com
+#     skip_upload: true
+
 changelog:
   use: github
   sort: asc
