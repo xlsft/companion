@@ -347,7 +347,11 @@ func (d *Dropdown) popup(gtx layout.Context, th *theme.Theme, labels []string, s
 		gtx.Constraints = layout.Exact(image.Pt(head.X, h))
 		return layout.UniformInset(th.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			d.list.Axis = layout.Vertical
-			return material.List(th.Theme, &d.list).Layout(gtx, len(labels), func(gtx layout.Context, i int) layout.Dimensions {
+			// The scrollbar floats over the rows so a long list keeps the
+			// same padding as a short one.
+			ls := material.List(th.Theme, &d.list)
+			ls.AnchorStrategy = material.Overlay
+			return ls.Layout(gtx, len(labels), func(gtx layout.Context, i int) layout.Dimensions {
 				return d.option(gtx, th, i, labels[i], i == sel)
 			})
 		})
@@ -381,15 +385,18 @@ func (d *Dropdown) option(gtx layout.Context, th *theme.Theme, i int, txt string
 			bg = th.Pal.Hover
 		}
 		return Box(gtx, th, bg, color.NRGBA{}, 4, func(gtx layout.Context) layout.Dimensions {
-			// The chosen option carries a check, not only a tint.
-			mark := layout.Spacer{Width: th.Dp(14), Height: th.Dp(14)}.Layout
+			// Text lines up with the field's own text and the check with
+			// its arrow: the popup's 4px inset plus 8px here make the
+			// field's 12px. The chosen option carries a check, not only a
+			// tint.
+			var mark layout.Widget
 			if sel {
 				mark = IconW(th, icon.Check, 14, th.Pal.AccentText)
 			}
-			return layout.Inset{Left: th.Dp(8), Right: th.Dp(8)}.Layout(gtx, FixedH(th, 34, func(gtx layout.Context) layout.Dimensions {
+			return layout.Inset{Left: th.Dp(8), Right: th.Dp(6)}.Layout(gtx, FixedH(th, 34, func(gtx layout.Context) layout.Dimensions {
 				l := label(th, 14, txt, th.Pal.Fg)
 				l.MaxLines = 1
-				return HStack(th, 8, mark, l.Layout)(gtx)
+				return Spread(l.Layout, mark)(gtx)
 			}))
 		})
 	})
