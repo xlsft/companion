@@ -54,6 +54,8 @@ func (w *Wizard) Layout(gtx layout.Context, th *theme.Theme, l i18n.Lang) layout
 	}
 	w.update(gtx, s, l)
 	s = w.snap()
+	w.autoCheck(gtx, s)
+	s = w.snap()
 
 	kit.Fill(gtx, th.Pal.Bg)
 	return layout.Flex{}.Layout(gtx,

@@ -3,6 +3,7 @@ package wizard
 import (
 	"context"
 	"math"
+	"strconv"
 	"strings"
 
 	"gioui.org/io/key"
@@ -34,6 +35,7 @@ type ttsState struct {
 	loadingV bool
 	saving   bool
 	err      string
+	saveGen  int // counts successful Saves; the speech check follows each
 }
 
 func (t *ttsState) init() {
@@ -174,10 +176,23 @@ func (t *ttsState) save(w *Wizard, gtx layout.Context) {
 			return
 		}
 		t.cfg, t.saved, t.voice = out, true, out.Voice
+		t.saveGen++
 		w.mu.Unlock()
 		// A new provider or key has other voices.
 		if providerChanged || apiKey != "" {
 			t.loadVoices(w)
 		}
 	})
+}
+
+// autoSig is non-empty only after the user saved in this session: the
+// check plays a sentence, which is expected right after Save and a surprise
+// on merely opening the step.
+func (t *ttsState) autoSig(w *Wizard) (string, bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if t.saveGen == 0 || t.saving {
+		return "", false
+	}
+	return strconv.Itoa(t.saveGen), true
 }
