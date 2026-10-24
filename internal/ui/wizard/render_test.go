@@ -20,7 +20,7 @@ import (
 // TestHeadlessRender draws every step through Gio's GPU pipeline when an
 // offscreen GL context is available. Set OC_UI_SNAPSHOT_DIR to keep PNGs.
 func TestHeadlessRender(t *testing.T) {
-	size := image.Pt(960, 680)
+	size := image.Pt(1280, 800) // the prototypes' frame
 	win, err := headless.NewWindow(size.X, size.Y)
 	if err != nil {
 		t.Skipf("no headless GPU context on this machine: %v", err)
@@ -47,6 +47,7 @@ func TestHeadlessRender(t *testing.T) {
 	for _, lang := range []i18n.Lang{i18n.EN, i18n.RU} {
 		h := newHarness(t)
 		h.lang, h.size = lang, size
+		h.w.cfg.Version, h.w.cfg.SetLanguage = "0.1.0-dev", func(i18n.Lang) {}
 		h.provider.info = &providers.Info{ID: "prov_1", HasKey: true,
 			Input: providers.Input{Kind: llm.KindOpenAI, BaseURL: "https://api.example.test/v1", Model: "gpt-test"}}
 		for _, st := range readiness.Steps {
@@ -59,7 +60,7 @@ func TestHeadlessRender(t *testing.T) {
 			for _, sc := range []struct {
 				suffix string
 				th     *theme.Theme
-			}{{"", theme.New(false, 1)}, {"-dark-x2", theme.New(true, theme.MaxScale)}} {
+			}{{"", theme.New(false, 1)}, {"-dark", theme.New(true, 1)}, {"-dark-x2", theme.New(true, theme.MaxScale)}} {
 				h.th = sc.th
 				h.frame()
 				ops := h.frame()

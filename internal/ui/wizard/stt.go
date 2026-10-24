@@ -3,20 +3,15 @@ package wizard
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 	"time"
 
 	"gioui.org/layout"
-	"gioui.org/op"
 
 	"github.com/xlsft/companion/internal/audio"
 	"github.com/xlsft/companion/internal/models"
 	"github.com/xlsft/companion/internal/models/hw"
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/ui/i18n"
-	"github.com/xlsft/companion/internal/ui/kit"
-	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 const meterRefresh = 50 * time.Millisecond
@@ -252,141 +247,4 @@ func (t *sttState) check(w *Wizard) {
 		t.transcript = tr
 		w.mu.Unlock()
 	})
-}
-
-func mb(n int64) string { return fmt.Sprintf("%.0f MB", float64(n)/(1<<20)) }
-
-func langsOf(l i18n.Lang, m models.Manifest) string {
-	if m.Multilingual() {
-		return i18n.T(l, "wiz.stt.multilingual")
-	}
-	return strings.Join(m.Languages, ", ")
-}
-
-func hardwareSummary(l i18n.Lang, p hw.Profile) string {
-	cpu := kit.OrDash(p.CPU.Model)
-	gpu := i18n.T(l, "wiz.stt.gpu.none")
-	switch {
-	case p.GPU.Usable():
-		gpu = strings.Join(p.GPU.Backends, "+")
-	case !p.GPU.Known:
-		gpu = i18n.T(l, "wiz.stt.gpu.unknown")
-	}
-	return i18n.Tf(l, "wiz.stt.hardware", cpu, p.CPU.Cores, float64(p.Memory.TotalBytes)/(1<<30), gpu)
-}
-
-// meterFraction maps RMS dBFS onto [0, 1] over a 60 dB range.
-func meterFraction(dbfs float64) float32 {
-	return float32(max(0, min(1, (dbfs+60)/60)))
-}
-
-func fmtETA(d time.Duration) string {
-	d = d.Round(time.Second)
-	return fmt.Sprintf("%d:%02d", int(d.Minutes()), int(d.Seconds())%60)
-}
-
-func (t *sttState) rows(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) []layout.Widget {
-	b := w.cfg.Backends.STT
-	if b == nil {
-		return []layout.Widget{w.text(th.StatusLabel(theme.StatusError, i18n.T(l, "wiz.notWired"))), gap(12),
-			w.checkButton(th, l, s, readiness.StepSTT, true)}
-	}
-	w.mu.Lock()
-	loaded, loadErr, prof, cat, inst := t.loaded, t.loadErr, t.profile, t.catalog, t.installed
-	rec, selected, devs, device := t.recommended, t.selected, t.devices, t.device
-	installing, prog, installErr := t.installing, t.progress, t.installErr
-	meter, meterErr, transcript := t.meter, t.meterErr, t.transcript
-	w.mu.Unlock()
-	if !loaded {
-		return []layout.Widget{w.text(kit.Muted(th, i18n.T(l, "wiz.loading")))}
-	}
-	rows := []layout.Widget{
-		w.text(kit.Subheading(th, i18n.T(l, "wiz.stt.model"))),
-		w.text(kit.Body(th, hardwareSummary(l, prof))),
-	}
-	if rec.ID != "" {
-		rows = append(rows, w.text(kit.Body(th, i18n.Tf(l, "wiz.stt.recommended", rec.Name, mb(rec.Size), langsOf(l, rec)))))
-	}
-	if loadErr != "" {
-		rows = append(rows, w.text(th.StatusLabel(theme.StatusError, loadErr)), w.text(kit.Muted(th, fixText(l, loadErr))))
-	}
-	labels := make([]string, len(cat))
-	sel := -1
-	for i, m := range cat {
-		labels[i] = fmt.Sprintf("%s · %s · %s", m.Name, mb(m.Size), langsOf(l, m))
-		if m.ID == rec.ID {
-			labels[i] += " · " + i18n.T(l, "wiz.stt.rec")
-		}
-		if inst[m.ID] {
-			labels[i] += " · " + i18n.T(l, "wiz.stt.installed")
-		}
-		if m.ID == selected {
-			sel = i
-		}
-	}
-	rows = append(rows, gap(6), func(gtx layout.Context) layout.Dimensions {
-		return t.modelDD.layout(w, gtx, th, labels, sel, i18n.T(l, "wiz.stt.pickModel"), !installing && !s.running)
-	}, gap(8))
-
-	dlLabel := "wiz.stt.download"
-	if inst[selected] {
-		dlLabel = "wiz.stt.use"
-	}
-	if installing {
-		frac := float32(0)
-		if prog.Total > 0 {
-			frac = float32(prog.Done) / float32(prog.Total)
-		}
-		line := i18n.Tf(l, "wiz.stt.progress", mb(prog.Done), mb(prog.Total), prog.Rate/(1<<20), fmtETA(prog.ETA))
-		rows = append(rows, bar(th, frac), gap(4), w.text(kit.Muted(th, line)), gap(4),
-			func(gtx layout.Context) layout.Dimensions {
-				return w.button(gtx, th, ActCancel, i18n.T(l, "wiz.cancel"), true)
-			})
-	} else {
-		rows = append(rows, func(gtx layout.Context) layout.Dimensions {
-			return w.button(gtx, th, ActDownload, i18n.T(l, dlLabel), sel >= 0 && !s.running)
-		})
-	}
-	if installErr != "" {
-		rows = append(rows, w.text(th.StatusLabel(theme.StatusError, i18n.Tf(l, "wiz.stt.installFailed", installErr))),
-			w.text(kit.Muted(th, fixText(l, installErr))))
-	}
-
-	// Microphone test.
-	anyInstalled := len(inst) > 0
-	devLabels := []string{i18n.T(l, "wiz.stt.defaultDevice")}
-	devSel := 0
-	for i, d := range devs {
-		devLabels = append(devLabels, d.Name)
-		if d.ID == device && device != "" {
-			devSel = i + 1
-		}
-	}
-	rows = append(rows, gap(16),
-		w.text(kit.Subheading(th, i18n.T(l, "wiz.stt.mic"))),
-		func(gtx layout.Context) layout.Dimensions {
-			return t.deviceDD.layout(w, gtx, th, devLabels, devSel, devLabels[0], anyInstalled && !s.running)
-		}, gap(8),
-		func(gtx layout.Context) layout.Dimensions {
-			return w.button(gtx, th, ActMicTest, i18n.T(l, "wiz.stt.micTest"), anyInstalled && meter == nil && !s.running)
-		},
-	)
-	if meter != nil {
-		lvl := meter.Level()
-		rows = append(rows, gap(6), func(gtx layout.Context) layout.Dimensions {
-			gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(meterRefresh)})
-			return bar(th, meterFraction(lvl.RMS))(gtx)
-		}, w.text(kit.Muted(th, i18n.Tf(l, "wiz.stt.level", lvl.RMS))))
-	}
-	if meterErr != "" {
-		rows = append(rows, w.text(th.StatusLabel(theme.StatusError, meterErr)), w.text(kit.Muted(th, fixText(l, meterErr))))
-	}
-	phrase := w.text(kit.Subheading(th, "«"+readiness.MicPhrase(string(l))+"»"))
-	rows = append(rows, gap(8), w.text(kit.Body(th, i18n.T(l, "wiz.stt.readAloud"))),
-		func(gtx layout.Context) layout.Dimensions { return kit.Card(gtx, th, phrase) },
-		gap(8), w.checkButton(th, l, s, readiness.StepSTT, anyInstalled))
-	if transcript != "" {
-		rows = append(rows, gap(6), w.text(kit.Body(th, i18n.Tf(l, "wiz.stt.heard", transcript))))
-	}
-	return rows
 }

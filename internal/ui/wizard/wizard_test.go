@@ -50,6 +50,12 @@ func TestStepLocking(t *testing.T) {
 	if h.has(ActBack) {
 		t.Error("Back offered on the first step")
 	}
+	// Next is shown but leads nowhere before the step passes.
+	h.click(ActNext)
+	h.frame()
+	if h.view() != readiness.StepPermissions {
+		t.Errorf("Next moved past an unpassed step to %s", h.view())
+	}
 
 	// Passing a step advances; Back returns; the sidebar goes forward again.
 	h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Passed})
@@ -57,7 +63,7 @@ func TestStepLocking(t *testing.T) {
 	h.eventually("advance to BYOK", func() bool { return h.view() == readiness.StepBYOK && h.idle() })
 	h.click(ActBack)
 	h.eventually("back to permissions", func() bool { return h.view() == readiness.StepPermissions })
-	h.w.stepBtns[1].Click()
+	h.click(ActNext)
 	h.eventually("forward to BYOK", func() bool { return h.view() == readiness.StepBYOK })
 	h.w.stepBtns[2].Click()
 	h.frame()
@@ -69,7 +75,8 @@ func TestStepLocking(t *testing.T) {
 
 // allowedActions is everything the wizard may ever offer (FR-ONB-004).
 var allowedActions = []Action{ActBack, ActCheck, ActRecheck, ActDiagnostics, ActQuit, ActSelectStep, ActCopy,
-	ActSave, ActTest, ActDownload, ActCancel, ActMicTest, ActLoadVoices, ActChoose, ActRunFull}
+	ActSave, ActTest, ActDownload, ActCancel, ActMicTest, ActLoadVoices, ActChoose, ActRunFull,
+	ActNext, ActLanguage, ActReplaceKey, ActHeaders}
 
 // forbiddenWords match at the start of a word, so "Скачать" is not "чат".
 var forbiddenWords = []string{"skip", "later", "chat", "try without", "open chat", "пропуст", "позже", "чат", "без настройки"}
@@ -119,7 +126,7 @@ func TestNoForbiddenActions(t *testing.T) {
 				t.Fatal(err)
 			}
 			h.eventually("failure shown", func() bool { return h.shows(i18n.T(lang, "wiz.result.failed")) })
-			h.w.stt.modelDD.open, h.w.stt.deviceDD.open, h.w.tts.voiceDD.open = true, true, true
+			h.w.stt.modelDD.open, h.w.stt.deviceDD.open = true, true
 			h.frame()
 			assertNoBypass(t, h, string(lang)+"/"+string(st)+"/failed")
 			if st == readiness.StepEndToEnd {
@@ -143,7 +150,7 @@ func TestFailureKeepsStepAndExplains(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Subsystem: permissions", "Status: denied", "How to fix:",
-		"× denied", "√ granted", "▲ needs a compositor key binding", "▲ works through the fallback",
+		"Denied", "Works", "Action needed", "Fallback",
 		fakePerm{}.HotkeyInstructions(),
 	} {
 		if !h.shows(want) {
@@ -194,8 +201,8 @@ func TestEndToEndStagesShownSeparately(t *testing.T) {
 	h.eventually("e2e", func() bool { return h.view() == readiness.StepEndToEnd })
 	h.click(ActRunFull)
 	h.eventually("result", func() bool { return h.idle() && h.shows("Status: llm_failed") })
-	for _, want := range []string{"√ Speech — passed", "√ Local recognition — passed", "√ Screen capture — passed",
-		"× Model answer — failed (timeout)", "? Speech output — not run", "? Overlay pointing — not run"} {
+	for _, want := range []string{"Speech — Done", "Local STT — Done", "Screenshot — Done",
+		"Model answer — Failed (timeout)", "Speech output — Not run", "Pointing — Not run"} {
 		if !h.shows(want) {
 			t.Errorf("missing %q in %q", want, h.w.frame.texts)
 		}
@@ -223,11 +230,11 @@ func TestKeyNeverRenderedAfterSave(t *testing.T) {
 	if b.key.Text() != "" {
 		t.Error("key still in the editor after Save")
 	}
-	h.eventually("saved", func() bool { return h.shows("Key saved") })
+	h.eventually("saved", func() bool { return h.shows("Saved in the system keychain") })
 	if got := h.provider.savedKeys(); !slices.Equal(got, []string{secret}) {
 		t.Errorf("backend keys = %v", got)
 	}
-	if !h.shows("In use: llm.example.test · model test-model") {
+	if !h.shows("go only to llm.example.test") {
 		t.Errorf("endpoint in use not shown: %q", h.w.frame.texts)
 	}
 	for _, s := range h.w.frame.texts {
@@ -237,7 +244,7 @@ func TestKeyNeverRenderedAfterSave(t *testing.T) {
 	}
 	// Re-saving without a key keeps it (empty APIKey on Update).
 	h.click(ActSave)
-	h.eventually("resaved", func() bool { return h.shows("Key saved") && !h.w.byok.saving })
+	h.eventually("resaved", func() bool { return h.shows("Saved in the system keychain") && !h.w.byok.saving })
 	if got := h.provider.savedKeys(); len(got) != 1 {
 		t.Errorf("backend keys after resave = %v", got)
 	}
@@ -255,7 +262,7 @@ func TestKeyNeverRenderedAfterSave(t *testing.T) {
 	if h.w.tts.key.Text() != "" {
 		t.Error("TTS key still in the editor after Save")
 	}
-	h.eventually("tts saved", func() bool { return h.shows("Key saved") })
+	h.eventually("tts saved", func() bool { return h.shows("Saved in the system keychain") })
 	for _, s := range h.w.frame.texts {
 		if strings.Contains(s, secret) {
 			t.Errorf("secret rendered in %q", s)
@@ -285,8 +292,8 @@ func TestBYOKTestSteps(t *testing.T) {
 	h.eventually("tested", func() bool { return h.view() == readiness.StepSTT })
 	h.w.stepBtns[1].Click()
 	h.eventually("back to byok", func() bool { return h.view() == readiness.StepBYOK })
-	for _, want := range []string{"√ Connection — passed", "The endpoint answers.", "√ Key and model — passed",
-		"√ Capabilities — passed", "√ text — passed", "√ streaming — passed", "× vision — failed", "√ tools — passed"} {
+	for _, want := range []string{"Connection — The endpoint answers.", "Key and model — The key is accepted",
+		"Text — yes", "Streaming — yes", "Vision — no", "Tools — yes"} {
 		if !h.shows(want) {
 			t.Errorf("missing %q", want)
 		}
@@ -304,7 +311,7 @@ func TestProgressFromSubscribe(t *testing.T) {
 	h.eventually("failure via subscribe", func() bool { return h.shows("Status: unavailable") })
 	h.pass(readiness.StepPermissions)
 	h.eventually("advance via subscribe", func() bool { return h.view() == readiness.StepBYOK })
-	if !h.shows("√ passed") {
+	if !h.shows("passed") {
 		t.Error("sidebar does not show the passed step")
 	}
 }
@@ -339,7 +346,7 @@ func TestSTTFlow(t *testing.T) {
 	h.pass(readiness.StepPermissions)
 	h.pass(readiness.StepBYOK)
 	h.eventually("stt loaded", func() bool { return h.view() == readiness.StepSTT && h.has(ActDownload) })
-	if !h.shows("Test CPU") || !h.shows("Рекомендуется:") || !h.shows("MB") {
+	if !h.shows("ГБ ОЗУ") || !h.shows("Рекомендуем") || !h.shows("whisper") {
 		t.Errorf("hardware/recommendation missing: %q", h.w.frame.texts)
 	}
 	if !h.shows("«Привет, это проверка микрофона»") {
@@ -389,7 +396,7 @@ func TestLayoutAllSteps(t *testing.T) {
 				for i, st := range readiness.Steps {
 					h.eventually("step", func() bool { return h.view() == st })
 					h.frame()
-					h.w.stt.modelDD.open, h.w.tts.voiceDD.open = true, true
+					h.w.stt.modelDD.open = true
 					h.frame()
 					if i < len(readiness.Steps)-1 {
 						h.pass(st)
