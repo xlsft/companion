@@ -38,7 +38,8 @@ const (
 type Style struct {
 	Color       string  // "#RRGGBB" or "#RRGGBBAA"
 	StrokeWidth float64 // logical pixels
-	Emphasis    bool    // pulse/glow
+	Emphasis    bool    // ring: outer halo; rect: dim the rest of the screen
+	Dashed      bool    // circle: dashed stroke, for secondary marks
 }
 
 // Command is one overlay instruction. Points are in normalized capture

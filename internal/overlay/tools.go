@@ -82,7 +82,8 @@ const annotateSchema = `{
           },
           "radius": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.5},
           "text": {"type": "string", "maxLength": 80},
-          "color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"}
+          "color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"},
+          "dashed": {"type": "boolean", "description": "circle only: dashed outline for secondary marks, e.g. several cells to click"}
         },
         "required": ["kind", "points"],
         "additionalProperties": false
@@ -144,8 +145,9 @@ func FromToolCall(cc CallContext, name string, args json.RawMessage) ([]Command,
 			cc.show(cc.CallID+"/ring", Command{Kind: KindRing, Points: []contracts.Point{p}, Radius: r, Style: Style{Emphasis: true}}),
 		)
 		if a.Label != "" {
-			// Anchor the label just right of the ring, clamped into the capture.
-			lp := contracts.Point{X: min(p.X+r*1.2, 1), Y: p.Y}
+			// Anchor the label just past the ring's halo; the renderer keeps
+			// it on screen near the right edge.
+			lp := contracts.Point{X: min(p.X+r*1.5, 1), Y: p.Y}
 			cmds = append(cmds, cc.show(cc.CallID+"/label", Command{Kind: KindLabel, Points: []contracts.Point{lp}, Text: a.Label}))
 		}
 	case ToolAnnotate:
@@ -156,6 +158,7 @@ func FromToolCall(cc CallContext, name string, args json.RawMessage) ([]Command,
 				Radius float64
 				Text   string
 				Color  string
+				Dashed bool
 			}
 		}
 		if err := decodeStrict(args, &a); err != nil {
@@ -185,7 +188,7 @@ func FromToolCall(cc CallContext, name string, args json.RawMessage) ([]Command,
 				r = defaultRingRadius
 			}
 			cmds = append(cmds, cc.show(fmt.Sprintf("%s/%d", cc.CallID, i), Command{
-				Kind: s.Kind, Points: pts, Radius: r, Text: s.Text, Style: Style{Color: s.Color},
+				Kind: s.Kind, Points: pts, Radius: r, Text: s.Text, Style: Style{Color: s.Color, Dashed: s.Dashed && s.Kind == KindCircle},
 			}))
 		}
 	case ToolClear:

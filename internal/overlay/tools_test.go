@@ -41,14 +41,19 @@ func TestAnnotate(t *testing.T) {
 	args := `{"shapes":[
 		{"kind":"arrow","points":[[0.1,0.1],[0.5,0.5]]},
 		{"kind":"rect","points":[[0.2,0.2],[0.3,0.4]],"color":"#00FF00"},
-		{"kind":"circle","points":[[0.5,0.5]]}
+		{"kind":"circle","points":[[0.5,0.5]],"dashed":true},
+		{"kind":"rect","points":[[0.2,0.2],[0.3,0.4]],"dashed":true}
 	]}`
 	cmds, err := FromToolCall(cc, ToolAnnotate, json.RawMessage(args))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cmds) != 3 || cmds[1].Style.Color != "#00FF00" || cmds[2].Radius != defaultRingRadius {
+	if len(cmds) != 4 || cmds[1].Style.Color != "#00FF00" || cmds[2].Radius != defaultRingRadius {
 		t.Fatalf("got %+v", cmds)
+	}
+	// Dashes are a circle style only; elsewhere the flag is ignored.
+	if !cmds[2].Style.Dashed || cmds[3].Style.Dashed {
+		t.Errorf("dashed: circle %v, rect %v", cmds[2].Style.Dashed, cmds[3].Style.Dashed)
 	}
 	if cmds[0].ID == cmds[1].ID {
 		t.Fatal("shape ids must be distinct")
