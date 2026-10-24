@@ -1,16 +1,20 @@
 package engine
 
 import (
+	"fmt"
 	"slices"
 	"testing"
+	"time"
 )
 
 func TestRegistry(t *testing.T) {
-	Register("test-registry", func(Config) (Engine, Info, error) { return nil, Info{}, nil })
-	if _, err := Lookup("test-registry"); err != nil {
+	// The registry is global; a unique name keeps -count=N runs independent.
+	name := fmt.Sprintf("test-registry-%d", time.Now().UnixNano())
+	Register(name, func(Config) (Engine, Info, error) { return nil, Info{}, nil })
+	if _, err := Lookup(name); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Contains(Names(), "test-registry") {
+	if !slices.Contains(Names(), name) {
 		t.Fatal("Names misses registered engine")
 	}
 	if _, err := Lookup("missing"); err == nil {
@@ -21,5 +25,5 @@ func TestRegistry(t *testing.T) {
 			t.Fatal("duplicate Register must panic")
 		}
 	}()
-	Register("test-registry", nil)
+	Register(name, nil)
 }
