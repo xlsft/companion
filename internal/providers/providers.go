@@ -246,11 +246,20 @@ func (s *Service) key(ctx context.Context, ref contracts.SecretRef) (string, err
 // id, for the profile resolver. The stored detection is not applied to the
 // adapter's own capability set; callers check Capabilities themselves.
 func (s *Service) Build(ctx context.Context, id string) (llm.Provider, llm.ProviderConfig, error) {
+	return s.BuildModel(ctx, id, "")
+}
+
+// BuildModel is Build with the model replaced by model when non-empty (a
+// profile's override). The stored provider is not changed.
+func (s *Service) BuildModel(ctx context.Context, id, model string) (llm.Provider, llm.ProviderConfig, error) {
 	rec, err := s.repo.Get(ctx, id)
 	if err != nil {
 		return nil, llm.ProviderConfig{}, err
 	}
 	cfg := s.config(rec)
+	if model != "" {
+		cfg.Model = model
+	}
 	key, err := s.key(ctx, rec.SecretRef)
 	if err != nil {
 		return nil, cfg, err
