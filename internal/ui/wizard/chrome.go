@@ -311,12 +311,9 @@ func (w *Wizard) header(gtx layout.Context, th *theme.Theme, l i18n.Lang, s snap
 	i := slices.Index(readiness.Steps, s.view())
 	n := len(readiness.Steps)
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
-	counter := w.text(kit.Text(th, 14, i18n.Tf(l, "wiz.stepOf", i+1, n), th.Pal.Muted))
 	return layout.Inset{Left: th.Dp(32), Right: th.Dp(32)}.Layout(gtx, kit.FixedH(th, 54, func(gtx layout.Context) layout.Dimensions {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-			layout.Rigid(counter),
-			kit.HSpace(th.Dp(16)),
 			// Half a step for the one on screen, as in the prototypes.
 			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 				return kit.Progress(gtx, th, (float32(i)+0.5)/float32(n))

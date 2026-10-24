@@ -320,7 +320,6 @@
   "wiz.step.stt.intro": "Sprache wird auf diesem Computer von einem whisper.cpp-Modell erkannt. Das funktioniert ohne Netzwerk genauso.",
   "wiz.step.tts": "Stimme",
   "wiz.step.tts.intro": "Antworten werden Satz für Satz gesprochen — der erste wird abgespielt, während das Modell noch schreibt. Die Sprachausgabe lässt sich in den Einstellungen ausschalten.",
-  "wiz.stepOf": "Schritt %d von %d",
   "wiz.stt.cancel": "Abbrechen",
   "wiz.stt.checksum": "Die Prüfsumme wird während des Downloads geprüft",
   "wiz.stt.cpu": "CPU, %d Kerne",

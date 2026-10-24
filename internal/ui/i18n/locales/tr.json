@@ -320,7 +320,6 @@
   "wiz.step.stt.intro": "Konuşma bu bilgisayarda bir whisper.cpp modeliyle tanınır. Ağ olmadan da aynı şekilde çalışır.",
   "wiz.step.tts": "Ses",
   "wiz.step.tts.intro": "Yanıtlar cümle cümle seslendirilir — model hâlâ yazarken ilk cümle çalmaya başlar. Sesli çıkış Ayarlar'dan kapatılabilir.",
-  "wiz.stepOf": "Adım %d / %d",
   "wiz.stt.cancel": "İptal",
   "wiz.stt.checksum": "Sağlama toplamı indirme sırasında doğrulanır",
   "wiz.stt.cpu": "CPU, %d çekirdek",

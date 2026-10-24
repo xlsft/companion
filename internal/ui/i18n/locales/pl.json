@@ -320,7 +320,6 @@
   "wiz.step.stt.intro": "Mowa jest rozpoznawana na tym komputerze przez model whisper.cpp. Bez sieci działa tak samo.",
   "wiz.step.tts": "Głos",
   "wiz.step.tts.intro": "Odpowiedzi są czytane zdanie po zdaniu — pierwsze odtwarza się, gdy model jeszcze pisze. Wyjście mowy można wyłączyć w Ustawieniach.",
-  "wiz.stepOf": "Krok %d z %d",
   "wiz.stt.cancel": "Anuluj",
   "wiz.stt.checksum": "Suma kontrolna jest sprawdzana w trakcie pobierania",
   "wiz.stt.cpu": "CPU, rdzenie: %d",

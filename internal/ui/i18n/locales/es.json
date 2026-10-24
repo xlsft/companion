@@ -320,7 +320,6 @@
   "wiz.step.stt.intro": "La voz se reconoce en este equipo con un modelo de whisper.cpp. Funciona igual sin red.",
   "wiz.step.tts": "Voz",
   "wiz.step.tts.intro": "Las respuestas se leen frase a frase: la primera suena mientras el modelo aún escribe. La salida de voz se puede desactivar en Ajustes.",
-  "wiz.stepOf": "Paso %d de %d",
   "wiz.stt.cancel": "Cancelar",
   "wiz.stt.checksum": "La suma de verificación se comprueba sobre la marcha",
   "wiz.stt.cpu": "CPU, %d núcleos",

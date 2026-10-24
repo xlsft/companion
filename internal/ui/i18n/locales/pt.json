@@ -320,7 +320,6 @@
   "wiz.step.stt.intro": "A fala é reconhecida neste computador por um modelo whisper.cpp. Funciona igual sem rede.",
   "wiz.step.tts": "Voz",
   "wiz.step.tts.intro": "As respostas são faladas frase por frase — a primeira toca enquanto o modelo ainda escreve. A saída de voz pode ser desativada em Configurações.",
-  "wiz.stepOf": "Etapa %d de %d",
   "wiz.stt.cancel": "Cancelar",
   "wiz.stt.checksum": "O checksum é verificado durante o download",
   "wiz.stt.cpu": "CPU, %d núcleos",

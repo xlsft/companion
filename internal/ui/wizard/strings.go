@@ -9,7 +9,6 @@ func init() { i18n.Register(texts) }
 // system protocol: the wizard speaks of "the system" only. Tests scan the
 // rendered labels for both.
 var texts = map[string][2]string{
-	"wiz.stepOf":   {"Step %d of %d", "Шаг %d из %d"},
 	"wiz.language": {"Interface language", "Язык интерфейса"},
 
 	// Aside names, then page headings.
