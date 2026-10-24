@@ -52,6 +52,15 @@ func MicPhrase(lang string) string {
 	return micPhrases["ru"]
 }
 
+// PhraseLanguage is the language MicPhrase(lang) is written in, for the
+// recogniser to listen for.
+func PhraseLanguage(lang string) string {
+	if _, ok := micPhrases[lang]; ok {
+		return lang
+	}
+	return "ru"
+}
+
 // ttsSentences is the fixed sentence the TTS check plays.
 var ttsSentences = map[string]string{
 	"ru": "Привет! Так звучит мой голос.",

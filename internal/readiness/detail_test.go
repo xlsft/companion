@@ -39,3 +39,11 @@ func TestTTSSentence(t *testing.T) {
 		t.Errorf("sentences: en=%q ru=%q de=%q", TTSSentence("en"), TTSSentence("ru"), TTSSentence("de"))
 	}
 }
+
+func TestPhraseLanguage(t *testing.T) {
+	for lang, want := range map[string]string{"ru": "ru", "en": "en", "de": "ru", "": "ru"} {
+		if got := PhraseLanguage(lang); got != want {
+			t.Errorf("PhraseLanguage(%q) = %q, want %q", lang, got, want)
+		}
+	}
+}

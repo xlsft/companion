@@ -40,6 +40,10 @@ type Recorder interface {
 // called per request so profile changes apply to the next request.
 type ProviderFunc func(ctx context.Context) (llm.Provider, error)
 
+// DefaultMaxModelSide bounds a screenshot sent to the model unless the
+// Orchestrator sets MaxModelSide.
+const DefaultMaxModelSide = defaultMaxModelSide
+
 const (
 	defaultMaxModelSide  = 1568
 	defaultMaxToolRounds = 4

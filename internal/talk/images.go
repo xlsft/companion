@@ -28,15 +28,11 @@ func (o *Orchestrator) prepareCaptures(caps []*contracts.Capture) ([]llm.Image, 
 		if c == nil || c.Image == nil {
 			continue
 		}
-		scaled := downscale(c.Image, maxSide)
-		meta := c.Meta
-		meta.Model = contracts.PixelSize{W: scaled.Bounds().Dx(), H: scaled.Bounds().Dy()}
-		var buf bytes.Buffer
-		enc := png.Encoder{CompressionLevel: png.BestSpeed}
-		if err := enc.Encode(&buf, scaled); err != nil {
-			return nil, "", fmt.Errorf("encode capture: %w", err)
+		img, meta, err := ModelImage(c, maxSide)
+		if err != nil {
+			return nil, "", err
 		}
-		images = append(images, llm.Image{MediaType: llm.MediaPNG, Data: buf.Bytes()})
+		images = append(images, img)
 		if o.Overlay != nil {
 			o.Overlay.RegisterCapture(meta)
 		}
@@ -45,6 +41,21 @@ func (o *Orchestrator) prepareCaptures(caps []*contracts.Capture) ([]llm.Image, 
 		}
 	}
 	return images, primary, nil
+}
+
+// ModelImage downscales c to fit maxSide×maxSide and encodes it as PNG
+// for a model request. The returned metadata has Model set to the sent
+// size, which the CoordinateMapper needs to map points back.
+func ModelImage(c *contracts.Capture, maxSide int) (llm.Image, contracts.CaptureMetadata, error) {
+	scaled := downscale(c.Image, maxSide)
+	meta := c.Meta
+	meta.Model = contracts.PixelSize{W: scaled.Bounds().Dx(), H: scaled.Bounds().Dy()}
+	var buf bytes.Buffer
+	enc := png.Encoder{CompressionLevel: png.BestSpeed}
+	if err := enc.Encode(&buf, scaled); err != nil {
+		return llm.Image{}, meta, fmt.Errorf("encode capture: %w", err)
+	}
+	return llm.Image{MediaType: llm.MediaPNG, Data: buf.Bytes()}, meta, nil
 }
 
 // downscale fits img into maxSide×maxSide keeping the aspect ratio. The
