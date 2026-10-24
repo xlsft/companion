@@ -6,6 +6,8 @@ import (
 	"gioui.org/layout"
 	"gioui.org/widget"
 
+	"github.com/xlsft/companion/internal/ui/icon"
+	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
 	"github.com/xlsft/companion/internal/ui/wizard"
 )
@@ -21,7 +23,8 @@ type wizardUI struct {
 	diagShown bool
 
 	backBtn widget.Clickable
-	diag    *diagPage
+	diag    *diagView
+	list    widget.List
 }
 
 func newWizardUI(sh *Shell) *wizardUI {
@@ -46,6 +49,7 @@ func newWizardUI(sh *Shell) *wizardUI {
 		Invalidate:    sh.invalidateAll,
 		Log:           sh.log,
 	})
+	w.list.Axis = layout.Vertical
 	return w
 }
 
@@ -72,16 +76,15 @@ func (w *wizardUI) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Di
 		return w.wiz.Layout(gtx, th, l)
 	}
 	// Diagnostics is read-only here: it offers no way out of setup
-	// (FR-ONB-014), only back to the wizard.
+	// (FR-ONB-014), only back to the wizard. It is the same view as
+	// Settings › Diagnostics.
 	if w.diag == nil {
-		w.diag = newDiagPage(w.sh.diag)
+		w.diag = newDiagView(w.sh.diag, w.sh.opts.Version)
 	}
-	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Left: 24, Top: 16}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return button(gtx, th, &w.backBtn, T(l, "wizard.back"))
-			})
-		}),
-		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return w.diag.Layout(gtx, th, l) }),
-	)
+	s := w.diag.update(gtx)
+	back := func(gtx layout.Context) layout.Dimensions {
+		return kit.ButtonStyle{Kind: kit.Ghost, Small: true, Icon: icon.Left, Label: T(l, "wizard.back")}.Layout(gtx, th, &w.backBtn)
+	}
+	rows := append([]layout.Widget{kit.Title(th, T(l, "diag.heading")).Layout}, w.diag.rows(th, l, s)...)
+	return pageScaffold(gtx, th, back, w.diag.actions(th, l, s), &w.list, rows)
 }

@@ -15,44 +15,32 @@ import (
 	"github.com/xlsft/companion/internal/ui/theme"
 )
 
-// Shared widgets live in kit so the wizard package can use them too.
-var (
-	button     = kit.Button
-	subheading = kit.Subheading
-	body       = kit.Body
-	muted      = kit.Muted
-	vspace     = kit.VSpace
-	card       = kit.Card
-)
-
-// pageScaffold is a main-window page: the 54px header with title and
-// actions, then rows in a scrolling list with the prototypes' padding.
-func pageScaffold(gtx layout.Context, th *theme.Theme, title string, actions layout.Widget, list *widget.List, rows []layout.Widget) layout.Dimensions {
+// pageScaffold is a page of its own: the 54px header with a title (or a
+// Back button) and actions, then rows in a scrolling list with the
+// prototypes' padding. Every row spans the column.
+func pageScaffold(gtx layout.Context, th *theme.Theme, title, actions layout.Widget, list *widget.List, rows []layout.Widget) layout.Dimensions {
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return kit.PageHeader(gtx, th, kit.PageTitle(th, title).Layout, actions)
+			return kit.PageHeader(gtx, th, title, actions)
 		}),
 		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 			list.Axis = layout.Vertical
 			return material.List(th.Theme, list).Layout(gtx, len(rows), func(gtx layout.Context, i int) layout.Dimensions {
-				in := layout.Inset{Left: th.Dp(28), Right: th.Dp(28)}
+				side := kit.PageMargin(gtx, th, 32)
+				in := layout.Inset{Top: th.Dp(16), Left: side, Right: side}
 				if i == 0 {
-					in.Top = th.Dp(24)
+					in.Top = th.Dp(28)
 				}
 				if i == len(rows)-1 {
-					in.Bottom = th.Dp(24)
+					in.Bottom = th.Dp(28)
 				}
-				return in.Layout(gtx, rows[i])
+				return in.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					gtx.Constraints.Min.X = gtx.Constraints.Max.X
+					return rows[i](gtx)
+				})
 			})
 		}),
 	)
-}
-
-// placeholderPage stands in for sections that are not implemented yet.
-type placeholderPage struct{ route Route }
-
-func (p placeholderPage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
-	return pageScaffold(gtx, th, T(l, p.route.labelKey()), nil, new(widget.List), []layout.Widget{muted(th, T(l, "placeholder.body")).Layout})
 }
 
 // dialog is a modal message box; Esc or its button closes it.
@@ -115,7 +103,7 @@ func (d *dialog) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dime
 			return layout.UniformInset(th.Dp(24)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 					layout.Rigid(kit.Title(th, d.title).Layout),
-					vspace(th.Dp(10)),
+					kit.VSpace(th.Dp(10)),
 					layout.Rigid(kit.Lead(th, d.text).Layout),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						if d.note == "" {
@@ -123,7 +111,7 @@ func (d *dialog) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dime
 						}
 						return layout.Inset{Top: th.Dp(12)}.Layout(gtx, kit.Small(th, d.note).Layout)
 					}),
-					vspace(th.Dp(20)),
+					kit.VSpace(th.Dp(20)),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						return layout.E.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 							return kit.SecondaryButton(gtx, th, &d.closeBtn, T(l, "dialog.close"))

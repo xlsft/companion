@@ -104,7 +104,7 @@ var shortcutFilters = func() []event.Filter {
 		key.Filter{Name: "0", Required: key.ModShortcut},
 		key.Filter{Name: "N", Required: key.ModShortcut},
 	}
-	for i := range Routes {
+	for i := range NavRoutes() {
 		fs = append(fs, key.Filter{Name: key.Name(rune('1' + i)), Required: key.ModShortcut})
 	}
 	return fs

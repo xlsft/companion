@@ -22,33 +22,59 @@ type page interface {
 type mainUI struct {
 	sh *Shell
 
-	// mu guards nav and pages; it is a leaf lock (never held while calling
-	// into the shell) because the tray goroutine navigates too.
+	// mu guards nav, pages and section; it is a leaf lock (never held
+	// while calling into the shell) because the tray goroutine navigates
+	// too.
 	mu    sync.Mutex
 	nav   Navigator
 	pages map[Route]page
+	// section is a Settings section to show on the next frame, or -1.
+	section settingsSection
 
 	chat *chatModel
 
 	newChatBtn widget.Clickable
 	aboutBtn   widget.Clickable
-	navBtns    []widget.Clickable
+	navBtns    map[Route]*widget.Clickable
 	about      dialog
 }
 
 func newMainUI(sh *Shell) *mainUI {
-	return &mainUI{
+	m := &mainUI{
 		sh:      sh,
 		pages:   map[Route]page{},
 		chat:    newChatModel(sh.opts.Chat, sh.log, sh.invalidateAll),
-		navBtns: make([]widget.Clickable, len(Routes)),
+		navBtns: map[Route]*widget.Clickable{},
+		section: -1,
 	}
+	for _, r := range NavRoutes() {
+		m.navBtns[r] = new(widget.Clickable)
+	}
+	return m
 }
 
 func (m *mainUI) navigate(r Route) {
 	m.mu.Lock()
 	m.nav.Go(r)
 	m.mu.Unlock()
+}
+
+// showSettings opens Settings at section s; safe from any goroutine (the
+// tray's Diagnostics item uses it).
+func (m *mainUI) showSettings(s settingsSection) {
+	m.mu.Lock()
+	m.nav.Go(RouteSettings)
+	m.section = s
+	m.mu.Unlock()
+}
+
+// takeSection returns a pending section switch, if any.
+func (m *mainUI) takeSection() (settingsSection, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s := m.section
+	m.section = -1
+	return s, s >= 0
 }
 
 func (m *mainUI) current() Route {
@@ -74,23 +100,23 @@ func (m *mainUI) page(r Route) page {
 	}
 	var p page
 	switch r {
-	case RouteHome:
-		p = newHomePage(m)
 	case RouteSettings:
-		p = newSettingsPage(m.sh.opts.Settings)
-	case RouteDiagnostics:
-		p = newDiagPage(m.sh.diag)
+		sp := newSettingsPage(m.sh.opts.Settings)
+		sp.diag = newDiagView(m.sh.diag, m.sh.opts.Version)
+		sp.jump = m.takeSection
+		p = sp
 	default:
-		p = placeholderPage{route: r}
+		// Only implemented routes are ever current.
+		p = newHomePage(m)
 	}
 	m.pages[r] = p
 	return p
 }
 
 func (m *mainUI) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
-	for i := range m.navBtns {
-		if m.navBtns[i].Clicked(gtx) {
-			m.navigate(Routes[i])
+	for r, b := range m.navBtns {
+		if b.Clicked(gtx) {
+			m.navigate(r)
 		}
 	}
 	if m.newChatBtn.Clicked(gtx) {
@@ -135,10 +161,13 @@ func (m *mainUI) sidebar(gtx layout.Context, th *theme.Theme, l Lang, cur Route)
 		}),
 		kit.VSpace(th.Dp(8)),
 	}
-	for i, r := range Routes {
+	for _, r := range Routes {
 		children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return layout.Inset{Left: th.Dp(8), Right: th.Dp(8), Bottom: th.Dp(2)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return kit.NavItem(gtx, th, &m.navBtns[i], r.icon(), T(l, r.labelKey()), r == cur)
+				if !r.Implemented() {
+					return kit.NavItemSoon(gtx, th, r.icon(), T(l, r.labelKey()), T(l, "nav.soon"))
+				}
+				return kit.NavItem(gtx, th, m.navBtns[r], r.icon(), T(l, r.labelKey()), r == cur)
 			})
 		}))
 	}

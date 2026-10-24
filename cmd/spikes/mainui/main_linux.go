@@ -6,9 +6,12 @@
 // appends the typed turn, and Stop ends the canned reply.
 //
 //	mainui -dark -lang ru -state chat   # chat | empty | offline
-//	mainui -route settings              # home | history | agents | skills | settings | diagnostics
+//	mainui -route settings -section voice
+//	                                     # route: home | settings
+//	                                     # section: general | voice | screen | privacy | diagnostics
 //
-// Diagnostics shows the real capability report of this machine.
+// Diagnostics (Settings › Diagnostics) shows the real capability report of
+// this machine.
 package main
 
 import (
@@ -36,14 +39,12 @@ import (
 
 func main() {
 	dark := flag.Bool("dark", true, "dark theme")
-	lang := flag.String("lang", "ru", "interface language (ru, en)")
+	lang := flag.String("lang", "ru", "interface language (en, ru, de, …)")
 	state := flag.String("state", "chat", "chat, empty or offline")
-	route := flag.String("route", "home", "section to open: home, history, agents, skills, settings, diagnostics")
+	route := flag.String("route", "home", "page to open: home or settings")
+	section := flag.String("section", "general", "settings section: general, voice, screen, privacy, diagnostics")
 	flag.Parse()
-	routes := map[string]ui.Route{
-		"home": ui.RouteHome, "history": ui.RouteHistory, "agents": ui.RouteAgents,
-		"skills": ui.RouteSkills, "settings": ui.RouteSettings, "diagnostics": ui.RouteDiagnostics,
-	}
+	routes := map[string]ui.Route{"home": ui.RouteHome, "settings": ui.RouteSettings}
 	start, ok := routes[*route]
 	if !ok {
 		fmt.Fprintln(os.Stderr, "mainui: unknown route", *route)
@@ -86,6 +87,9 @@ func main() {
 		// The main window exists once the app has started the shell.
 		time.Sleep(300 * time.Millisecond)
 		shell.Navigate(start)
+		if start == ui.RouteSettings && !shell.ShowSettings(*section) {
+			fmt.Fprintln(os.Stderr, "mainui: unknown section", *section)
+		}
 	}()
 	go func() {
 		if err := app.New(log, shell).Run(ctx); err != nil {

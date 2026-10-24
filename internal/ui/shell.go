@@ -90,7 +90,7 @@ type Options struct {
 	Tray contracts.Tray
 	// Chat is the Home chat's backend; nil shows the chat as not connected.
 	Chat ChatBackend
-	// Diagnose produces the capability report for the Diagnostics page.
+	// Diagnose produces the capability report for Diagnostics.
 	Diagnose func(ctx context.Context) (contracts.CapabilityReport, error)
 	// Quit asks the process to shut down; the app lifecycle then calls Stop.
 	Quit    func()
@@ -300,7 +300,7 @@ func (s *Shell) Open() {
 	}
 	s.ensureMainLocked()
 	s.mainWin = s.newWindow(windowSpec{
-		Title: T(s.lang, "app.name"), Width: 960, Height: 640,
+		Title: T(s.lang, "app.name"), Width: 1080, Height: 720,
 		Content: s.main, Shell: s, OnClosed: s.windowClosed,
 	})
 }
@@ -312,7 +312,8 @@ func (s *Shell) ensureMainLocked() {
 	}
 }
 
-// OpenDiagnostics shows diagnostics in the current mode's window.
+// OpenDiagnostics shows Diagnostics in the current mode's window: the
+// wizard's own view in setup mode, Settings › Diagnostics in main mode.
 func (s *Shell) OpenDiagnostics() {
 	s.mu.Lock()
 	switch {
@@ -323,11 +324,32 @@ func (s *Shell) OpenDiagnostics() {
 		s.wizard.showDiagnostics(true)
 	default:
 		s.ensureMainLocked()
-		s.main.navigate(RouteDiagnostics)
+		s.main.showSettings(secDiagnostics)
 	}
 	s.mu.Unlock()
 	s.Open()
 	s.invalidateAll()
+}
+
+// ShowSettings opens Settings at the named section ("general", "voice",
+// "screen", "privacy", "diagnostics") in main mode and reports whether
+// the name is known.
+func (s *Shell) ShowSettings(section string) bool {
+	sec, ok := sectionByName(section)
+	if !ok {
+		return false
+	}
+	s.mu.Lock()
+	m := s.main
+	if s.mode != ModeMain {
+		m = nil
+	}
+	s.mu.Unlock()
+	if m != nil {
+		m.showSettings(sec)
+		s.invalidateAll()
+	}
+	return true
 }
 
 // Quit asks the process to shut down. Safe to call repeatedly.
