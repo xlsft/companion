@@ -61,8 +61,30 @@ type Capture struct {
 	Image *image.RGBA
 }
 
-// Release drops the pixel buffer so it can be garbage collected.
-func (c *Capture) Release() { c.Image = nil }
+// Release zeroes and drops the pixel buffer: screen content must not linger
+// in memory until the GC happens to reuse it (FR-SCREEN-006).
+func (c *Capture) Release() {
+	if c.Image != nil {
+		clear(c.Image.Pix)
+	}
+	c.Image = nil
+}
+
+// ScreenAttachment describes a screenshot that was sent with a request, for
+// the chat to show and, if the user opted in, to store.
+type ScreenAttachment struct {
+	// Meta carries no pixels; Model is the size actually sent.
+	Meta CaptureMetadata
+	// Image is the model-sized picture. It is set only when the user chose
+	// to keep screenshots; otherwise nil and nothing may store pixels.
+	Image *image.RGBA
+}
+
+// AttachmentSink is told which screenshots a request carried, before the
+// model is asked. Implementations must not retain Image unless storing it.
+type AttachmentSink interface {
+	ScreenAttached(ref SessionRef, shots []ScreenAttachment)
+}
 
 // ScreenCapturer takes screenshots on explicit request (FR-SCREEN-001).
 // CaptureAllDisplays returns one Capture per display.

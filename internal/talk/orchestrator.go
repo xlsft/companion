@@ -64,6 +64,12 @@ type Orchestrator struct {
 	// MaxModelSide bounds the longest side of a screenshot sent to the model.
 	MaxModelSide  int
 	MaxToolRounds int
+	// Attachments is told which screenshots a request carries. nil: the
+	// chat is not told.
+	Attachments contracts.AttachmentSink
+	// KeepScreenshots reports whether the sent screenshot may be handed on
+	// for storing; nil or false keeps pixels out of the sink.
+	KeepScreenshots func() bool
 
 	mu sync.Mutex
 	// history keeps the text of previous turns of the current SessionID for
@@ -111,7 +117,7 @@ func (o *Orchestrator) Reason(ctx context.Context, ref contracts.SessionRef, req
 		return session.Reply{}, fmt.Errorf("talk provider: %w", err)
 	}
 
-	images, primary, err := o.prepareCaptures(req.Captures)
+	images, primary, err := o.prepareCaptures(ref, req.Captures)
 	releaseAll(req.Captures)
 	if err != nil {
 		return session.Reply{}, err
