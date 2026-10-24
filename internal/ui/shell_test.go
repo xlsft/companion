@@ -133,6 +133,12 @@ func (m *memProgress) Save(_ context.Context, d []byte) error {
 
 func newHarness(t *testing.T, mode Mode, tray *fakeTray) *harness {
 	t.Helper()
+	return newHarnessWith(t, mode, tray, nil)
+}
+
+// newHarnessWith lets a test adjust the options before the shell starts.
+func newHarnessWith(t *testing.T, mode Mode, tray *fakeTray, adjust func(*Options)) *harness {
+	t.Helper()
 	h := &harness{wins: &fakeWindows{}, tray: tray}
 	checks := map[readiness.Step]readiness.Check{}
 	for _, st := range readiness.Steps {
@@ -159,6 +165,9 @@ func newHarness(t *testing.T, mode Mode, tray *fakeTray) *harness {
 	}
 	if tray != nil {
 		opts.Tray = tray
+	}
+	if adjust != nil {
+		adjust(&opts)
 	}
 	h.sh = newShell(opts, h.wins.factory)
 	if err := h.sh.Start(context.Background()); err != nil {

@@ -27,10 +27,11 @@ type wizardUI struct {
 	backBtn widget.Clickable
 	diag    *diagView
 	list    widget.List
+	update  *updateBanner
 }
 
 func newWizardUI(sh *Shell) *wizardUI {
-	w := &wizardUI{sh: sh}
+	w := &wizardUI{sh: sh, update: newUpdateBanner(sh.opts.Updates)}
 	w.wiz = wizard.New(wizard.Config{
 		Gate:     sh.opts.Gate,
 		Backends: sh.opts.Setup,
@@ -79,6 +80,10 @@ func (w *wizardUI) diagnosticsShown() bool {
 }
 
 func (w *wizardUI) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
+	return w.update.wrap(gtx, th, l, func(gtx layout.Context) layout.Dimensions { return w.content(gtx, th, l) })
+}
+
+func (w *wizardUI) content(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
 	if w.backBtn.Clicked(gtx) {
 		w.showDiagnostics(false)
 	}

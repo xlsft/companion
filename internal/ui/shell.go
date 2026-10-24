@@ -90,6 +90,9 @@ type Options struct {
 	Tray contracts.Tray
 	// Chat is the Home chat's backend; nil shows the chat as not connected.
 	Chat ChatBackend
+	// Updates is the in-app updater; nil shows no update banner and leaves
+	// the update settings without a status.
+	Updates UpdateBackend
 	// Diagnose produces the capability report for Diagnostics.
 	Diagnose func(ctx context.Context) (contracts.CapabilityReport, error)
 	// Quit asks the process to shut down; the app lifecycle then calls Stop.
@@ -121,6 +124,7 @@ type Shell struct {
 	mainWin  window
 	closing  map[window]bool // closed by the shell, not the user
 	unsub    func()
+	unwatch  func() // stops update state notifications
 	// mainBuilds counts main UI constructions; tests assert laziness.
 	mainBuilds int
 }
@@ -180,6 +184,12 @@ func (s *Shell) Start(ctx context.Context) error {
 			s.log.Warn("tray failed to start, closing the last window will quit", "err", err)
 		}
 	}
+	if s.opts.Updates != nil {
+		unwatch := s.opts.Updates.Watch(s.invalidateAll)
+		s.mu.Lock()
+		s.unwatch = unwatch
+		s.mu.Unlock()
+	}
 	s.mu.Lock()
 	s.started = true
 	s.mu.Unlock()
@@ -194,9 +204,12 @@ func (s *Shell) Stop(ctx context.Context) error {
 	wins := []window{s.wizWin, s.mainWin}
 	s.wizWin, s.mainWin = nil, nil
 	wizUI, mainView := s.wizard, s.main
-	unsub := s.unsub
+	unsub, unwatch := s.unsub, s.unwatch
 	trayOK := s.trayOK
 	s.mu.Unlock()
+	if unwatch != nil {
+		unwatch()
+	}
 	for _, w := range wins {
 		if w != nil {
 			w.Close()
