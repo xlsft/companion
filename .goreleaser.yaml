@@ -77,6 +77,9 @@ release:
   github:
     owner: xlsft
     name: companion
+  # Lets "re-run failed jobs" on a tag finish later steps (the tap update)
+  # instead of failing on assets the first run already uploaded.
+  replace_existing_artifacts: true
   extra_files:
     - glob: ./dist-release/*.tar.gz
     - glob: ./dist-release/*.AppImage
