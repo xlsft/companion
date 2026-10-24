@@ -28,10 +28,14 @@ type gnomeBind struct {
 
 func gnomeBinds(req Request) []gnomeBind {
 	talk, cancel := Commands(req.Exe)
-	return []gnomeBind{
+	b := []gnomeBind{
 		{gnomeBase + "companion-talk/", "Companion: talk", talk, gnomeChord(req.Talk)},
 		{gnomeBase + "companion-cancel/", "Companion: cancel", cancel, gnomeChord(req.Cancel)},
 	}
+	if req.Dictate.Key != "" {
+		b = append(b, gnomeBind{gnomeBase + "companion-dictate/", "Companion: dictate", DictateCommand(req.Exe), gnomeChord(req.Dictate)})
+	}
+	return b
 }
 
 var gnomeMods = []struct {

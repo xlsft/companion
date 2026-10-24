@@ -23,10 +23,11 @@ import (
 )
 
 // Binding IDs the ctl CLI addresses. They match what the core registers for
-// Talk and Escape.
+// Talk, Escape and dictation.
 const (
-	TalkID   contracts.HotkeyID = "talk"
-	CancelID contracts.HotkeyID = "cancel"
+	TalkID    contracts.HotkeyID = "talk"
+	CancelID  contracts.HotkeyID = "cancel"
+	DictateID contracts.HotkeyID = "dictate"
 )
 
 // Reply error codes.
@@ -120,6 +121,9 @@ var ctlCommands = []struct{ name, line string }{
 	{"talk-press", "hotkey talk press"},
 	{"talk-release", "hotkey talk release"},
 	{"cancel", "hotkey cancel press"},
+	{"dictate-toggle", "hotkey dictate toggle"},
+	{"dictate-press", "hotkey dictate press"},
+	{"dictate-release", "hotkey dictate release"},
 	{"ping", "ping"},
 }
 

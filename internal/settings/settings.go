@@ -48,6 +48,12 @@ type Voice struct {
 	// internal/shortcut); each platform binds them its own way.
 	TalkHotkey   string `json:"talk_hotkey"`
 	CancelHotkey string `json:"cancel_hotkey"`
+	// DictateHotkey types what is said into the focused field of any app,
+	// verbatim (OC-78); "" turns dictation's shortcut off.
+	DictateHotkey string `json:"dictate_hotkey"`
+	// DictationClipboard lets dictation paste through the clipboard where
+	// typing does not work; the clipboard is restored afterwards.
+	DictationClipboard bool `json:"dictation_clipboard"`
 }
 
 // Models holds provider profile ids per role; empty means not configured yet.
@@ -125,7 +131,7 @@ func Defaults() Settings {
 	return Settings{
 		Version: CurrentVersion,
 		Voice: Voice{HotkeyMode: HotkeyHold, CaptureMoment: CaptureStart, TTSSpeed: 1.0, Language: "auto",
-			TalkHotkey: shortcut.DefaultTalk, CancelHotkey: shortcut.DefaultCancel},
+			TalkHotkey: shortcut.DefaultTalk, CancelHotkey: shortcut.DefaultCancel, DictateHotkey: shortcut.DefaultDictate},
 		Screen:   Screen{Target: ScreenActive},
 		Memory:   Memory{Enabled: true},
 		Platform: Platform{TrayIcon: true},
@@ -135,6 +141,18 @@ func Defaults() Settings {
 }
 
 var langCode = regexp.MustCompile(`^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$`)
+
+// fitDictate gives settings stored before the dictation shortcut existed
+// a Dictate chord that does not clash with the user's own Talk or Cancel.
+func (s *Settings) fitDictate() {
+	t, c, err := shortcut.ValidatePair(s.Voice.TalkHotkey, s.Voice.CancelHotkey)
+	if err != nil || s.Voice.DictateHotkey == "" {
+		return
+	}
+	if _, err := shortcut.ValidateDictate(s.Voice.DictateHotkey, t, c); err != nil {
+		s.Voice.DictateHotkey = shortcut.PickDictate(t, c)
+	}
+}
 
 // Validate reports the first invalid field.
 func (s Settings) Validate() error {
@@ -154,8 +172,14 @@ func (s Settings) Validate() error {
 	if s.Voice.Language != "auto" && !langCode.MatchString(s.Voice.Language) {
 		return fmt.Errorf("settings: voice.language %q invalid", s.Voice.Language)
 	}
-	if _, _, err := shortcut.ValidatePair(s.Voice.TalkHotkey, s.Voice.CancelHotkey); err != nil {
+	talk, cancel, err := shortcut.ValidatePair(s.Voice.TalkHotkey, s.Voice.CancelHotkey)
+	if err != nil {
 		return fmt.Errorf("settings: voice hotkeys: %w", err)
+	}
+	if s.Voice.DictateHotkey != "" {
+		if _, err := shortcut.ValidateDictate(s.Voice.DictateHotkey, talk, cancel); err != nil {
+			return fmt.Errorf("settings: voice dictate hotkey: %w", err)
+		}
 	}
 	switch s.Screen.Target {
 	case ScreenActive, ScreenAll:

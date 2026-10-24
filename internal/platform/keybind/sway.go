@@ -89,9 +89,15 @@ func swayChord(h contracts.Hotkey) string {
 func swayBlock(req Request) string {
 	e := shellWord(req.Exe)
 	t, c := swayChord(req.Talk), swayChord(req.Cancel)
-	return block("#", "bindsym "+t+" exec "+e+" ctl talk-press\n"+
-		"bindsym --release "+t+" exec "+e+" ctl talk-release\n"+
-		"bindsym "+c+" exec "+e+" ctl cancel\n")
+	s := "bindsym " + t + " exec " + e + " ctl talk-press\n" +
+		"bindsym --release " + t + " exec " + e + " ctl talk-release\n" +
+		"bindsym " + c + " exec " + e + " ctl cancel\n"
+	if req.Dictate.Key != "" {
+		d := swayChord(req.Dictate)
+		s += "bindsym " + d + " exec " + e + " ctl dictate-press\n" +
+			"bindsym --release " + d + " exec " + e + " ctl dictate-release\n"
+	}
+	return block("#", s)
 }
 
 var swayModNames = map[string]contracts.Modifier{
@@ -142,7 +148,7 @@ func applySway(ctx context.Context, env Env, req Request) (Result, error) {
 	}
 	res := Result{Path: path, Changed: ed.changed()}
 	main, _ := os.ReadFile(swayMain(env))
-	if used := swayBound(withoutBlock(string(main), "#")); used[req.Talk] || used[req.Cancel] {
+	if req.takenIn(swayBound(withoutBlock(string(main), "#"))) {
 		return res, fail(CodeConflict, contracts.ErrHotkeyConflict)
 	}
 	if err := ed.commit(); err != nil {

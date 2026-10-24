@@ -1,5 +1,5 @@
 // Package shortcut is the portable form of the user's global shortcuts
-// (Talk, Cancel): the chord syntax stored in settings ("super+space"),
+// (Talk, Cancel, Dictate): the chord syntax stored in settings ("super+space"),
 // its validation and its keycap labels. It knows nothing about how a
 // platform binds a chord; internal/platform/keys and keybind translate
 // it per backend.
@@ -17,17 +17,27 @@ import (
 // Defaults. Cancel is not plain Escape: a global grab of Escape would
 // take it away from every other app, and Super+Escape is taken by the
 // shortcut-inhibit toggle on several desktops.
+// Dictate is Ctrl+Alt+Space because Super+D opens the launcher on
+// several desktops.
 const (
-	DefaultTalk   = "super+space"
-	DefaultCancel = "super+backspace"
+	DefaultTalk    = "super+space"
+	DefaultCancel  = "super+backspace"
+	DefaultDictate = "ctrl+alt+space"
 )
 
-// Role is which shortcut a chord is for; Talk is stricter.
+// DictateFallbacks are tried in order when DefaultDictate is already the
+// user's Talk or Cancel chord.
+var DictateFallbacks = []string{DefaultDictate, "super+alt+space", "ctrl+alt+d"}
+
+// Role is which shortcut a chord is for; Talk and Dictate are stricter.
 type Role int
 
 const (
 	Talk Role = iota
 	Cancel
+	// Dictate types speech into the focused field (OC-78); like Talk it
+	// starts recording, so it needs a modifier.
+	Dictate
 )
 
 // keyNames are the key names a chord may end in, the same set
@@ -79,6 +89,7 @@ const (
 	CodeShiftOnly  = "shift_only"
 	CodeReserved   = "reserved"
 	CodeSame       = "same_as_talk"
+	CodeDuplicate  = "same_as_other" // Dictate equals Talk or Cancel
 )
 
 // Error is a rejected chord.
@@ -180,7 +191,7 @@ func Validate(role Role, h, talk contracts.Hotkey) error {
 		return &Error{CodeUnknownKey}
 	case reserved[Format(h)]:
 		return &Error{CodeReserved}
-	case h.Mods == 0 && (role == Talk || !bareOK(h.Key)):
+	case h.Mods == 0 && (role != Cancel || !bareOK(h.Key)):
 		return &Error{CodeNoModifier}
 	case h.Mods == contracts.ModShift && !bareOK(h.Key):
 		return &Error{CodeShiftOnly}
@@ -188,6 +199,33 @@ func Validate(role Role, h, talk contracts.Hotkey) error {
 		return &Error{CodeSame}
 	}
 	return nil
+}
+
+// ValidateDictate parses and checks the stored Dictate chord against the
+// Talk and Cancel chords it must not repeat.
+func ValidateDictate(dictate string, talk, cancel contracts.Hotkey) (contracts.Hotkey, error) {
+	d, err := Parse(dictate)
+	if err != nil {
+		return d, err
+	}
+	if err := Validate(Dictate, d, contracts.Hotkey{}); err != nil {
+		return d, err
+	}
+	if d == talk || d == cancel {
+		return d, &Error{CodeDuplicate}
+	}
+	return d, nil
+}
+
+// PickDictate is the first of DictateFallbacks that fits beside talk and
+// cancel, or "" when none does.
+func PickDictate(talk, cancel contracts.Hotkey) string {
+	for _, c := range DictateFallbacks {
+		if _, err := ValidateDictate(c, talk, cancel); err == nil {
+			return c
+		}
+	}
+	return ""
 }
 
 // ValidatePair parses and checks both stored chords.

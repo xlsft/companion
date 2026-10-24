@@ -57,6 +57,8 @@ func TestValidateRejects(t *testing.T) {
 		{"talk hotkey unparsable", func(s *Settings) { s.Voice.TalkHotkey = "hyper+x" }},
 		{"talk hotkey without modifier", func(s *Settings) { s.Voice.TalkHotkey = "space" }},
 		{"cancel equals talk", func(s *Settings) { s.Voice.CancelHotkey = s.Voice.TalkHotkey }},
+		{"dictate equals talk", func(s *Settings) { s.Voice.DictateHotkey = s.Voice.TalkHotkey }},
+		{"dictate without modifier", func(s *Settings) { s.Voice.DictateHotkey = "f8" }},
 		{"ui language", func(s *Settings) { s.UI.Language = "xx" }},
 		{"ui language region", func(s *Settings) { s.UI.Language = "en-US" }},
 	}
@@ -121,6 +123,35 @@ func TestUpdatePersistsAndNotifies(t *testing.T) {
 	}
 	if err := s.Update(ctx, func(x *Settings) { x.Memory.Enabled = false }); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Settings stored before dictation existed get a Dictate chord that does
+// not clash with the user's own shortcuts.
+func TestStoredSettingsGetDictate(t *testing.T) {
+	tests := []struct {
+		name, stored, want string
+	}{
+		{"no field", `{"version":1,"voice":{"talk_hotkey":"super+space","cancel_hotkey":"super+backspace"}}`, "ctrl+alt+space"},
+		{"talk took the default", `{"version":1,"voice":{"talk_hotkey":"ctrl+alt+space","cancel_hotkey":"super+backspace"}}`, "super+alt+space"},
+		{"turned off", `{"version":1,"voice":{"dictate_hotkey":""}}`, ""},
+		{"kept", `{"version":1,"voice":{"dictate_hotkey":"super+alt+d"}}`, "super+alt+d"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			_, kv := newSvc(t)
+			if err := kv.Set(ctx, kvKey, []byte(tt.stored)); err != nil {
+				t.Fatal(err)
+			}
+			s, err := NewService(ctx, kv)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := s.Get().Voice.DictateHotkey; got != tt.want {
+				t.Errorf("dictate = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

@@ -50,9 +50,14 @@ func niriBlock(req Request) string {
 		return "    " + niriChord(h) + ` repeat=false hotkey-overlay-title=` + strconv.Quote(title) +
 			` { spawn ` + q + ` "ctl" ` + strconv.Quote(sub) + `; }` + "\n"
 	}
+	dictate := ""
+	if req.Dictate.Key != "" {
+		dictate = line(req.Dictate, "Companion: dictate", "dictate-toggle")
+	}
 	return block("//", "binds {\n"+
 		line(req.Talk, "Companion: talk", "talk-toggle")+
 		line(req.Cancel, "Companion: cancel", "cancel")+
+		dictate+
 		"}\n")
 }
 
@@ -73,7 +78,7 @@ func applyNiri(ctx context.Context, env Env, req Request) (Result, error) {
 	res := Result{Path: path, Changed: ed.changed()}
 	// The block goes last and later binds override earlier ones, so a key
 	// the user bound themselves would be taken silently.
-	if used := niriBound(path, string(ed.old)); used[req.Talk] || used[req.Cancel] {
+	if req.takenIn(niriBound(path, string(ed.old))) {
 		return res, fail(CodeConflict, contracts.ErrHotkeyConflict)
 	}
 	if ed.changed() && env.has("niri") {

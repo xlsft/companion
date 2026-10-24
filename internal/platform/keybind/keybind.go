@@ -1,4 +1,4 @@
-// Package keybind makes the Talk and Cancel shortcuts work on desktops
+// Package keybind makes the Talk, Cancel and Dictate shortcuts work on desktops
 // where an app cannot take global keys itself: it binds them to
 // "companion ctl ..." in the compositor's own configuration and reloads it.
 //
@@ -82,6 +82,8 @@ func (m Method) ConfigBased() bool {
 // Request is what to bind.
 type Request struct {
 	Talk, Cancel contracts.Hotkey
+	// Dictate is the dictation chord (OC-78); a zero Hotkey binds none.
+	Dictate contracts.Hotkey
 	// Exe is the command the binds run, the absolute path of this binary.
 	Exe string
 }
@@ -233,8 +235,26 @@ func Applied(ctx context.Context, m Method, env Env, req Request) bool {
 	return false
 }
 
+// chords are the chords req binds.
+func (r Request) chords() []contracts.Hotkey {
+	if r.Dictate.Key == "" {
+		return []contracts.Hotkey{r.Talk, r.Cancel}
+	}
+	return []contracts.Hotkey{r.Talk, r.Cancel, r.Dictate}
+}
+
+// takenIn reports whether a chord of r is in used.
+func (r Request) takenIn(used map[contracts.Hotkey]bool) bool {
+	for _, h := range r.chords() {
+		if used[h] {
+			return true
+		}
+	}
+	return false
+}
+
 func (r Request) check() error {
-	for _, h := range []contracts.Hotkey{r.Talk, r.Cancel} {
+	for _, h := range r.chords() {
 		if _, ok := keys.XKBName(h.Key); !ok {
 			return fail(CodeBadChord, fmt.Errorf("key %q", h.Key))
 		}
@@ -251,6 +271,9 @@ func Commands(exe string) (talk, cancel string) {
 	e := shellWord(exe)
 	return e + " ctl talk-toggle", e + " ctl cancel"
 }
+
+// DictateCommand is the ctl command line of the dictation shortcut.
+func DictateCommand(exe string) string { return shellWord(exe) + " ctl dictate-toggle" }
 
 // shellWord quotes s for sh-like exec lines when it has special characters.
 func shellWord(s string) string {

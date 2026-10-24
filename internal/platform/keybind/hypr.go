@@ -40,9 +40,15 @@ func hyprBlock(req Request) string {
 	e := shellWord(req.Exe)
 	tm, tk := hyprChord(req.Talk)
 	cm, ck := hyprChord(req.Cancel)
-	return block("#", "bind = "+tm+", "+tk+", exec, "+e+" ctl talk-press\n"+
-		"bindr = "+tm+", "+tk+", exec, "+e+" ctl talk-release\n"+
-		"bind = "+cm+", "+ck+", exec, "+e+" ctl cancel\n")
+	s := "bind = " + tm + ", " + tk + ", exec, " + e + " ctl talk-press\n" +
+		"bindr = " + tm + ", " + tk + ", exec, " + e + " ctl talk-release\n" +
+		"bind = " + cm + ", " + ck + ", exec, " + e + " ctl cancel\n"
+	if req.Dictate.Key != "" {
+		dm, dk := hyprChord(req.Dictate)
+		s += "bind = " + dm + ", " + dk + ", exec, " + e + " ctl dictate-press\n" +
+			"bindr = " + dm + ", " + dk + ", exec, " + e + " ctl dictate-release\n"
+	}
+	return block("#", s)
 }
 
 var hyprModNames = map[string]contracts.Modifier{
@@ -95,7 +101,7 @@ func applyHyprland(ctx context.Context, env Env, req Request) (Result, error) {
 		return Result{Path: path}, err
 	}
 	res := Result{Path: path, Changed: ed.changed()}
-	if used := hyprBound(withoutBlock(string(ed.old), "#")); used[req.Talk] || used[req.Cancel] {
+	if req.takenIn(hyprBound(withoutBlock(string(ed.old), "#"))) {
 		return res, fail(CodeConflict, contracts.ErrHotkeyConflict)
 	}
 	running := env.getenv("HYPRLAND_INSTANCE_SIGNATURE") != "" && env.has("hyprctl")
