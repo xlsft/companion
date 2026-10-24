@@ -50,7 +50,7 @@ func archName(goarch string) (string, bool) {
 	case "amd64":
 		return "x86_64", true
 	case "arm64":
-		return "arm64", true
+		return "aarch64", true
 	}
 	return "", false
 }

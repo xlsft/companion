@@ -14,7 +14,7 @@ func TestSelectAssets(t *testing.T) {
 	v := Version{Major: 0, Minor: 2, Patch: 0}
 	all := []Asset{
 		{Name: "companion-0.2.0-linux-x86_64.tar.gz"},
-		{Name: "companion-0.2.0-linux-arm64.tar.gz"},
+		{Name: "companion-0.2.0-linux-aarch64.tar.gz"},
 		{Name: "Companion-0.2.0-x86_64.AppImage"},
 		{Name: ChecksumsName},
 		{Name: SignatureName},
@@ -36,8 +36,8 @@ func TestSelectAssets(t *testing.T) {
 		err          error
 	}{
 		{"linux amd64", "linux", "amd64", all, "companion-0.2.0-linux-x86_64.tar.gz", nil},
-		{"linux arm64", "linux", "arm64", all, "companion-0.2.0-linux-arm64.tar.gz", nil},
-		{"no build for arch", "linux", "arm64", without("companion-0.2.0-linux-arm64.tar.gz"), "", ErrNoAsset},
+		{"linux arm64", "linux", "arm64", all, "companion-0.2.0-linux-aarch64.tar.gz", nil},
+		{"no build for arch", "linux", "arm64", without("companion-0.2.0-linux-aarch64.tar.gz"), "", ErrNoAsset},
 		{"no checksums", "linux", "amd64", without(ChecksumsName), "", ErrNoChecksums},
 		{"no signature", "linux", "amd64", without(SignatureName), "", ErrNoSignature},
 		{"windows", "windows", "amd64", all, "", contracts.ErrUnsupported},
