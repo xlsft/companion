@@ -23,6 +23,7 @@ import (
 	"github.com/xlsft/companion/internal/platform/control"
 	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/platform/tray"
+	"github.com/xlsft/companion/internal/secrets"
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/store"
 	"github.com/xlsft/companion/internal/ui"
@@ -67,7 +68,7 @@ func main() {
 	if err != nil {
 		log.Warn("capability detection", "err", err)
 	}
-	c, err := newCore(ctx, log, dir, db, svc, report)
+	c, err := newCore(ctx, log, dir, db, svc, report, secrets.NewKeyring())
 	if err != nil {
 		log.Error("start core", "err", err)
 		db.Close()

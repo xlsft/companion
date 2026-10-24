@@ -92,14 +92,16 @@ type core struct {
 	wg     sync.WaitGroup
 }
 
-func newCore(ctx context.Context, log *slog.Logger, dataDir string, db *store.DB, svc *settings.Service, report contracts.CapabilityReport) (*core, error) {
+// newCore builds the services; sec is the OS keyring in the app and an
+// in-memory store in tests.
+func newCore(ctx context.Context, log *slog.Logger, dataDir string, db *store.DB, svc *settings.Service, report contracts.CapabilityReport, sec contracts.SecretStore) (*core, error) {
 	c := &core{
 		log: log, dataDir: dataDir, db: db, settings: svc, report: report,
 		// No overall timeout: model and TTS bodies stream for minutes.
 		// Each provider bounds its own connect and header phase.
 		http: &http.Client{},
 	}
-	c.secrets = secrets.NewKeyring()
+	c.secrets = sec
 	c.providers = providers.New(store.NewProviderRepo(db), c.secrets, c.http)
 	c.history = history.New(db, filepath.Join(dataDir, "history"))
 
@@ -459,7 +461,7 @@ func (c *core) ttsProvider(ctx context.Context, s settings.Settings) (tts.Provid
 	if err != nil || len(key) == 0 {
 		return nil, ""
 	}
-	cfg := tts.Config{APIKey: string(key)}
+	cfg := tts.Config{APIKey: string(key), BaseURL: s.TTS.BaseURL}
 	label := s.TTS.Voice
 	switch s.TTS.ProviderID {
 	case ttsElevenLabs:

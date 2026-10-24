@@ -58,6 +58,9 @@ type Models struct {
 type TTS struct {
 	ProviderID string `json:"provider_id"`
 	Voice      string `json:"voice"`
+	// BaseURL overrides the provider's endpoint, e.g. for a compatible
+	// local speech server; "" is the provider's default.
+	BaseURL string `json:"base_url,omitempty"`
 	// APIKeyRef points into the OS secret store; never exported (FR-DATA-005).
 	APIKeyRef contracts.SecretRef `json:"api_key_ref,omitempty"`
 }
