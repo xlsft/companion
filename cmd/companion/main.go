@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/xlsft/companion/internal/app"
 	"github.com/xlsft/companion/internal/buildinfo"
 	"github.com/xlsft/companion/internal/platform/control"
+	"github.com/xlsft/companion/internal/platform/desktop"
 	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/platform/tray"
 	"github.com/xlsft/companion/internal/secrets"
@@ -91,6 +93,18 @@ func main() {
 	if svc.Get().Platform.TrayIcon {
 		tr = tray.New()
 	}
+	// An installed update restarts the process: the lifecycle stops
+	// cleanly first, then the new binary replaces this one (below).
+	var restart atomic.Bool
+	exe, exeErr := os.Executable()
+	var onInstalled func()
+	if exeErr == nil {
+		onInstalled = func() {
+			restart.Store(true)
+			stop()
+		}
+	}
+	upd := newUpdater(log, dir, svc, exe, onInstalled)
 	shell := ui.New(ui.Options{
 		Mode:     mode,
 		Settings: svc,
@@ -99,6 +113,7 @@ func main() {
 		Chat:     c.chat,
 		Tray:     tr,
 		Diagnose: detect.New().Detect,
+		Updates:  upd,
 		Quit:     stop,
 		Log:      log,
 		Dark:     *dark,
@@ -109,13 +124,20 @@ func main() {
 	// the lifecycle runs beside it and ends the process when it returns.
 	go func() {
 		code := 0
-		if err := app.New(log, c, shell).Run(ctx); err != nil {
+		if err := app.New(log, c, upd, shell).Run(ctx); err != nil {
 			log.Error("companion exited with error", "err", err)
 			code = 1
 		}
 		stop()
 		if err := db.Close(); err != nil {
 			log.Error("close store", "err", err)
+		}
+		if restart.Load() {
+			// The updater replaced the binaries in place, so the same path
+			// now holds the new version.
+			err := desktop.Reexec(exe, os.Args[1:])
+			log.Error("restart after update failed; start Companion again", "err", err)
+			os.Exit(1)
 		}
 		os.Exit(code)
 	}()

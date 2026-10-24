@@ -123,6 +123,8 @@ func NewService(cfg Config) *Service {
 		s.st.Managed = Code(err)
 	} else if cfg.Installer != nil {
 		s.st.Managed = Code(cfg.Installer.Installable())
+	} else {
+		s.st.Managed = Code(ErrNotWritable) // install directory unknown
 	}
 	return s
 }
