@@ -64,31 +64,31 @@ const pointAtSchema = `{
   "additionalProperties": false
 }`
 
+// ShapeSchema is the JSON schema of one annotate shape; tools that carry
+// drawings of their own (walkthrough steps) reuse it so every drawing the
+// model makes is validated the same way.
+const ShapeSchema = `{
+  "type": "object",
+  "properties": {
+    "kind": {"type": "string", "enum": ["ring", "rect", "circle", "arrow", "freehand", "label", "spotlight", "highlight", "underline", "brackets", "badge"]},
+    "points": {
+      "type": "array",
+      "items": {"type": "array", "items": {"type": "number", "minimum": 0, "maximum": 1}, "minItems": 2, "maxItems": 2},
+      "description": "ring/circle/spotlight/badge/label: [center or anchor]; rect/highlight/brackets: [top-left, bottom-right]; arrow/underline: [from, to]; freehand: 2..64 points. spotlight dims everything but a circle; highlight is a marker over text; brackets are focus corners; badge is a numbered step marker whose text is 1-3 characters"
+    },
+    "radius": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.5},
+    "text": {"type": "string", "maxLength": 80},
+    "color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"},
+    "dashed": {"type": "boolean", "description": "circle only: dashed outline for secondary marks, e.g. several cells to click"}
+  },
+  "required": ["kind", "points"],
+  "additionalProperties": false
+}`
+
 const annotateSchema = `{
   "type": "object",
   "properties": {
-    "shapes": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 12,
-      "items": {
-        "type": "object",
-        "properties": {
-          "kind": {"type": "string", "enum": ["ring", "rect", "circle", "arrow", "freehand", "label", "spotlight", "highlight", "underline", "brackets", "badge"]},
-          "points": {
-            "type": "array",
-            "items": {"type": "array", "items": {"type": "number", "minimum": 0, "maximum": 1}, "minItems": 2, "maxItems": 2},
-            "description": "ring/circle/spotlight/badge/label: [center or anchor]; rect/highlight/brackets: [top-left, bottom-right]; arrow/underline: [from, to]; freehand: 2..64 points. spotlight dims everything but a circle; highlight is a marker over text; brackets are focus corners; badge is a numbered step marker whose text is 1-3 characters"
-          },
-          "radius": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.5},
-          "text": {"type": "string", "maxLength": 80},
-          "color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"},
-          "dashed": {"type": "boolean", "description": "circle only: dashed outline for secondary marks, e.g. several cells to click"}
-        },
-        "required": ["kind", "points"],
-        "additionalProperties": false
-      }
-    }
+    "shapes": {"type": "array", "minItems": 1, "maxItems": 12, "items": ` + ShapeSchema + `}
   },
   "required": ["shapes"],
   "additionalProperties": false
@@ -100,6 +100,9 @@ const (
 	maxFreehandPoints      = 64
 	maxShapes              = 12
 )
+
+// MaxShapes is how many shapes one drawing may have.
+const MaxShapes = maxShapes
 
 var ErrBadToolCall = errors.New("bad overlay tool call")
 
