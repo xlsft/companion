@@ -153,22 +153,20 @@ func TestDictation(t *testing.T) {
 		{name: "talk has the microphone", busy: true, rec: fakeRecorder{text: "x"},
 			steps: []any{toggle}, code: CodeBusy},
 	}
-	for _, tt := range tests {
+	for i := range tests {
+		tt := &tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			clk := &clock{t: time.Unix(1000, 0)}
 			s := New(Config{Recorder: &tt.rec, Inserter: &tt.ins, Busy: func() bool { return tt.busy }})
 			s.now = clk.now
 			defer s.Close()
-			for i, st := range tt.steps {
+			// A start is Listening at once, so steps need no waiting.
+			for _, st := range tt.steps {
 				switch v := st.(type) {
 				case time.Duration:
 					clk.add(v)
 				case contracts.HotkeyEventKind:
 					s.Hotkey(v)
-					// A start must be listening before the next event.
-					if v != release && i < len(tt.steps)-1 && s.Active() {
-						waitPhase(t, s, Listening)
-					}
 				}
 			}
 			st := waitIdle(t, s)
