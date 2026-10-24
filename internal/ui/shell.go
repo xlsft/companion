@@ -424,6 +424,12 @@ func (s *Shell) navShortcut(digit int) {
 	if !ok {
 		return
 	}
+	s.Navigate(r)
+}
+
+// Navigate shows section r of the main window; it does nothing in setup
+// mode, where there are no sections.
+func (s *Shell) Navigate(r Route) {
 	s.mu.Lock()
 	m := s.main
 	if s.mode != ModeMain {

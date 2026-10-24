@@ -6,11 +6,15 @@
 // appends the typed turn, and Stop ends the canned reply.
 //
 //	mainui -dark -lang ru -state chat   # chat | empty | offline
+//	mainui -route settings              # home | history | agents | skills | settings | diagnostics
+//
+// Diagnostics shows the real capability report of this machine.
 package main
 
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -23,16 +27,28 @@ import (
 
 	"github.com/xlsft/companion/internal/app"
 	"github.com/xlsft/companion/internal/chat"
+	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/store"
 	"github.com/xlsft/companion/internal/ui"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func main() {
 	dark := flag.Bool("dark", true, "dark theme")
 	lang := flag.String("lang", "ru", "interface language (ru, en)")
 	state := flag.String("state", "chat", "chat, empty or offline")
+	route := flag.String("route", "home", "section to open: home, history, agents, skills, settings, diagnostics")
 	flag.Parse()
+	routes := map[string]ui.Route{
+		"home": ui.RouteHome, "history": ui.RouteHistory, "agents": ui.RouteAgents,
+		"skills": ui.RouteSkills, "settings": ui.RouteSettings, "diagnostics": ui.RouteDiagnostics,
+	}
+	start, ok := routes[*route]
+	if !ok {
+		fmt.Fprintln(os.Stderr, "mainui: unknown route", *route)
+		os.Exit(2)
+	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
@@ -64,7 +80,13 @@ func main() {
 	case "empty":
 		be = newDemo(chat.View{})
 	}
-	shell := ui.New(ui.Options{Mode: ui.ModeMain, Settings: svc, Chat: be, Quit: stop, Log: log, Dark: *dark, Version: "spike"})
+	diagnose := func(ctx context.Context) (contracts.CapabilityReport, error) { return detect.New().Detect(ctx) }
+	shell := ui.New(ui.Options{Mode: ui.ModeMain, Settings: svc, Chat: be, Diagnose: diagnose, Quit: stop, Log: log, Dark: *dark, Version: "spike"})
+	go func() {
+		// The main window exists once the app has started the shell.
+		time.Sleep(300 * time.Millisecond)
+		shell.Navigate(start)
+	}()
 	go func() {
 		if err := app.New(log, shell).Run(ctx); err != nil {
 			log.Error("spike exited with error", "err", err)
