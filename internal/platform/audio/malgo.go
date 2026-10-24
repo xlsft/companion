@@ -112,7 +112,7 @@ func open(deviceID string) (core.RawStream, error) {
 	}
 	var idPtr unsafe.Pointer
 	if deviceID != "" {
-		id, ok := findDevice(mctx, deviceID)
+		id, ok := findDevice(mctx, malgo.Capture, deviceID)
 		if !ok {
 			freeContext(mctx)
 			return nil, core.ErrDeviceNotFound
@@ -150,12 +150,12 @@ func open(deviceID string) (core.RawStream, error) {
 	return r, nil
 }
 
-func findDevice(mctx *malgo.AllocatedContext, id string) (malgo.DeviceID, bool) {
+func findDevice(mctx *malgo.AllocatedContext, kind malgo.DeviceType, id string) (malgo.DeviceID, bool) {
 	want, err := hex.DecodeString(id)
 	if err != nil {
 		return malgo.DeviceID{}, false
 	}
-	infos, err := mctx.Devices(malgo.Capture)
+	infos, err := mctx.Devices(kind)
 	if err != nil {
 		return malgo.DeviceID{}, false
 	}
