@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/widget"
 
 	"github.com/xlsft/companion/internal/ui/icon"
@@ -84,6 +85,10 @@ func (p *diagPage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Di
 	var rows []layout.Widget
 	if running {
 		rows = append(rows, muted(th, T(l, "diag.running")).Layout)
+		// Poll as well: an invalidate from the detection goroutine can
+		// land while this very frame is being drawn and be lost, leaving
+		// the page on "checking" until something else redraws it.
+		gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(100 * time.Millisecond)})
 	}
 	if err != nil {
 		rows = append(rows, th.StatusLabel(theme.StatusWarn, T(l, "diag.failed")).Layout)
