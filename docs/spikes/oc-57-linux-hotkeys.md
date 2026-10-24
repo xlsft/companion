@@ -12,7 +12,7 @@
 | Wayland, portal binds | GlobalShortcuts (`BindShortcuts`, `preferred_trigger` e.g. `CTRL+ALT+space`) | always | false until the first `Deactivated` after an `Activated` |
 | Wayland, portal refuses (niri) or absent (Sway) | none: dropped at the first `Register` on `Unsupported` | always | false until the first `release` command |
 
-The socket always runs so `companion ctl` works on every session. `Service.Backend()` says which path delivers; `ipc+compositor-binding` means the user must add a compositor binding (`control.Instructions`).
+The socket always runs so `companion ctl` works on every session. `Service.Backend()` says which path delivers; `ipc+compositor-binding` means the binding lives in the compositor's config, which `internal/platform/keybind` writes when the user presses Apply.
 
 Why the portal starts with `SupportsRelease()==false`: whether a backend sends `Deactivated` on key-up cannot be queried, and OC-6 could not verify it on GNOME. Wrongly claiming release would leave hold-to-talk recording forever; starting in toggle costs one session in toggle mode before the first release switches the session layer to hold-to-talk.
 

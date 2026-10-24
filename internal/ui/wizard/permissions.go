@@ -2,10 +2,8 @@ package wizard
 
 import (
 	"image/color"
-	"io"
-	"strings"
+	"sync/atomic"
 
-	"gioui.org/io/clipboard"
 	"gioui.org/layout"
 
 	"github.com/xlsft/companion/internal/readiness"
@@ -32,18 +30,29 @@ var permissionIcons = map[contracts.Capability]icon.Name{
 }
 
 type permState struct {
-	copied bool // UI goroutine only
+	hotkeys *HotkeyEditor // UI goroutine only, created on first use
+	// recheck: shortcuts were applied, so the check runs again.
+	recheck atomic.Bool
+}
+
+func (p *permState) editor(w *Wizard) *HotkeyEditor {
+	if p.hotkeys == nil {
+		p.hotkeys = &HotkeyEditor{
+			Backend:    w.cfg.Backends.Permissions,
+			Invalidate: w.cfg.Invalidate,
+			ApplyBtn:   w.clickable(ActApplyHotkeys),
+			OnApplied: func() {
+				p.recheck.Store(true)
+				w.cfg.Invalidate()
+			},
+		}
+	}
+	return p.hotkeys
 }
 
 func (p *permState) update(w *Wizard, gtx layout.Context, s snapshot) {
-	if w.checkClicked(gtx) {
-		p.copied = false
+	if w.checkClicked(gtx) || p.recheck.Swap(false) {
 		w.runCheck(readiness.StepPermissions, nil, nil)
-	}
-	if w.clicked(gtx, ActCopy) && w.cfg.Backends.Permissions != nil {
-		txt := w.cfg.Backends.Permissions.HotkeyInstructions()
-		gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(txt))})
-		p.copied = true
 	}
 }
 
@@ -82,7 +91,7 @@ func (p *permState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) st
 }
 
 // row is one permission as a status row. A permission that needs the user
-// is tinted and, for the hotkey, carries the shortcut to add.
+// is tinted; the hotkey row carries the shortcut editor.
 func (p *permState) row(w *Wizard, th *theme.Theme, l i18n.Lang, c contracts.Capability, code string, have bool) layout.Widget {
 	ds, key := permStatus(code)
 	word := i18n.T(l, key)
@@ -109,32 +118,11 @@ func (p *permState) row(w *Wizard, th *theme.Theme, l i18n.Lang, c contracts.Cap
 		Title: i18n.T(l, "wiz.perm."+string(c)), Caption: why,
 		Status: ds, Badge: word, Tint: needsUser,
 	}
-	if binding {
-		row.Body = p.binding(w, th, l)
+	if c == contracts.CapGlobalHotkey {
+		w.frame.actions = append(w.frame.actions, ActApplyHotkeys)
+		row.Body = p.editor(w).Layout(th, l, &w.frame.texts)
 	}
 	return w.statusRow(th, row)
-}
-
-// binding is the shortcut to add in the system settings, with Copy. The
-// text comes from the platform as is; the wizard adds no environment
-// names around it.
-func (p *permState) binding(w *Wizard, th *theme.Theme, l i18n.Lang) layout.Widget {
-	txt := ""
-	if w.cfg.Backends.Permissions != nil {
-		txt = w.cfg.Backends.Permissions.HotkeyInstructions()
-	}
-	w.frame.texts = append(w.frame.texts, txt)
-	mode := w.text(kit.Muted(th, i18n.T(l, "wiz.perm.mode")))
-	copyB := kit.ButtonStyle{Kind: kit.Secondary, Small: true, Label: i18n.T(l, "wiz.perm.copy"), Icon: icon.Copy2}
-	if p.copied {
-		copyB.Label, copyB.Icon = i18n.T(l, "wiz.perm.copied"), icon.Check
-	}
-	return kit.VStack(th, 8,
-		func(gtx layout.Context) layout.Dimensions { return kit.CodeBlock(gtx, th, txt) },
-		kit.HStack(th, 8, func(gtx layout.Context) layout.Dimensions {
-			return w.btn(gtx, th, ActCopy, copyB, txt != "")
-		}, mode),
-	)
 }
 
 func (p *permState) footer(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) footerSpec {

@@ -3,9 +3,17 @@ package ui
 import (
 	"context"
 	"errors"
+	"image"
+	"strings"
 	"testing"
 
+	"gioui.org/io/input"
+	"gioui.org/layout"
+	"gioui.org/op"
+	"gioui.org/unit"
+
 	"github.com/xlsft/companion/internal/settings"
+	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 func TestSpeedMapping(t *testing.T) {
@@ -86,5 +94,40 @@ func TestSettingsPageApplyAndSync(t *testing.T) {
 	fp.sync(svc.Get())
 	if !fp.saveErr || fp.memory.Value {
 		t.Errorf("failed write: saveErr=%v memory=%v", fp.saveErr, fp.memory.Value)
+	}
+}
+
+// Settings → Voice carries the same shortcut editor as setup, in the
+// system's words only.
+func TestSettingsVoiceShortcutEditor(t *testing.T) {
+	h := newHarness(t, ModeMain, nil)
+	m, _ := h.mainBuilt()
+	m.showSettings(secVoice)
+	th := theme.New(false, 1)
+	r := new(input.Router)
+	frame(r, h.sh, th, m)
+	frame(r, h.sh, th, m)
+	sp, ok := m.pages[RouteSettings].(*settingsPage)
+	if !ok || sp.hotkeys == nil {
+		t.Fatal("no shortcut editor in Settings")
+	}
+	for _, l := range []Lang{LangEN, LangRU} {
+		var texts []string
+		gtx := layout.Context{Ops: new(op.Ops), Metric: unit.Metric{PxPerDp: 1, PxPerSp: 1}, Source: r.Source(),
+			Constraints: layout.Exact(image.Pt(700, 400))}
+		sp.hotkeys.Layout(th, l, &texts)(gtx)
+		joined := strings.Join(texts, "|")
+		for _, want := range []string{"Super", "Space", "Backspace", T(l, "hotkey.apply")} {
+			if !strings.Contains(joined, want) {
+				t.Errorf("%s: editor lacks %q: %s", l, want, joined)
+			}
+		}
+		for _, s := range texts {
+			for _, n := range environmentNames {
+				if strings.Contains(strings.ToLower(s), n) {
+					t.Errorf("%q names %q", s, n)
+				}
+			}
+		}
 	}
 }

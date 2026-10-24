@@ -31,9 +31,6 @@ func TestNoEnvironmentNames(t *testing.T) {
 				h.eventually("report", func() bool { return h.shows(i18n.T(lang, "cap.col.means")) })
 			}
 			for _, s := range h.w.frame.texts {
-				if s == (fakePerm{}).HotkeyInstructions() {
-					continue // the platform's own binding text, shown as is
-				}
 				for _, n := range environmentNames {
 					if contains(s, n) {
 						t.Errorf("%s/%s: %q names %q", lang, st, s, n)

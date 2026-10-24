@@ -25,6 +25,7 @@ import (
 	"github.com/xlsft/companion/internal/platform/control"
 	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/platform/hotkeys"
+	"github.com/xlsft/companion/internal/platform/keybind"
 	"github.com/xlsft/companion/internal/platform/keys"
 	waylandhotkeys "github.com/xlsft/companion/internal/platform/linuxwayland/hotkeys"
 	x11hotkeys "github.com/xlsft/companion/internal/platform/linuxx11/hotkeys"
@@ -125,7 +126,9 @@ func run(ctx context.Context, dur time.Duration, backend, talkChord, socket, dri
 	if s, ok := svc.(*hotkeys.Service); ok {
 		logf("backend after Register: %s", s.Backend())
 		if s.Backend() == hotkeys.BackendIPC {
-			logf("compositor snippet:\n%s", control.Instructions(report.Compositor, ""))
+			m := keybind.Resolve(report.Compositor, report.Desktop, false)
+			talk, cancel := keybind.Commands("companion")
+			logf("keybind method %s; by hand bind %q and %q", m, talk, cancel)
 		}
 	}
 	logf("SupportsRelease=%v; listening %v", svc.SupportsRelease(), dur)

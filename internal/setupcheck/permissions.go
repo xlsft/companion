@@ -190,11 +190,15 @@ type HotkeyState struct {
 	// CtlSeen: a "companion ctl" command reached the control socket since
 	// start, so a compositor binding exists and works.
 	CtlSeen bool
+	// Applied: the shortcuts were bound and verified, e.g. written to the
+	// desktop's configuration and reloaded without error.
+	Applied bool
 }
 
 // HotkeyPermission decides the global hotkey's permission value. Where only
-// the control socket exists the user binds a compositor key to it; once a
-// command arrived through that binding it counts as granted.
+// the control socket exists the shortcuts are bound in the desktop's
+// configuration; that counts once it was applied and verified, or once a
+// command arrived through such a binding.
 func HotkeyPermission(s HotkeyState) string {
 	switch {
 	case !s.Running:
@@ -205,7 +209,7 @@ func HotkeyPermission(s HotkeyState) string {
 		return "hotkey_conflict"
 	case s.Primary && s.Err == nil:
 		return readiness.PermGranted
-	case s.CtlSeen:
+	case s.Applied, s.CtlSeen:
 		return readiness.PermGranted
 	}
 	return readiness.PermNeedsBinding

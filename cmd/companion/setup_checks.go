@@ -6,10 +6,12 @@ import (
 
 	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/platform/hotkeys"
+	"github.com/xlsft/companion/internal/platform/keybind"
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/setupcheck"
 	"github.com/xlsft/companion/internal/stt/supervisor"
 	"github.com/xlsft/companion/internal/talk"
+	"github.com/xlsft/companion/internal/ui/wizard"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -120,10 +122,18 @@ func (c *core) hotkeyState() setupcheck.HotkeyState {
 	if c.hotkeys == nil {
 		return setupcheck.HotkeyState{}
 	}
+	c.hkMu.Lock()
+	applied := c.hkStatus.State == wizard.HotkeyApplied
+	err := c.hotkeysErr
+	c.hkMu.Unlock()
+	m := c.hotkeyMethod()
 	return setupcheck.HotkeyState{
 		Running: true,
-		Primary: c.hotkeys.Backend() != hotkeys.BackendIPC,
-		Err:     c.hotkeysErr,
+		// Hyprland's portal holds the shortcuts without binding keys, so
+		// only a service that binds chords itself counts as primary.
+		Primary: m == keybind.MethodService && c.hotkeys.Backend() != hotkeys.BackendIPC,
+		Err:     err,
 		CtlSeen: c.ctlSeen.Load(),
+		Applied: applied,
 	}
 }

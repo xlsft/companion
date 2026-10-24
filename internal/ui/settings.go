@@ -14,6 +14,7 @@ import (
 	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/internal/ui/wizard"
 )
 
 // TTS speed range mirrors settings.Validate; the slider snaps to sliderSnap
@@ -116,6 +117,9 @@ type settingsPage struct {
 	keepShots, memory, saveText, shareDiag, login, tray widget.Bool
 
 	saveErr bool
+
+	// hotkeys edits the Talk and Cancel shortcuts; nil without a backend.
+	hotkeys *wizard.HotkeyEditor
 }
 
 func newSettingsPage(store SettingsStore) *settingsPage {
@@ -331,7 +335,14 @@ func (p *settingsPage) sectionRows(th *theme.Theme, l Lang, cur settings.Setting
 		if p.speedPending || p.speed.Float.Dragging() {
 			speed = speedFromSlider(p.speed.Float.Value)
 		}
-		return []layout.Widget{panelOf(th,
+		var shortcuts []layout.Widget
+		if p.hotkeys != nil {
+			shortcuts = []layout.Widget{panelOf(th,
+				setting(th, l, "voice.shortcuts", "voice.shortcuts.d", true, nil),
+				kit.Pad(th, 16, 20, p.hotkeys.Layout(th, l, nil)),
+			)}
+		}
+		return append(shortcuts, panelOf(th,
 			setting(th, l, "voice.hotkeyMode", "voice.hotkeyMode.d", false, func(gtx layout.Context) layout.Dimensions {
 				return kit.Segmented(gtx, th, &p.hotkey, []kit.Option{
 					{Key: string(settings.HotkeyHold), Label: T(l, "voice.hold")},
@@ -350,7 +361,7 @@ func (p *settingsPage) sectionRows(th *theme.Theme, l Lang, cur settings.Setting
 					return p.speed.Layout(gtx, th, T(l, "tts.speed"))
 				}, kit.Code(th, Tf(l, "tts.speedValue", speed)).Layout)(gtx)
 			}),
-		)}
+		))
 	case secScreen:
 		return []layout.Widget{panelOf(th,
 			setting(th, l, "screen.target", "screen.target.d", false, func(gtx layout.Context) layout.Dimensions {
