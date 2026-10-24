@@ -1,11 +1,13 @@
 package ui
 
 import (
+	"context"
 	"sync"
 
 	"gioui.org/layout"
 	"gioui.org/widget"
 
+	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
@@ -46,8 +48,16 @@ func newWizardUI(sh *Shell) *wizardUI {
 		},
 		OnDiagnostics: func() { w.showDiagnostics(true); sh.invalidateAll() },
 		OnQuit:        sh.Quit,
-		Invalidate:    sh.invalidateAll,
-		Log:           sh.log,
+		SetLanguage: func(l Lang) {
+			ctx, cancel := context.WithTimeout(context.Background(), saveTimout)
+			defer cancel()
+			if err := sh.opts.Settings.Update(ctx, func(s *settings.Settings) { s.UI.Language = string(l) }); err != nil {
+				sh.log.Warn("language change failed", "err", err)
+			}
+		},
+		Version:    sh.opts.Version,
+		Invalidate: sh.invalidateAll,
+		Log:        sh.log,
 	})
 	w.list.Axis = layout.Vertical
 	return w
