@@ -53,6 +53,9 @@ func TestValidateRejects(t *testing.T) {
 		{"speed high", func(s *Settings) { s.Voice.TTSSpeed = 1.6 }},
 		{"language", func(s *Settings) { s.Voice.Language = "English!" }},
 		{"screen target", func(s *Settings) { s.Screen.Target = "some" }},
+		{"talk hotkey unparsable", func(s *Settings) { s.Voice.TalkHotkey = "hyper+x" }},
+		{"talk hotkey without modifier", func(s *Settings) { s.Voice.TalkHotkey = "space" }},
+		{"cancel equals talk", func(s *Settings) { s.Voice.CancelHotkey = s.Voice.TalkHotkey }},
 		{"ui language", func(s *Settings) { s.UI.Language = "xx" }},
 		{"ui language region", func(s *Settings) { s.UI.Language = "en-US" }},
 	}
