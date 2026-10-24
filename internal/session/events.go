@@ -81,6 +81,15 @@ type SpeechStarted struct{ Ref contracts.SessionRef }
 // SpeechDone reports that TTS playback finished.
 type SpeechDone struct{ Ref contracts.SessionRef }
 
+// SpeechFailed reports that TTS could not play the reply. The text answer
+// stays valid, so the session finishes normally without audio instead of
+// failing (FR-VOICE-011, OC-66). A Reason step that streams TTS itself
+// emits it; a failing Steps.Speak is converted to it by the Manager.
+type SpeechFailed struct {
+	Ref contracts.SessionRef
+	Err error
+}
+
 // Failure ends the generation in StateFailed. Op is a technical step name.
 type Failure struct {
 	Ref contracts.SessionRef
@@ -102,6 +111,7 @@ func (e LLMDone) ref() contracts.SessionRef           { return e.Ref }
 func (e SpeechStarted) ref() contracts.SessionRef     { return e.Ref }
 func (e SpeechDone) ref() contracts.SessionRef        { return e.Ref }
 func (e Failure) ref() contracts.SessionRef           { return e.Ref }
+func (e SpeechFailed) ref() contracts.SessionRef      { return e.Ref }
 
 func (e HotkeyDown) withRef(r contracts.SessionRef) Event        { e.Ref = r; return e }
 func (e HotkeyUp) withRef(r contracts.SessionRef) Event          { e.Ref = r; return e }
@@ -117,6 +127,7 @@ func (e LLMDone) withRef(r contracts.SessionRef) Event           { e.Ref = r; re
 func (e SpeechStarted) withRef(r contracts.SessionRef) Event     { e.Ref = r; return e }
 func (e SpeechDone) withRef(r contracts.SessionRef) Event        { e.Ref = r; return e }
 func (e Failure) withRef(r contracts.SessionRef) Event           { e.Ref = r; return e }
+func (e SpeechFailed) withRef(r contracts.SessionRef) Event      { e.Ref = r; return e }
 
 func (HotkeyDown) userInput() {}
 func (HotkeyUp) userInput()   {}

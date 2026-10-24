@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -107,6 +108,7 @@ type generation struct {
 	speechStarted   bool
 	speechRequested bool
 	speechDone      bool
+	speechErr       error // TTS failed; the reply is shown as text only
 }
 
 // Manager owns at most one active Talk session. All state is touched only
@@ -364,6 +366,9 @@ func (m *Manager) handleResult(ev Event) bool {
 	g := m.g
 	switch ev := ev.(type) {
 	case Failure:
+		if ev.Op == opSpeak && m.state.bargeable() {
+			return m.speechFailed(ev.Err)
+		}
 		err := ev.Err
 		if err == nil {
 			err = ErrFailed
@@ -427,6 +432,11 @@ func (m *Manager) handleResult(ev Event) bool {
 		g.speechStarted = true
 		m.setState(StateSpeaking, "")
 		return true
+	case SpeechFailed:
+		if g.speechDone || !m.state.bargeable() {
+			return false
+		}
+		return m.speechFailed(ev.Err)
 	case SpeechDone:
 		if g.speechDone || !(g.speechStarted || g.speechRequested) {
 			return false
@@ -552,7 +562,7 @@ func (m *Manager) maybeFinish() {
 	if !g.speechStarted && !g.speechRequested && g.settings.SpeakReplies && g.reply.Text != "" {
 		g.speechRequested = true
 		text := g.reply.Text
-		m.run("speak", func(ctx context.Context) (Event, error) {
+		m.run(opSpeak, func(ctx context.Context) (Event, error) {
 			return SpeechDone{Ref: g.ref}, m.steps.Speak(ctx, g.ref, text, g.emit)
 		})
 		return
@@ -564,7 +574,31 @@ func (m *Manager) maybeFinish() {
 		m.setState(StateAwaitingInput, "")
 		return
 	}
+	if g.speechErr != nil {
+		m.retire(ErrDone)
+		m.publish(Snapshot{Ref: g.ref, State: StateIdle, Mode: g.mode, Reason: "done_without_speech", Err: g.speechErr})
+		return
+	}
 	m.complete("done")
+}
+
+const opSpeak = "speak"
+
+// speechFailed degrades the answer to text only (OC-66): playback is
+// considered finished and, if audio was playing, the state returns to
+// Responding so the UI stops showing a speaking indicator.
+func (m *Manager) speechFailed(err error) bool {
+	g := m.g
+	if err == nil {
+		err = errors.New("speech failed")
+	}
+	g.speechErr = err
+	g.speechRequested, g.speechDone = true, true
+	if m.state == StateSpeaking {
+		m.setState(StateResponding, "")
+	}
+	m.maybeFinish()
+	return true
 }
 
 // run starts a step for the active generation and posts its result unless

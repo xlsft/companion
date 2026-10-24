@@ -682,3 +682,41 @@ func TestFromHotkey(t *testing.T) {
 		}
 	}
 }
+
+func TestSpeakFailureKeepsTextAnswer(t *testing.T) {
+	h := newHarness(t, Config{Settings: Settings{Capture: CaptureNever, SpeakReplies: true}})
+	h.post(SubmitText{Text: "hi"})
+	h.expect(StateReasoning)
+	h.waitCall("reason")
+	h.postResult(LLMDone{Text: "answer"})
+	h.expect(StateResponding)
+	speak := h.waitCall("speak")
+	ttsErr := errors.New("tts unavailable")
+	h.postResult(Failure{Op: opSpeak, Err: ttsErr})
+	s := h.expect(StateIdle)[0]
+	if s.Reason != "done_without_speech" || !errors.Is(s.Err, ttsErr) {
+		t.Fatalf("final snapshot %+v", s)
+	}
+	waitDone(t, speak.ctx, 50*time.Millisecond)
+	if !errors.Is(context.Cause(speak.ctx), ErrDone) {
+		t.Errorf("cause %v, want ErrDone", context.Cause(speak.ctx))
+	}
+}
+
+func TestStreamedSpeechFailureDegradesToText(t *testing.T) {
+	h := newHarness(t, Config{Settings: Settings{Capture: CaptureNever, SpeakReplies: true}})
+	h.post(SubmitText{Text: "hi"})
+	h.expect(StateReasoning)
+	h.waitCall("reason")
+	h.postResult(LLMDelta{Text: "part"})
+	h.postResult(SpeechStarted{})
+	h.expect(StateResponding, StateSpeaking)
+	h.postResult(SpeechFailed{Err: errors.New("device lost")})
+	h.expect(StateResponding)
+	h.postResult(LLMDone{Text: "part of the answer"})
+	if s := h.expect(StateIdle)[0]; s.Reason != "done_without_speech" {
+		t.Fatalf("final snapshot %+v", s)
+	}
+	// The manager must not try to speak the reply again after a failure.
+	h.expectNone()
+}

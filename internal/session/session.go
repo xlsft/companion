@@ -82,7 +82,8 @@ type Snapshot struct {
 	// Reason is a technical code for terminal and idle states
 	// ("cancel", "barge_in", "done", "empty_transcript", or the failed step).
 	Reason string
-	// Err is set for StateFailed.
+	// Err is set for StateFailed, and on the final Idle snapshot with
+	// Reason "done_without_speech" when the reply could not be spoken.
 	Err error
 	// Text is content carried by this update: a partial transcript while
 	// Listening/Transcribing, a model delta while Responding/Speaking, or
