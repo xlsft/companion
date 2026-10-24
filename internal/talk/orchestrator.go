@@ -91,7 +91,14 @@ type Orchestrator struct {
 	// follow-ups; screenshots of past turns are not resent.
 	historyID contracts.SessionID
 	history   []llm.Message
+	// metas are the latest prepared screenshots' metadata, no pixels, so a
+	// walkthrough step drawn on one can tell where its hints are.
+	metas []contracts.CaptureMetadata
 }
+
+// maxMetas bounds metas; a walkthrough only looks up its plan's screenshot
+// right after it was made.
+const maxMetas = 8
 
 var _ session.Steps = (*Orchestrator)(nil)
 
@@ -132,16 +139,11 @@ func (o *Orchestrator) Speak(ctx context.Context, _ contracts.SessionRef, text s
 func (o *Orchestrator) Reason(ctx context.Context, ref contracts.SessionRef, req session.Request, emit session.Emitter) (session.Reply, error) {
 	var guide walkthrough.View
 	if o.Guide != nil {
+		// Whatever the user says during a walkthrough goes to the model,
+		// which knows the steps and sees the screen: "done, what's next?",
+		// "I did that already", "go back" or a question. Its answer takes
+		// the floor from the step being spoken.
 		guide = o.Guide.View()
-		if cmd, ok := walkthrough.ParseIntent(req.Text); ok && guide.Active() {
-			// "Next", "repeat"… steer the walkthrough; the model is not asked.
-			releaseAll(req.Captures)
-			if err := o.Guide.Do(ctx, cmd); err != nil && !errors.Is(err, walkthrough.ErrNotActive) {
-				return session.Reply{}, fmt.Errorf("walkthrough: %w", err)
-			}
-			return session.Reply{}, nil
-		}
-		// A question in the middle of a step: the answer takes the floor.
 		o.Guide.Hush()
 	}
 	provider, err := o.Provider(ctx)
@@ -181,12 +183,17 @@ func (o *Orchestrator) Reason(ctx context.Context, ref contracts.SessionRef, req
 		}
 	}
 	if o.Guide != nil {
-		t := walkthrough.StartTool()
-		tools = append(tools, llm.Tool{Name: t.Name, Description: t.Description, Schema: t.Schema})
+		specs := []overlay.ToolSpec{walkthrough.StartTool()}
+		if guide.Active() {
+			specs = append(specs, walkthrough.ControlTool(), walkthrough.ReviseTool())
+		}
+		for _, t := range specs {
+			tools = append(tools, llm.Tool{Name: t.Name, Description: t.Description, Schema: t.Schema})
+		}
 	}
 
 	sp := o.startSpeech(ctx, emit)
-	text, plan, err := o.converse(ctx, provider, ref, primary, msgs, tools, emit, sp)
+	text, next, err := o.converse(ctx, provider, ref, primary, guide, msgs, tools, emit, sp)
 	speechErr := sp.finish()
 	if err != nil {
 		return session.Reply{}, err
@@ -194,10 +201,18 @@ func (o *Orchestrator) Reason(ctx context.Context, ref contracts.SessionRef, req
 	if speechErr != nil && ctx.Err() == nil {
 		emit(session.SpeechFailed{Err: speechErr})
 	}
-	if plan != nil && ctx.Err() == nil {
-		// Started only now, after the answer was spoken, so the first
-		// step is not talked over.
-		if err := o.Guide.Start(ctx, *plan, primary); err != nil {
+	// Started or moved only now, after the answer was spoken, so the step
+	// is not talked over.
+	switch {
+	case ctx.Err() != nil:
+	case next.plan != nil:
+		if err := o.Guide.Start(ctx, *next.plan, primary); err != nil {
+			return session.Reply{}, fmt.Errorf("walkthrough: %w", err)
+		}
+	case next.control != nil:
+		// Moved meanwhile (auto-advance, the card): the decision is stale.
+		err := o.Guide.Control(ctx, *next.control, guide.Index)
+		if err != nil && !errors.Is(err, walkthrough.ErrMoved) && !errors.Is(err, walkthrough.ErrNotActive) {
 			return session.Reply{}, fmt.Errorf("walkthrough: %w", err)
 		}
 	}
@@ -209,11 +224,18 @@ func (o *Orchestrator) Reason(ctx context.Context, ref contracts.SessionRef, req
 	return session.Reply{Text: text}, nil
 }
 
+// guideNext is what a conversation asks of the walkthrough once its
+// answer is spoken.
+type guideNext struct {
+	plan    *walkthrough.Plan
+	control *walkthrough.Control
+}
+
 // converse runs model rounds until the model stops calling tools, or has
-// planned a walkthrough: then the steps speak for themselves and plan is
-// returned for starting.
+// planned or moved a walkthrough: then the steps speak for themselves and
+// what to do with the walkthrough is returned.
 func (o *Orchestrator) converse(ctx context.Context, p llm.Provider, ref contracts.SessionRef, capture contracts.CaptureID,
-	msgs []llm.Message, tools []llm.Tool, emit session.Emitter, sp *speechPipe) (string, *walkthrough.Plan, error) {
+	guide walkthrough.View, msgs []llm.Message, tools []llm.Tool, emit session.Emitter, sp *speechPipe) (string, guideNext, error) {
 	rounds := o.MaxToolRounds
 	if rounds <= 0 {
 		rounds = defaultMaxToolRounds
@@ -222,17 +244,17 @@ func (o *Orchestrator) converse(ctx context.Context, p llm.Provider, ref contrac
 	for round := 0; ; round++ {
 		res, err := o.stream(ctx, p, llm.ChatRequest{Messages: msgs, Tools: tools, Policy: o.Policy, Session: ref}, emit, sp)
 		if err != nil {
-			return "", nil, err
+			return "", guideNext{}, err
 		}
 		answer += res.text
 		if len(res.calls) == 0 {
 			sp.flush()
-			return answer, nil, nil
+			return answer, guideNext{}, nil
 		}
 		if round+1 >= rounds {
 			// Out of tool budget: keep what was said rather than failing.
 			sp.flush()
-			return answer, nil, nil
+			return answer, guideNext{}, nil
 		}
 		assistant := llm.Message{Role: llm.RoleAssistant, ToolCalls: res.calls}
 		if res.thinking.Text != "" || res.thinking.Signature != "" {
@@ -242,23 +264,41 @@ func (o *Orchestrator) converse(ctx context.Context, p llm.Provider, ref contrac
 			assistant.Content = append(assistant.Content, llm.Text(res.text))
 		}
 		msgs = append(msgs, assistant)
-		var plan *walkthrough.Plan
+		var next guideNext
 		for _, call := range res.calls {
 			// A cancelled generation must not start another action.
 			if err := ctx.Err(); err != nil {
-				return "", nil, err
+				return "", guideNext{}, err
 			}
-			if call.Name == walkthrough.ToolStart && o.Guide != nil {
+			switch {
+			case o.Guide == nil:
+			case call.Name == walkthrough.ToolStart:
 				var msg llm.Message
-				msg, plan = startTool(capture, call)
+				msg, next.plan = startTool(capture, call)
 				msgs = append(msgs, msg)
+				continue
+			case call.Name == walkthrough.ToolControl && guide.Active():
+				c, err := walkthrough.FromControlCall(call.Arguments, guide.Total)
+				if err != nil {
+					msgs = append(msgs, toolResult(call, err.Error(), true))
+					continue
+				}
+				next.control = &c
+				msgs = append(msgs, toolResult(call, "done", false))
+				continue
+			case call.Name == walkthrough.ToolRevise && guide.Active():
+				msgs = append(msgs, o.reviseTool(ctx, call))
 				continue
 			}
 			msgs = append(msgs, o.runTool(ctx, ref, capture, call))
 		}
-		if plan != nil {
+		if next.plan != nil {
+			// A new walkthrough replaces the one in progress.
+			next.control = nil
+		}
+		if next.plan != nil || next.control != nil {
 			sp.flush()
-			return answer, plan, nil
+			return answer, next, nil
 		}
 	}
 }
@@ -271,6 +311,18 @@ func startTool(capture contracts.CaptureID, call llm.ToolCall) (llm.Message, *wa
 		return toolResult(call, err.Error(), true), nil
 	}
 	return toolResult(call, "started", false), &plan
+}
+
+// reviseTool applies a revise_step call to the walkthrough in progress.
+func (o *Orchestrator) reviseTool(ctx context.Context, call llm.ToolCall) llm.Message {
+	r, err := walkthrough.FromReviseCall(call.Arguments)
+	if err == nil {
+		err = o.Guide.Revise(ctx, r)
+	}
+	if err != nil {
+		return toolResult(call, err.Error(), true)
+	}
+	return toolResult(call, "revised", false)
 }
 
 func toolResult(call llm.ToolCall, text string, isErr bool) llm.Message {
@@ -326,27 +378,55 @@ func (o *Orchestrator) stream(ctx context.Context, p llm.Provider, req llm.ChatR
 // the model. Problems are reported back to the model as an error result so
 // it can correct itself; they never fail the session.
 func (o *Orchestrator) runTool(ctx context.Context, ref contracts.SessionRef, capture contracts.CaptureID, call llm.ToolCall) llm.Message {
+	msg, _ := o.runToolCmds(ctx, ref, capture, call)
+	return msg
+}
+
+// runToolCmds is runTool that also returns the commands put on screen.
+func (o *Orchestrator) runToolCmds(ctx context.Context, ref contracts.SessionRef, capture contracts.CaptureID, call llm.ToolCall) (llm.Message, []overlay.Command) {
 	result := func(text string, isErr bool) llm.Message {
 		return llm.Message{Role: llm.RoleTool, ToolCallID: call.ID, IsError: isErr, Content: []llm.Part{llm.Text(text)}}
 	}
 	if o.Overlay == nil {
-		return result("drawing is not available", true)
+		return result("drawing is not available", true), nil
 	}
 	cmds, err := overlay.FromToolCall(overlay.CallContext{
 		Session: ref, Capture: capture, CallID: call.ID, Segment: -1,
 	}, call.Name, call.Arguments)
 	if err != nil {
-		return result(err.Error(), true)
+		return result(err.Error(), true), nil
 	}
-	for _, c := range cmds {
+	for i, c := range cmds {
 		if err := o.Overlay.Apply(ctx, c); err != nil {
 			if errors.Is(err, contracts.ErrStale) {
-				return result("the screen changed since the screenshot; describe the location in words instead", true)
+				return result("the screen changed since the screenshot; describe the location in words instead", true), cmds[:i]
 			}
-			return result("could not draw: "+err.Error(), true)
+			return result("could not draw: "+err.Error(), true), cmds[:i]
 		}
 	}
-	return result("shown", false)
+	return result("shown", false), cmds
+}
+
+// rememberMeta keeps meta for captureMeta.
+func (o *Orchestrator) rememberMeta(meta contracts.CaptureMetadata) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.metas = append(o.metas, meta)
+	if n := len(o.metas); n > maxMetas {
+		o.metas = append([]contracts.CaptureMetadata(nil), o.metas[n-maxMetas:]...)
+	}
+}
+
+// captureMeta is the metadata of a recently prepared screenshot.
+func (o *Orchestrator) captureMeta(id contracts.CaptureID) (contracts.CaptureMetadata, bool) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	for i := len(o.metas) - 1; i >= 0; i-- {
+		if o.metas[i].ID == id {
+			return o.metas[i], true
+		}
+	}
+	return contracts.CaptureMetadata{}, false
 }
 
 func (o *Orchestrator) systemPrompt(withScreen bool, guide walkthrough.View) string {
@@ -365,9 +445,12 @@ func (o *Orchestrator) systemPrompt(withScreen bool, guide walkthrough.View) str
 		p += " When the task takes several actions on screen, guide the user with start_walkthrough instead of " +
 			"listing every step at once."
 		if guide.Active() {
-			p += fmt.Sprintf(" A walkthrough is in progress: %q, at step %d of %d, %q. The user moves on by saying "+
-				"next, back, repeat, pause or stop; answer questions about the step briefly.",
-				guide.Goal, guide.Index+1, guide.Total, guide.Title)
+			p += " " + guide.Brief() + " The attached screenshot shows where the user is now. Call " +
+				"walkthrough_control when the user says they did the step or asks what's next (next), already did " +
+				"it or later ones (next or goto), wants to go back, hear it again, pause, resume or stop, or names a " +
+				"step to jump to; then say at most a few words, the step is shown and spoken for you. Judge by what " +
+				"they say and the screenshot. If they only ask a question, answer it briefly without moving; if the " +
+				"screen shows the current step must be done differently, call revise_step."
 		}
 	}
 	return p

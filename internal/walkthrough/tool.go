@@ -16,7 +16,71 @@ const (
 	// ToolRevise lets the model correct the current step after looking at
 	// a new screenshot of it.
 	ToolRevise = "revise_step"
+	// ToolControl moves the walkthrough in progress: the model decides
+	// from what the user says, or from a screenshot taken after the user
+	// acted, that the step is done or that they want something else.
+	ToolControl = "walkthrough_control"
 )
+
+// ControlTool is the walkthrough_control definition.
+func ControlTool() overlay.ToolSpec {
+	return overlay.ToolSpec{
+		Name: ToolControl,
+		Description: "Move the walkthrough in progress. next: the current step is done (the user did it or says so, " +
+			"or asks what's next); previous: back one step; repeat: show and say the current step again; pause, " +
+			"resume, stop: as the user asks; goto: jump to the step numbered in step. Don't call it for a plain " +
+			"question about the step: just answer. After calling it say at most a few words: the step it moves to " +
+			"is shown and spoken for you.",
+		Schema: json.RawMessage(controlSchema),
+	}
+}
+
+var controlSchema = `{
+  "type": "object",
+  "properties": {
+    "action": {"type": "string", "enum": ["next", "previous", "repeat", "pause", "resume", "stop", "goto"]},
+    "step": {"type": "integer", "minimum": 1, "maximum": 12, "description": "Step number (1-based), for goto only"},
+    "reason": {"type": "string", "maxLength": 200, "description": "Why, in a few words"}
+  },
+  "required": ["action"],
+  "additionalProperties": false
+}`
+
+// Control is a walkthrough_control call. Reason is model text about the
+// user's screen and is never logged.
+type Control struct {
+	Action Command `json:"action"`
+	// Step is 1-based and set only for goto.
+	Step   int    `json:"step,omitempty"`
+	Reason string `json:"reason,omitempty"`
+}
+
+const maxReasonLen = 200
+
+// FromControlCall validates a walkthrough_control call against a
+// walkthrough of total steps.
+func FromControlCall(args json.RawMessage, total int) (Control, error) {
+	var c Control
+	if err := decodeStrict(args, &c); err != nil {
+		return Control{}, err
+	}
+	if len([]rune(c.Reason)) > maxReasonLen {
+		return Control{}, fmt.Errorf("%w: reason longer than %d characters", ErrInvalidPlan, maxReasonLen)
+	}
+	switch c.Action {
+	case CmdNext, CmdPrev, CmdRepeat, CmdPause, CmdResume, CmdStop:
+		if c.Step != 0 {
+			return Control{}, fmt.Errorf("%w: step is only for goto", ErrInvalidPlan)
+		}
+	case CmdGoto:
+		if c.Step < 1 || c.Step > total {
+			return Control{}, fmt.Errorf("%w: goto needs a step from 1 to %d", ErrInvalidPlan, total)
+		}
+	default:
+		return Control{}, fmt.Errorf("%w: unknown action %q", ErrInvalidPlan, c.Action)
+	}
+	return c, nil
+}
 
 // StartTool is the start_walkthrough definition.
 func StartTool() overlay.ToolSpec {

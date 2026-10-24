@@ -52,6 +52,7 @@ func (o *Orchestrator) prepare(ref contracts.SessionRef, caps []*contracts.Captu
 		if o.Overlay != nil {
 			o.Overlay.RegisterCapture(meta)
 		}
+		o.rememberMeta(meta)
 		if primary == "" {
 			primary = meta.ID
 		}

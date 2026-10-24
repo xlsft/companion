@@ -182,7 +182,7 @@ func newCore(ctx context.Context, log *slog.Logger, dataDir string, db *store.DB
 		c.ctl.Scene = c.overlay
 		presenter.Scene = c.overlay
 	}
-	c.guide = walkthrough.New(walkthrough.Config{Presenter: presenter, Store: walkthrough.NewKVStore(store.NewKV(db)), Log: log})
+	c.guide = walkthrough.New(walkthrough.Config{Presenter: presenter, Store: walkthrough.NewKVStore(store.NewKV(db)), Watch: c.stepWatch(), Log: log})
 	c.orch.Guide = c.guide
 	c.ctl.Guide = c.guide
 	c.chat = chat.New(chat.Config{
@@ -203,6 +203,19 @@ func newCore(ctx context.Context, log *slog.Logger, dataDir string, db *store.DB
 		return s.Screen.KeepScreenshots && s.Privacy.SaveTranscripts
 	}
 	return c, nil
+}
+
+// stepWatch lets walkthrough steps watch the screen (auto-advance), on
+// backends that capture silently: the Screenshot portal may flash or
+// sound the shutter on every grab, so there the user moves on by voice.
+func (c *core) stepWatch() *walkthrough.Watch {
+	if c.capturer == nil || c.capturer.Backend() == capture.BackendPortalScreenshot {
+		return nil
+	}
+	return &walkthrough.Watch{
+		Capturer: c.capturer,
+		Target:   func() contracts.CaptureRequest { return captureRequest(c.settings.Get()) },
+	}
 }
 
 // sidecarPath is the stt-sidecar next to this executable, which is how

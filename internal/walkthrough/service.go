@@ -20,7 +20,10 @@ type Presenter interface {
 	// planned on that screenshot; otherwise a new screenshot is taken and
 	// the model may mark the step anew and revise it. The returned step is
 	// what is shown and said.
-	Show(ctx context.Context, p Presentation) (Step, error)
+	Show(ctx context.Context, p Presentation) (Shown, error)
+	// Check asks the model, on a new screenshot, whether the user has done
+	// p.Step, after the screen around it changed (auto-advance).
+	Check(ctx context.Context, p Presentation) (Verdict, error)
 	// Say speaks text and returns when it was spoken.
 	Say(ctx context.Context, text string) error
 	// End removes every hint drawn for ref's walkthrough.
@@ -38,12 +41,45 @@ type Presentation struct {
 	// Capture is the screenshot Step.Shapes are normalized to; "" asks for
 	// a new one.
 	Capture contracts.CaptureID
+	// Brief is the whole walkthrough for the model (View.Brief).
+	Brief string
+}
+
+// Shown is a step as Show put it on screen.
+type Shown struct {
+	Step Step
+	// Area holds the hints drawn, in desktop coordinates; zero for none.
+	Area contracts.Rect
+}
+
+// Verdict is the model's answer to a Check.
+type Verdict struct {
+	// Control moves the walkthrough, typically on to the next step; nil
+	// when the step is not done yet.
+	Control *Control
+	// Step is the step revised; zero when unchanged.
+	Step Step
+	// Area holds hints drawn anew, in desktop coordinates; zero for none.
+	Area contracts.Rect
+}
+
+// Watch lets a running step watch the screen for the user doing it.
+type Watch struct {
+	Capturer contracts.ScreenCapturer
+	// Target is what to sample for a step without hints.
+	Target func() contracts.CaptureRequest
+	// Enabled is asked whenever a step is shown; nil means on.
+	Enabled func() bool
+	// Interval overrides WatchInterval (tests).
+	Interval time.Duration
 }
 
 type Config struct {
 	Presenter Presenter
 	// Store keeps the progress across restarts; nil keeps it in memory.
 	Store Store
+	// Watch enables auto-advance; nil leaves moving on to the user.
+	Watch *Watch
 	Log   *slog.Logger
 	Now   func() time.Time
 	NewID func() string
@@ -70,6 +106,10 @@ type Service struct {
 	stop    context.CancelFunc // of the showing in flight
 	// preparing: the current showing is working out its hints.
 	preparing bool
+	// watch is the current step's screen watcher; wgen tells its
+	// successive runs apart.
+	watchStop context.CancelFunc
+	wgen      uint64
 	subs      map[chan View]struct{}
 }
 
@@ -141,12 +181,53 @@ func (s *Service) Start(ctx context.Context, plan Plan, capture contracts.Captur
 
 // Do applies a command; ErrNotActive when no walkthrough is in progress.
 func (s *Service) Do(_ context.Context, cmd Command) error {
+	return s.move(func(st State) (State, Effect, error) { return st.Apply(cmd) }, nil)
+}
+
+// ErrMoved: the walkthrough is no longer at the step a decision was made
+// on, e.g. auto-advance moved it while the model was answering.
+var ErrMoved = errors.New("walkthrough moved on meanwhile")
+
+// Control applies the model's walkthrough_control decision, made while the
+// walkthrough was at step at (0-based); ErrMoved if it is not there now.
+func (s *Service) Control(_ context.Context, c Control, at int) error {
+	return s.move(func(st State) (State, Effect, error) {
+		if c.Action == CmdGoto {
+			return st.GoTo(c.Step - 1)
+		}
+		return st.Apply(c.Action)
+	}, func(st State) bool { return st.Index == at })
+}
+
+// Revise changes the current step's title and instruction.
+func (s *Service) Revise(_ context.Context, r Revision) error {
+	if err := (Plan{Goal: "-", Steps: []Step{{Title: r.Title, Say: r.Say}}}).Validate(); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if s.closed || !s.st.Status.Active() {
+		s.mu.Unlock()
+		return ErrNotActive
+	}
+	s.reviseLocked(s.st.Index, Step{Title: r.Title, Say: r.Say})
+	s.publishLocked()
+	s.mu.Unlock()
+	s.persist()
+	return nil
+}
+
+// move applies a transition if ok (nil: always) accepts the state.
+func (s *Service) move(apply func(State) (State, Effect, error), ok func(State) bool) error {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
 		return ErrNotActive
 	}
-	next, eff, err := s.st.Apply(cmd)
+	if ok != nil && s.st.Status.Active() && !ok(s.st) {
+		s.mu.Unlock()
+		return ErrMoved
+	}
+	next, eff, err := apply(s.st)
 	if err != nil {
 		s.mu.Unlock()
 		return err
@@ -159,6 +240,7 @@ func (s *Service) Do(_ context.Context, cmd Command) error {
 	case EffectHush:
 		s.st = next
 		s.hushLocked()
+		s.disarmLocked()
 	case EffectEnd:
 		s.endLocked()
 		s.st = next
@@ -248,14 +330,21 @@ func (s *Service) refLocked() contracts.SessionRef {
 	return contracts.SessionRef{ID: contracts.SessionID("walkthrough-" + s.st.ID), Generation: s.gen}
 }
 
+func (s *Service) presentationLocked() Presentation {
+	st := s.st
+	return Presentation{Ref: s.refLocked(), Goal: st.Plan.Goal, Index: st.Index, Total: len(st.Plan.Steps),
+		Step: st.Plan.Steps[st.Index], Brief: s.viewLocked().Brief()}
+}
+
 // presentLocked starts showing the current step.
 func (s *Service) presentLocked() {
 	s.hushLocked()
+	s.disarmLocked()
 	s.gen++
 	ctx, cancel := context.WithCancel(s.ctx)
 	s.stop = cancel
 	st := s.st
-	p := Presentation{Ref: s.refLocked(), Goal: st.Plan.Goal, Index: st.Index, Total: len(st.Plan.Steps), Step: st.Plan.Steps[st.Index]}
+	p := s.presentationLocked()
 	if st.Fresh {
 		p.Capture = s.capture
 	}
@@ -267,10 +356,18 @@ func (s *Service) presentLocked() {
 	go func() {
 		defer s.wg.Done()
 		defer cancel()
-		step, err := s.cfg.Presenter.Show(ctx, p)
+		shown, err := s.cfg.Presenter.Show(ctx, p)
+		s.mu.Lock()
+		if s.gen == gen && s.st.Status == StatusRunning {
+			// Watched from now on, also when Hush cut the showing short:
+			// the user may well act while being talked to.
+			s.armLocked(shown.Area)
+		}
+		s.mu.Unlock()
 		if ctx.Err() != nil {
 			return
 		}
+		step := shown.Step
 		if err != nil {
 			// The step is still said; only its hints are missing.
 			s.cfg.Log.Warn("walkthrough step hints", "err", err)
@@ -282,15 +379,8 @@ func (s *Service) presentLocked() {
 			return
 		}
 		s.preparing = false
-		cur := s.st.Plan.Steps[p.Index]
-		revised := step.Title != "" && step.Say != "" && (step.Title != cur.Title || step.Say != cur.Say)
-		if revised {
-			steps := slices.Clone(s.st.Plan.Steps)
-			steps[p.Index].Title, steps[p.Index].Say = step.Title, step.Say
-			s.st.Plan.Steps = steps
-		} else {
-			step = cur
-		}
+		revised := s.reviseLocked(p.Index, step)
+		step = s.st.Plan.Steps[p.Index]
 		s.publishLocked()
 		s.mu.Unlock()
 		if revised {
@@ -300,6 +390,18 @@ func (s *Service) presentLocked() {
 			s.cfg.Log.Warn("walkthrough step speech", "err", err)
 		}
 	}()
+}
+
+// reviseLocked replaces step i's text with step's, if that is a change.
+func (s *Service) reviseLocked(i int, step Step) bool {
+	cur := s.st.Plan.Steps[i]
+	if step.Title == "" || step.Say == "" || (step.Title == cur.Title && step.Say == cur.Say) {
+		return false
+	}
+	steps := slices.Clone(s.st.Plan.Steps)
+	steps[i].Title, steps[i].Say = step.Title, step.Say
+	s.st.Plan.Steps = steps
+	return true
 }
 
 // hushLocked cancels the showing in flight.
@@ -314,6 +416,7 @@ func (s *Service) hushLocked() {
 // endLocked stops the current walkthrough's showing and removes its hints.
 func (s *Service) endLocked() {
 	s.hushLocked()
+	s.disarmLocked()
 	if s.st.Status.Active() && s.cfg.Presenter != nil {
 		// Generation 0 up to the current one: every showing's hints.
 		s.cfg.Presenter.End(context.WithoutCancel(s.ctx), s.refLocked())
@@ -323,6 +426,7 @@ func (s *Service) endLocked() {
 func (s *Service) viewLocked() View {
 	v := s.st.view()
 	v.Preparing = s.preparing
+	v.Watching = s.watchStop != nil && s.st.Status == StatusRunning
 	return v
 }
 
