@@ -1,7 +1,6 @@
 package wizard
 
 import (
-	"gioui.org/font"
 	"gioui.org/layout"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -13,7 +12,7 @@ import (
 
 func monospace(th *theme.Theme, txt string) material.LabelStyle {
 	l := material.Label(th.Theme, th.Sp(0.9), txt)
-	l.Font.Typeface = font.Typeface("Go Mono")
+	l.Font.Typeface = theme.Mono
 	return l
 }
 

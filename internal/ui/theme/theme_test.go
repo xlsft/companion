@@ -1,6 +1,7 @@
 package theme
 
 import (
+	"image/color"
 	"math"
 	"testing"
 )
@@ -18,7 +19,7 @@ func TestClampScale(t *testing.T) {
 
 func TestApplyScalesText(t *testing.T) {
 	th := New(false, 1.5)
-	if th.TextSize != 24 || th.Sp(2) != 48 {
+	if th.TextSize != 21 || th.Sp(2) != 42 {
 		t.Errorf("TextSize=%v Sp(2)=%v", th.TextSize, th.Sp(2))
 	}
 	th.Apply(true, 1)
@@ -50,11 +51,43 @@ func TestPaletteContrast(t *testing.T) {
 			{"ok/surface", rgb3(p.OK), rgb3(p.Surface)},
 			{"warn/surface", rgb3(p.Warn), rgb3(p.Surface)},
 			{"error/surface", rgb3(p.Error), rgb3(p.Surface)},
-			{"fg/selected", rgb3(p.Fg), rgb3(p.Selected)},
+			{"fg/selected", rgb3(p.Fg), rgb3(over(p.Selected, p.Bg))},
+			{"fg2/surface", rgb3(p.Fg2), rgb3(p.Surface)},
+			{"muted/raised", rgb3(p.Muted), rgb3(p.Raised)},
+			{"subtle/bg", rgb3(p.Subtle), rgb3(p.Bg)},
+			{"accenttext/surface", rgb3(p.AccentText), rgb3(p.Surface)},
+			{"ok/oksoft", rgb3(p.OK), rgb3(over(p.OKSoft, p.Surface))},
+			{"warn/warnsoft", rgb3(p.Warn), rgb3(over(p.WarnSoft, p.Surface))},
+			{"error/errsoft", rgb3(p.Error), rgb3(over(p.ErrSoft, p.Surface))},
 		} {
 			if r := contrast(pair.fg, pair.bg); r < 4.5 {
 				t.Errorf("%s %s contrast %.2f < 4.5", name, pair.label, r)
 			}
+		}
+	}
+}
+
+// over composites a translucent tint onto an opaque background.
+func over(fg, bg color.NRGBA) color.NRGBA {
+	a := float64(fg.A) / 255
+	mix := func(f, b uint8) uint8 { return uint8(float64(f)*a + float64(b)*(1-a) + 0.5) }
+	return color.NRGBA{R: mix(fg.R, bg.R), G: mix(fg.G, bg.G), B: mix(fg.B, bg.B), A: 0xff}
+}
+
+// Tokens must match the prototypes' CSS exactly.
+func TestHSL(t *testing.T) {
+	tests := []struct {
+		h, s, l float64
+		want    color.NRGBA
+	}{
+		{240, 5, 9, color.NRGBA{22, 22, 24, 255}},
+		{240, 15, 99, color.NRGBA{252, 252, 253, 255}},
+		{0, 0, 100, color.NRGBA{255, 255, 255, 255}},
+		{120, 100, 25, color.NRGBA{0, 128, 0, 255}},
+	}
+	for _, tt := range tests {
+		if got := hsl(tt.h, tt.s, tt.l); got != tt.want {
+			t.Errorf("hsl(%v,%v,%v) = %v, want %v", tt.h, tt.s, tt.l, got, tt.want)
 		}
 	}
 }
