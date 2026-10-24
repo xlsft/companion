@@ -10,6 +10,7 @@ package insert
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,7 +37,9 @@ func TestLiveInsert(t *testing.T) {
 				t.Skip("kitty:", err)
 			}
 			defer func() { _ = term.Process.Kill(); _ = term.Wait() }()
-			time.Sleep(1500 * time.Millisecond) // window mapped and focused
+			if !focusedOn(ctx, "companion-insert-test", 5*time.Second) {
+				t.Skip("the test window did not get keyboard focus; not typing into another window")
+			}
 			in := New(report, Options{UseClipboard: func() bool { return tc.clip }})
 			defer in.Close()
 			text := want + "\n"
@@ -89,4 +92,25 @@ func (s *spyClip) SetText(ctx context.Context, text string) error {
 func (s *spyClip) Restore(ctx context.Context, c Clip) error {
 	s.restored++
 	return s.Clipboard.Restore(ctx, c)
+}
+
+// focusedOn waits until the window with appID has keyboard focus, so a
+// live test never types into someone else's window. Only niri can tell;
+// elsewhere it trusts that a new window takes focus.
+func focusedOn(ctx context.Context, appID string, wait time.Duration) bool {
+	if os.Getenv("NIRI_SOCKET") == "" {
+		time.Sleep(1500 * time.Millisecond)
+		return true
+	}
+	for deadline := time.Now().Add(wait); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+		out, err := exec.CommandContext(ctx, "niri", "msg", "--json", "focused-window").Output()
+		var w struct {
+			AppID string `json:"app_id"`
+		}
+		if err == nil && json.Unmarshal(out, &w) == nil && w.AppID == appID {
+			time.Sleep(300 * time.Millisecond) // let the client settle its keymap
+			return true
+		}
+	}
+	return false
 }
