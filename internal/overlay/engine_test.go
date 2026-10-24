@@ -18,8 +18,13 @@ type fakeSurface struct {
 }
 
 func (s *fakeSurface) Display() contracts.DisplayID { return s.display }
+
+// Present keeps a copy: like the real surfaces, the engine reuses its frame
+// buffer after Present returns.
 func (s *fakeSurface) Present(_ context.Context, f *image.RGBA) error {
-	s.frames = append(s.frames, f)
+	c := image.NewRGBA(f.Bounds())
+	copy(c.Pix, f.Pix)
+	s.frames = append(s.frames, c)
 	return nil
 }
 func (s *fakeSurface) SetInteractive(contracts.Rect) error { return nil }
@@ -68,6 +73,9 @@ func (t *timers) fireAll() {
 func newTestEngine(topo *contracts.Topology) (*Engine, *fakeHost, *timers) {
 	host := &fakeHost{}
 	e := NewEngine(host, func(context.Context) (contracts.Topology, error) { return *topo, nil })
+	// Frames are checked in their settled look and must not change under
+	// the test from a background animation loop.
+	e.motion = false
 	tm := &timers{}
 	e.afterFunc = tm.after
 	for _, d := range topo.Displays {
@@ -213,5 +221,48 @@ func TestUnknownCapture(t *testing.T) {
 	e, _, _ := newTestEngine(&topo)
 	if err := e.Apply(context.Background(), ring("r", s1, "nope")); !errors.Is(err, ErrUnknownCapture) {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// With motion on, the engine keeps presenting frames while a hint is shown
+// and stops the loop once the scene is empty.
+func TestAnimationLoopRunsOnlyWhileShown(t *testing.T) {
+	topo := contracts.Topology{Version: 1, Displays: []contracts.Display{dispA}}
+	e, host, _ := newTestEngine(&topo)
+	e.mu.Lock()
+	e.motion = true
+	e.mu.Unlock()
+	ctx := context.Background()
+	if err := e.Apply(ctx, ring("r", s1, "cap-a")); err != nil {
+		t.Fatal(err)
+	}
+	surf := host.open()[0]
+	frames := func() int {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		return len(surf.frames)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for frames() < 4 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if n := frames(); n < 4 {
+		t.Fatalf("only %d frames while animating", n)
+	}
+	e.Clear(ctx)
+	for {
+		e.mu.Lock()
+		running := e.animating
+		e.mu.Unlock()
+		if !running {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("animation loop still running after Clear")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !surf.closed {
+		t.Error("surface left open after Clear")
 	}
 }

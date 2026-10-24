@@ -70,6 +70,7 @@ func TestBadToolCalls(t *testing.T) {
 		{"unknown field", ToolPointAt, `{"x":0.5,"y":0.5,"session":"other"}`, cc},
 		{"no capture", ToolPointAt, `{"x":0.5,"y":0.5}`, CallContext{Session: cc.Session}},
 		{"image card not allowed", ToolAnnotate, `{"shapes":[{"kind":"image_card","points":[[0.1,0.1]]}]}`, cc},
+		{"long badge", ToolAnnotate, `{"shapes":[{"kind":"badge","points":[[0.1,0.1]],"text":"1234"}]}`, cc},
 		{"bad point", ToolAnnotate, `{"shapes":[{"kind":"label","points":[[0.1]],"text":"x"}]}`, cc},
 		{"no shapes", ToolAnnotate, `{"shapes":[]}`, cc},
 		{"malformed json", ToolAnnotate, `{"shapes":`, cc},
@@ -88,5 +89,22 @@ func TestClearWorksWithoutCapture(t *testing.T) {
 	cmds, err := FromToolCall(CallContext{Session: cc.Session}, ToolClear, nil)
 	if err != nil || len(cmds) != 1 || cmds[0].Op != OpClearSession {
 		t.Fatalf("got %+v, %v", cmds, err)
+	}
+}
+
+func TestAnnotateNewKinds(t *testing.T) {
+	args := `{"shapes":[
+		{"kind":"spotlight","points":[[0.5,0.5]]},
+		{"kind":"highlight","points":[[0.1,0.1],[0.3,0.15]]},
+		{"kind":"underline","points":[[0.1,0.2],[0.3,0.2]]},
+		{"kind":"brackets","points":[[0.4,0.4],[0.6,0.6]]},
+		{"kind":"badge","points":[[0.7,0.7]],"text":"2"}
+	]}`
+	cmds, err := FromToolCall(cc, ToolAnnotate, json.RawMessage(args))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cmds) != 5 || cmds[0].Radius != defaultSpotlightRadius {
+		t.Fatalf("got %+v", cmds)
 	}
 }

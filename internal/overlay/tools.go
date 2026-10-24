@@ -74,11 +74,11 @@ const annotateSchema = `{
       "items": {
         "type": "object",
         "properties": {
-          "kind": {"type": "string", "enum": ["ring", "rect", "circle", "arrow", "freehand", "label"]},
+          "kind": {"type": "string", "enum": ["ring", "rect", "circle", "arrow", "freehand", "label", "spotlight", "highlight", "underline", "brackets", "badge"]},
           "points": {
             "type": "array",
             "items": {"type": "array", "items": {"type": "number", "minimum": 0, "maximum": 1}, "minItems": 2, "maxItems": 2},
-            "description": "ring/circle/label: [center or anchor]; rect: [top-left, bottom-right]; arrow: [from, to]; freehand: 2..64 points"
+            "description": "ring/circle/spotlight/badge/label: [center or anchor]; rect/highlight/brackets: [top-left, bottom-right]; arrow/underline: [from, to]; freehand: 2..64 points. spotlight dims everything but a circle; highlight is a marker over text; brackets are focus corners; badge is a numbered step marker whose text is 1-3 characters"
           },
           "radius": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.5},
           "text": {"type": "string", "maxLength": 80},
@@ -95,9 +95,10 @@ const annotateSchema = `{
 }`
 
 const (
-	defaultRingRadius = 0.02
-	maxFreehandPoints = 64
-	maxShapes         = 12
+	defaultRingRadius      = 0.02
+	defaultSpotlightRadius = 0.06
+	maxFreehandPoints      = 64
+	maxShapes              = 12
 )
 
 var ErrBadToolCall = errors.New("bad overlay tool call")
@@ -169,7 +170,8 @@ func FromToolCall(cc CallContext, name string, args json.RawMessage) ([]Command,
 		}
 		for i, s := range a.Shapes {
 			switch s.Kind {
-			case KindRing, KindRect, KindCircle, KindArrow, KindFreehand, KindLabel:
+			case KindRing, KindRect, KindCircle, KindArrow, KindFreehand, KindLabel,
+				KindSpotlight, KindHighlight, KindUnderline, KindBrackets, KindBadge:
 			default:
 				return nil, fmt.Errorf("%w: shape %d kind %q not allowed", ErrBadToolCall, i, s.Kind)
 			}
@@ -184,8 +186,13 @@ func FromToolCall(cc CallContext, name string, args json.RawMessage) ([]Command,
 				pts[j] = contracts.Point{X: xy[0], Y: xy[1]}
 			}
 			r := s.Radius
-			if r == 0 && (s.Kind == KindRing || s.Kind == KindCircle) {
-				r = defaultRingRadius
+			if r == 0 {
+				switch s.Kind {
+				case KindRing, KindCircle:
+					r = defaultRingRadius
+				case KindSpotlight:
+					r = defaultSpotlightRadius
+				}
 			}
 			cmds = append(cmds, cc.show(fmt.Sprintf("%s/%d", cc.CallID, i), Command{
 				Kind: s.Kind, Points: pts, Radius: r, Text: s.Text, Style: Style{Color: s.Color, Dashed: s.Dashed && s.Kind == KindCircle},

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +18,24 @@ var ErrUnknownCapture = errors.New("overlay command references unknown capture")
 
 // TopologyFunc returns the current display topology.
 type TopologyFunc func(ctx context.Context) (contracts.Topology, error)
+
+// frame is a display's reusable frame buffer and the area its last
+// render drew, which the next render clears and reports as damage.
+type frame struct {
+	img             *image.RGBA
+	drawn, volatile image.Rectangle
+	scene           string
+}
+
+// sceneKey identifies which annotations, in which incarnation, a frame
+// shows; replacing an annotation gives it a new birth time.
+func sceneKey(order []string, anns map[string]*annotation) string {
+	var b strings.Builder
+	for _, id := range order {
+		fmt.Fprintf(&b, "%s@%d;", id, anns[id].shape.born.UnixNano())
+	}
+	return b.String()
+}
 
 type annotation struct {
 	cmd     Command
@@ -34,11 +54,20 @@ type Engine struct {
 	// afterFunc is time.AfterFunc; replaced in tests.
 	afterFunc func(time.Duration, func()) func() bool
 
+	// now is time.Now; replaced in tests.
+	now func() time.Time
+
 	mu          sync.Mutex
 	current     contracts.SessionRef
 	captures    map[contracts.CaptureID]contracts.CaptureMetadata
 	annotations map[string]*annotation
 	surfaces    map[contracts.DisplayID]contracts.OverlaySurface
+	// frames are reused per display: animating allocates no frame buffers.
+	frames map[contracts.DisplayID]*frame
+	// motion enables entrance and shimmer animation; animating is set
+	// while the frame loop runs. The loop only runs while hints are shown.
+	motion    bool
+	animating bool
 }
 
 func NewEngine(host contracts.OverlayHost, topology TopologyFunc) *Engine {
@@ -48,9 +77,54 @@ func NewEngine(host contracts.OverlayHost, topology TopologyFunc) *Engine {
 		afterFunc: func(d time.Duration, f func()) func() bool {
 			return time.AfterFunc(d, f).Stop
 		},
+		now:         time.Now,
 		captures:    map[contracts.CaptureID]contracts.CaptureMetadata{},
 		annotations: map[string]*annotation{},
 		surfaces:    map[contracts.DisplayID]contracts.OverlaySurface{},
+		frames:      map[contracts.DisplayID]*frame{},
+		motion:      true,
+	}
+}
+
+// SetMotion turns animation on or off, e.g. for the system's reduced
+// motion preference. Without motion hints appear in their final look.
+func (e *Engine) SetMotion(on bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.motion = on
+	e.animateLocked()
+}
+
+// animateLocked starts the frame loop if there is something to animate.
+func (e *Engine) animateLocked() {
+	if !e.motion || e.animating || len(e.annotations) == 0 {
+		return
+	}
+	e.animating = true
+	go e.animLoop()
+}
+
+// animLoop re-presents every display with hints at frameEvery until the
+// scene is empty or motion is turned off. A frame that cannot be shown is
+// skipped; the next tick tries again.
+func (e *Engine) animLoop() {
+	t := time.NewTicker(frameEvery)
+	defer t.Stop()
+	for range t.C {
+		e.mu.Lock()
+		if !e.motion || len(e.annotations) == 0 {
+			e.animating = false
+			e.mu.Unlock()
+			return
+		}
+		shown := map[contracts.DisplayID]bool{}
+		for _, a := range e.annotations {
+			shown[a.display] = true
+		}
+		for d := range shown {
+			_ = e.presentLocked(context.Background(), d)
+		}
+		e.mu.Unlock()
 	}
 }
 
@@ -114,6 +188,7 @@ func (e *Engine) Apply(ctx context.Context, cmd Command) error {
 	for _, d := range touched {
 		errs = append(errs, e.presentLocked(ctx, d))
 	}
+	e.animateLocked()
 	return errors.Join(errs...)
 }
 
@@ -196,6 +271,7 @@ func (e *Engine) clearLocked(ctx context.Context) {
 func (e *Engine) closeSurface(d contracts.DisplayID, s contracts.OverlaySurface) {
 	_ = s.Close()
 	delete(e.surfaces, d)
+	delete(e.frames, d)
 }
 
 func (e *Engine) resolveLocked(ctx context.Context, cmd Command) (*annotation, error) {
@@ -239,6 +315,8 @@ func (e *Engine) resolveLocked(ctx context.Context, cmd Command) (*annotation, e
 			text:   text,
 			style:  cmd.Style,
 			scale:  display.Scale,
+			born:   e.now(),
+			cache:  &shapeCache{},
 		},
 	}, nil
 }
@@ -279,6 +357,7 @@ func (e *Engine) presentLocked(ctx context.Context, id contracts.DisplayID) erro
 		}
 		return fmt.Errorf("%w: display %s gone", contracts.ErrStale, id)
 	}
+	full := !open
 	if !open {
 		s, err = e.host.Open(ctx, id)
 		if err != nil {
@@ -286,5 +365,27 @@ func (e *Engine) presentLocked(ctx context.Context, id contracts.DisplayID) erro
 		}
 		e.surfaces[id] = s
 	}
-	return s.Present(ctx, render(d.Native, shapes))
+	fr := e.frames[id]
+	if fr == nil || fr.img.Bounds().Dx() != d.Native.W || fr.img.Bounds().Dy() != d.Native.H {
+		fr = &frame{img: image.NewRGBA(image.Rect(0, 0, d.Native.W, d.Native.H))}
+		e.frames[id] = fr
+		full = true
+	}
+	drawn, volatile := renderInto(fr.img, shapes, e.now(), e.motion, fr.drawn)
+	// Unchanged scene: only the moving parts differ from the last frame
+	// (and where they were). A changed scene may differ anywhere either
+	// frame drew.
+	damage := volatile.Union(fr.volatile)
+	if key := sceneKey(order, e.annotations); key != fr.scene {
+		damage = drawn.Union(fr.drawn)
+		fr.scene = key
+	}
+	fr.drawn, fr.volatile = drawn, volatile
+	if dp, ok := s.(contracts.OverlayDamagePresenter); ok && !full {
+		if damage.Empty() {
+			return nil
+		}
+		return dp.PresentDamage(ctx, fr.img, damage)
+	}
+	return s.Present(ctx, fr.img)
 }

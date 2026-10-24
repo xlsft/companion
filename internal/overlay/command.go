@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"unicode/utf8"
 
 	"github.com/xlsft/companion/pkg/contracts"
 )
@@ -23,6 +24,11 @@ const (
 	KindFreehand  Kind = "freehand"   // polyline through Points, at least 2
 	KindLabel     Kind = "label"      // Text anchored at Points[0]
 	KindImageCard Kind = "image_card" // card anchored at Points[0] showing ImageRef
+	KindSpotlight Kind = "spotlight"  // dims the screen except a circle at Points[0] with Radius
+	KindHighlight Kind = "highlight"  // marker fill over a rect, Points[0] top-left, Points[1] bottom-right
+	KindUnderline Kind = "underline"  // stroke from Points[0] to Points[1], under text
+	KindBrackets  Kind = "brackets"   // focus corners around a rect, like KindRect
+	KindBadge     Kind = "badge"      // numbered marker at Points[0], Text is 1–3 characters
 )
 
 // Op is what a command does to the scene.
@@ -128,9 +134,17 @@ func (c Command) Validate() error {
 		if c.ImageRef == "" {
 			return invalid("image card without image")
 		}
-	case KindRect:
+	case KindRect, KindHighlight, KindBrackets:
 		if c.Points[0].X >= c.Points[1].X || c.Points[0].Y >= c.Points[1].Y {
-			return invalid("rect corners out of order")
+			return invalid("%s corners out of order", c.Kind)
+		}
+	case KindSpotlight:
+		if c.Radius <= 0 || c.Radius > 1 {
+			return invalid("spotlight radius %g outside (0,1]", c.Radius)
+		}
+	case KindBadge:
+		if n := utf8.RuneCountInString(c.Text); n < 1 || n > 3 {
+			return invalid("badge text must be 1–3 characters")
 		}
 	}
 	return nil
@@ -146,4 +160,9 @@ var pointsPerKind = map[Kind]int{
 	KindFreehand:  0,
 	KindLabel:     1,
 	KindImageCard: 1,
+	KindSpotlight: 1,
+	KindHighlight: 2,
+	KindUnderline: 2,
+	KindBrackets:  2,
+	KindBadge:     1,
 }
