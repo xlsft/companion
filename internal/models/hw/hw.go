@@ -8,6 +8,8 @@ import (
 	"runtime"
 
 	"golang.org/x/sys/cpu"
+
+	"github.com/xlsft/openclick/internal/models/disk"
 )
 
 // GPU backend names; they match Manifest.Backends plus "rocm" which no
@@ -96,3 +98,6 @@ func detectCPU() CPU {
 	c.FastSIMD = c.AVX2 || c.NEON
 	return c
 }
+
+// FreeDiskSpace returns the bytes available to the user on the filesystem of dir.
+func FreeDiskSpace(dir string) (uint64, error) { return disk.Free(dir) }

@@ -1,12 +1,12 @@
 //go:build linux || darwin
 
-package hw
+package disk
 
 import "golang.org/x/sys/unix"
 
-// FreeDiskSpace returns bytes available to an unprivileged user on the
+// Free returns bytes available to an unprivileged user on the
 // filesystem holding dir.
-func FreeDiskSpace(dir string) (uint64, error) {
+func Free(dir string) (uint64, error) {
 	var st unix.Statfs_t
 	if err := unix.Statfs(dir, &st); err != nil {
 		return 0, err

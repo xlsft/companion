@@ -1,11 +1,11 @@
 //go:build windows
 
-package hw
+package disk
 
 import "golang.org/x/sys/windows"
 
-// FreeDiskSpace returns bytes available to the calling user (quota aware).
-func FreeDiskSpace(dir string) (uint64, error) {
+// Free returns bytes available to the calling user (quota aware).
+func Free(dir string) (uint64, error) {
 	p, err := windows.UTF16PtrFromString(dir)
 	if err != nil {
 		return 0, err
