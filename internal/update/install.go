@@ -55,6 +55,43 @@ func InstallDir(exe string) (string, error) {
 // the administrator's, not a package's, and is left to the write check.
 var managedPrefixes = []string{"/usr/", "/bin/", "/sbin/", "/lib/", "/nix/", "/gnu/store/", "/snap/", "/var/lib/flatpak/", "/app/"}
 
+// managedParts mark Homebrew's kegs wherever its prefix is (the default
+// /home/linuxbrew/.linuxbrew, ~/.linuxbrew or a custom one): they are
+// writable by the user, so the write check alone would let the app
+// overwrite files brew tracks.
+var managedParts = []string{"/Cellar/", "/.linuxbrew/"}
+
+// managedDir reports whether a package manager owns the files in dir.
+func managedDir(dir string) bool {
+	if runtime.GOOS == "windows" {
+		return false
+	}
+	d := filepath.ToSlash(filepath.Clean(dir)) + "/"
+	for _, p := range managedPrefixes {
+		if strings.HasPrefix(d, p) && !strings.HasPrefix(d, "/usr/local/") {
+			return true
+		}
+	}
+	for _, p := range managedParts {
+		if strings.Contains(d, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// writableDir reports ErrNotWritable unless a file can be created in dir.
+func writableDir(dir string) error {
+	f, err := os.CreateTemp(dir, ".companion-write-check-*")
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrNotWritable, errors.Unwrap(err))
+	}
+	name := f.Name()
+	f.Close()
+	os.Remove(name)
+	return nil
+}
+
 func (in *Installer) names() []string {
 	if in.Names == nil {
 		return DefaultBinaries()
@@ -64,22 +101,10 @@ func (in *Installer) names() []string {
 
 // Installable reports whether Dir can be updated in place.
 func (in *Installer) Installable() error {
-	if runtime.GOOS != "windows" {
-		d := filepath.ToSlash(filepath.Clean(in.Dir)) + "/"
-		for _, p := range managedPrefixes {
-			if strings.HasPrefix(d, p) && !strings.HasPrefix(d, "/usr/local/") {
-				return ErrPackageManaged
-			}
-		}
+	if managedDir(in.Dir) {
+		return ErrPackageManaged
 	}
-	f, err := os.CreateTemp(in.Dir, ".companion-write-check-*")
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrNotWritable, errors.Unwrap(err))
-	}
-	name := f.Name()
-	f.Close()
-	os.Remove(name)
-	return nil
+	return writableDir(in.Dir)
 }
 
 // Install extracts the binaries from the gzipped tarball and swaps them in.

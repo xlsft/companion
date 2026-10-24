@@ -171,6 +171,9 @@ func TestInstallable(t *testing.T) {
 		{"/usr/lib/companion", ErrPackageManaged},
 		{"/usr/bin", ErrPackageManaged},
 		{"/nix/store/abc-companion/bin", ErrPackageManaged},
+		{"/home/linuxbrew/.linuxbrew/Cellar/companion/0.0.1/libexec", ErrPackageManaged},
+		{"/usr/local/Cellar/companion/0.0.1/libexec", ErrPackageManaged},
+		{filepath.Join(t.TempDir(), "Cellar", "companion", "0.0.1", "libexec"), ErrPackageManaged},
 		{"/usr/local/lib/companion-does-not-exist", ErrNotWritable},
 		{ro, ErrNotWritable},
 	}
