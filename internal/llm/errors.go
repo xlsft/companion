@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -93,6 +94,38 @@ func Retryable(err error) bool {
 		return p.Status >= 500 || p.Status == 408 || p.Status == 409
 	}
 	return false
+}
+
+// ErrorKind returns a short, stable, log-safe name for a normalized error:
+// the technical code UIs and diagnostics key on. It never includes message
+// text.
+func ErrorKind(err error) string {
+	var p *ErrProvider
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, ErrAuth):
+		return "auth"
+	case errors.Is(err, &ErrRateLimited{}):
+		return "rate_limit"
+	case errors.Is(err, ErrTimeout), errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.Is(err, ErrNetwork):
+		return "network"
+	case errors.Is(err, ErrContextLength):
+		return "context_length"
+	case errors.Is(err, &ErrUnsupportedCapability{}):
+		return "unsupported_capability"
+	case errors.Is(err, ErrMalformedStream):
+		return "malformed_stream"
+	case errors.Is(err, ErrInvalidRequest):
+		return "invalid_request"
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.As(err, &p):
+		return "provider"
+	}
+	return "unknown"
 }
 
 func invalidRequest(format string, args ...any) error {
