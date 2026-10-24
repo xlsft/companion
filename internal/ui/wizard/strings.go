@@ -152,6 +152,11 @@ var texts = map[string][2]string{
 	"hotkey.invalid.shift_only":     {"Shift alone types text: add Ctrl, Alt or Super", "Один Shift печатает текст: добавьте Ctrl, Alt или Super"},
 	"hotkey.invalid.reserved":       {"Reserved by the system or other apps", "Занято системой или другими программами"},
 	"hotkey.invalid.same_as_talk":   {"Must differ from Talk", "Должно отличаться от разговора"},
+	"hotkey.invalid.same_as_other":  {"Already a Companion shortcut", "Уже занято другим сочетанием Companion"},
+
+	"dictation.shortcut": {"Dictate", "Диктовка"},
+	"dictation.applied":  {"Works: %s to dictate", "Работает: %s — диктовать"},
+	"dictation.mode":     {"Press to dictate, press again to type it", "Нажать — диктовать, нажать ещё раз — напечатать"},
 
 	"hotkey.err.config_missing":  {"The system's shortcut settings were not found", "Не найдены настройки сочетаний системы"},
 	"hotkey.err.read_failed":     {"Could not read the system's shortcut settings", "Не удалось прочитать настройки сочетаний системы"},

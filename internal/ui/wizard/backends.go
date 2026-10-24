@@ -49,17 +49,32 @@ const (
 	HotkeyManual
 )
 
-// HotkeyStatus is what the shortcut editor shows.
+// HotkeyStatus is what the shortcut editors show.
 type HotkeyStatus struct {
 	Talk, Cancel string // stored chords
 	State        HotkeyState
 	// Code is the technical reason of a failure (HotkeyFailed).
 	Code string
+	// Dictate is the stored dictation chord, "" for none; DictateState
+	// and DictateCode are how binding it went (OC-78).
+	Dictate      string
+	DictateState HotkeyState
+	DictateCode  string
 	// ToggleOnly: the system's binds fire on press only, so Talk is
 	// press to start, press again to send.
 	ToggleOnly bool
-	// Commands are the commands to bind by hand (HotkeyManual).
+	// Commands are the commands to bind by hand (HotkeyManual): Talk,
+	// Cancel and, with a Dictate chord, Dictate.
 	Commands []string
+}
+
+// DictateHotkeys is a Permissions backend that also binds the dictation
+// shortcut; Settings shows the dictation editor only for one.
+type DictateHotkeys interface {
+	Hotkeys() HotkeyStatus
+	// ApplyDictateHotkey validates, stores and binds the dictation chord
+	// beside the stored Talk and Cancel.
+	ApplyDictateHotkey(ctx context.Context, chord string) HotkeyStatus
 }
 
 // Provider manages the LLM endpoint configured in setup; *providers.Service

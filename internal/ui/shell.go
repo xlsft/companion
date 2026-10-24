@@ -93,6 +93,8 @@ type Options struct {
 	// Updates is the in-app updater; nil shows no update banner and leaves
 	// the update settings without a status.
 	Updates UpdateBackend
+	// Dictation is raw system dictation; nil shows no dictation banner.
+	Dictation DictationBackend
 	// Diagnose produces the capability report for Diagnostics.
 	Diagnose func(ctx context.Context) (contracts.CapabilityReport, error)
 	// Quit asks the process to shut down; the app lifecycle then calls Stop.
@@ -129,6 +131,7 @@ type Shell struct {
 	closing  map[window]bool // closed by the shell, not the user
 	unsub    func()
 	unwatch  func() // stops update state notifications
+	undict   func() // stops dictation state notifications
 	// mainBuilds counts main UI constructions; tests assert laziness.
 	mainBuilds int
 }
@@ -200,6 +203,12 @@ func (s *Shell) Start(ctx context.Context) error {
 		s.unwatch = unwatch
 		s.mu.Unlock()
 	}
+	if s.opts.Dictation != nil {
+		undict := s.opts.Dictation.Watch(s.invalidateAll)
+		s.mu.Lock()
+		s.undict = undict
+		s.mu.Unlock()
+	}
 	s.mu.Lock()
 	s.started = true
 	s.mu.Unlock()
@@ -214,12 +223,15 @@ func (s *Shell) Stop(ctx context.Context) error {
 	wins := []window{s.wizWin, s.mainWin}
 	s.wizWin, s.mainWin = nil, nil
 	wizUI, mainView := s.wizard, s.main
-	unsub, unwatch := s.unsub, s.unwatch
+	unsub, unwatch, undict := s.unsub, s.unwatch, s.undict
 	trayOK := s.trayOK
 	s.mu.Unlock()
 	s.stopOnce.Do(func() { close(s.done) })
 	if unwatch != nil {
 		unwatch()
+	}
+	if undict != nil {
+		undict()
 	}
 	for _, w := range wins {
 		if w != nil {

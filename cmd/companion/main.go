@@ -119,6 +119,7 @@ func main() {
 		Tray:       tr,
 		Diagnose:   detect.New().Detect,
 		Updates:    upd,
+		Dictation:  dictationUI{c.dictation, c},
 		Quit:       stop,
 		Log:        log,
 		Appearance: scheme,
