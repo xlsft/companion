@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags-ignore: ["**"] # tags are built by Release, which calls this
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+# A new push to a pull request or branch cancels its older run. Called by
+# Release, github.workflow is "Release", so a tag's run never cancels CI.
+concurrency:
+  group: ${{ github.workflow }}-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Gio (Wayland, X11, EGL) and the PipeWire grabber are cgo; these are their
+  # headers. Audio (miniaudio) and D-Bus need none at build time.
+  GIO_DEPS: >-
+    libwayland-dev libx11-dev libx11-xcb-dev libxkbcommon-x11-dev
+    libgles2-mesa-dev libegl1-mesa-dev libffi-dev libxcursor-dev
+    libxfixes-dev libvulkan-dev libpipewire-0.3-dev pkg-config
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: System packages
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends $GIO_DEPS
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l cmd internal pkg packaging)
+          if [ -n "$unformatted" ]; then echo "Run gofmt on:"; echo "$unformatted"; exit 1; fi
+      - name: go mod tidy
+        run: go mod tidy && git diff --exit-code go.mod go.sum
+      - name: go vet
+        run: make vet
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -tags novulkan ./...
+      - name: shellcheck
+        run: shellcheck packaging/install.sh packaging/dist-linux.sh
+
+  test:
+    name: Test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: System packages
+        # Mesa's software renderer lets the headless Gio render tests run.
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends $GIO_DEPS libgl1-mesa-dri libegl-mesa0
+      - name: go test -race
+        shell: bash
+        run: |
+          set -o pipefail
+          go test -tags=novulkan -race -count=1 -coverprofile=coverage.out ./... | tee test.out
+      - name: Coverage summary
+        if: always()
+        run: |
+          {
+            echo '### Unit test coverage'
+            echo '```'
+            awk '/coverage:/ { pkg = ($1 == "ok") ? $2 : $1; sub("github.com/xlsft/companion/", "", pkg); for (i = 1; i <= NF; i++) if ($i == "coverage:") print pkg, $(i+1) }' test.out | column -t
+            [ -f coverage.out ] && echo "total $(go tool cover -func=coverage.out | tail -1 | awk '{print $NF}')"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: System packages
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends $GIO_DEPS
+      - name: Native build (cgo, UI included)
+        run: make build
+      - name: Cross build (pure-Go packages for windows, darwin, linux)
+        run: make cross
+
+  whisper:
+    name: Speech sidecar (whisper.cpp)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: System packages
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends cmake ninja-build ccache
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: whisper-${{ runner.os }}-${{ runner.arch }}
+      - name: make whisper
+        # Portable ggml, as in a release; ccache makes reruns take seconds.
+        run: make whisper WHISPER_NATIVE=OFF WHISPER_CMAKE_EXTRA="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+      - name: make build-whisper
+        run: make build-whisper && grep -q whisper_init_from_file bin/stt-sidecar
