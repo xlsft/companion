@@ -77,6 +77,12 @@ func SelectAssets(r Release, goos, goarch string) (Bundle, error) {
 	if err != nil {
 		return Bundle{}, err
 	}
+	return selectBundle(r, name)
+}
+
+// selectBundle picks the asset called name (a tarball or an AppImage) and
+// the files that vouch for it.
+func selectBundle(r Release, name string) (Bundle, error) {
 	var b Bundle
 	found := map[string]*Asset{name: &b.Tarball, ChecksumsName: &b.Checksums, SignatureName: &b.Signature}
 	for _, a := range r.Assets {

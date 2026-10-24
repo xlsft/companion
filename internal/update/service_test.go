@@ -74,8 +74,12 @@ type fakeRelease struct {
 }
 
 func newFakeRelease(t *testing.T, v string, tarball []byte) *fakeRelease {
+	return newFakeAsset(t, v, "companion-"+v+"-linux-x86_64.tar.gz", tarball)
+}
+
+// newFakeAsset serves a release whose installable asset is name.
+func newFakeAsset(t *testing.T, v, name string, tarball []byte) *fakeRelease {
 	f := &fakeRelease{tarball: tarball}
-	name := "companion-" + v + "-linux-x86_64.tar.gz"
 	sum := sha256.Sum256(tarball)
 	f.sums = hex.EncodeToString(sum[:]) + "  " + name + "\n"
 	mux := http.NewServeMux()

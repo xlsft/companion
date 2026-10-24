@@ -69,8 +69,10 @@ type Config struct {
 	Checker    *Checker
 	Downloader *Downloader
 	Verifier   SignatureVerifier
-	Installer  *Installer
-	Prefs      Prefs
+	// Installer is the install being updated: an *Installer for a tarball
+	// install or an *AppImage.
+	Installer Target
+	Prefs     Prefs
 	// Current is the running version (buildinfo.Version).
 	Current string
 	// WorkDir holds downloads between attempts.
@@ -117,12 +119,16 @@ func NewService(cfg Config) *Service {
 	s := &Service{cfg: cfg, kick: make(chan struct{}, 1), watchers: map[int]func(){}}
 	s.current, s.verErr = ParseVersion(cfg.Current)
 	s.st.Current = s.current
-	if _, err := TarballName(s.current, cfg.GOOS, cfg.GOARCH); err != nil {
+	if cfg.Installer == nil {
+		if _, err := TarballName(s.current, cfg.GOOS, cfg.GOARCH); err != nil {
+			s.st.Managed = Code(err)
+		} else {
+			s.st.Managed = Code(ErrNotWritable) // install directory unknown
+		}
+	} else if _, err := cfg.Installer.AssetName(s.current, cfg.GOOS, cfg.GOARCH); err != nil {
 		s.st.Managed = Code(err)
-	} else if cfg.Installer != nil {
-		s.st.Managed = Code(cfg.Installer.Installable())
 	} else {
-		s.st.Managed = Code(ErrNotWritable) // install directory unknown
+		s.st.Managed = Code(cfg.Installer.Installable())
 	}
 	return s
 }
@@ -303,7 +309,11 @@ func (s *Service) install(ctx context.Context, rel Release) error {
 	if err := s.cfg.Installer.Installable(); err != nil {
 		return err
 	}
-	b, err := SelectAssets(rel, s.cfg.GOOS, s.cfg.GOARCH)
+	name, err := s.cfg.Installer.AssetName(rel.Version, s.cfg.GOOS, s.cfg.GOARCH)
+	if err != nil {
+		return err
+	}
+	b, err := selectBundle(rel, name)
 	if err != nil {
 		return err
 	}

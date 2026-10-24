@@ -41,8 +41,10 @@ func newUpdater(log *slog.Logger, dataDir string, svc *settings.Service, exe str
 	client := &http.Client{Timeout: 30 * time.Minute} // bounds a stalled tarball download
 	ua := "companion/" + buildinfo.Version
 	token := os.Getenv(envToken)
-	var inst *update.Installer
-	if dir, err := update.InstallDir(exe); err == nil {
+	var inst update.Target // an interface: no typed nil when the directory is unknown
+	if img := update.AppImageFromEnv(exe, os.Getenv); img != "" {
+		inst = &update.AppImage{Path: img, Check: smokeCheck}
+	} else if dir, err := update.InstallDir(exe); err == nil {
 		inst = &update.Installer{Dir: dir, Check: smokeCheck}
 	} else {
 		log.Warn("update: install directory unknown", "err", err)

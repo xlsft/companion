@@ -30,6 +30,7 @@ import (
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/store"
 	"github.com/xlsft/companion/internal/ui"
+	"github.com/xlsft/companion/internal/update"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -97,6 +98,12 @@ func main() {
 	// cleanly first, then the new binary replaces this one (below).
 	var restart atomic.Bool
 	exe, exeErr := os.Executable()
+	// An AppImage restarts from the image file: its mount, where exe
+	// lives, goes away with this process.
+	relaunch := exe
+	if img := update.AppImageFromEnv(exe, os.Getenv); img != "" {
+		relaunch = img
+	}
 	var onInstalled func()
 	if exeErr == nil {
 		onInstalled = func() {
@@ -143,7 +150,7 @@ func main() {
 		if restart.Load() {
 			// The updater replaced the binaries in place, so the same path
 			// now holds the new version.
-			err := desktop.Reexec(exe, os.Args[1:])
+			err := desktop.Reexec(relaunch, os.Args[1:])
 			log.Error("restart after update failed; start Companion again", "err", err)
 			os.Exit(1)
 		}
