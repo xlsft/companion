@@ -18,6 +18,7 @@ import (
 	"github.com/xlsft/companion/internal/displays"
 	"github.com/xlsft/companion/internal/history"
 	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/memory"
 	"github.com/xlsft/companion/internal/models"
 	"github.com/xlsft/companion/internal/overlay"
 	paudio "github.com/xlsft/companion/internal/platform/audio"
@@ -57,6 +58,7 @@ type core struct {
 	secrets   contracts.SecretStore
 	providers *providers.Service
 	history   *history.Repo
+	memory    *memory.Service
 
 	modelsDir  string
 	catalog    models.Catalog
@@ -115,6 +117,15 @@ func newCore(ctx context.Context, log *slog.Logger, dataDir string, db *store.DB
 	c.secrets = sec
 	c.providers = providers.New(store.NewProviderRepo(db), c.secrets, c.http)
 	c.history = history.New(db, filepath.Join(dataDir, "history"))
+	// Learning follows Settings > Memory; a fact may point at its turn
+	// only while transcripts are saved.
+	c.memory = memory.New(memory.Config{
+		Repo:            memory.NewRepo(db),
+		Provider:        memory.ProviderFunc(c.talkProvider),
+		Enabled:         func() bool { return c.settings.Get().Memory.Enabled },
+		SaveTranscripts: func() bool { return c.settings.Get().Privacy.SaveTranscripts },
+		Log:             log,
+	})
 
 	var err error
 	c.modelsDir = filepath.Join(dataDir, "models")
@@ -153,6 +164,7 @@ func newCore(ctx context.Context, log *slog.Logger, dataDir string, db *store.DB
 			Device: func() string { return micDevice(c.settings.Get()) },
 		},
 		Target: captureRequest(svc.Get()),
+		Memory: c.memory,
 	}
 	if c.capturer != nil {
 		c.orch.Capturer = c.capturer
@@ -168,6 +180,7 @@ func newCore(ctx context.Context, log *slog.Logger, dataDir string, db *store.DB
 	c.chat = chat.New(chat.Config{
 		Talk:     c.ctl,
 		History:  c.history,
+		Context:  c.memory,
 		Save:     func() bool { return c.settings.Get().Privacy.SaveTranscripts },
 		Caps:     c.caps,
 		STTModel: c.sttModelName,
@@ -237,6 +250,7 @@ func (c *core) Stop(ctx context.Context) error {
 	}
 	var errs []error
 	c.chat.Close()
+	c.memory.Close()
 	errs = append(errs, c.talk.Close())
 	if c.hotkeys != nil {
 		errs = append(errs, c.hotkeys.Close())

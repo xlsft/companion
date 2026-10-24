@@ -289,7 +289,7 @@ func TestIsPrivate(t *testing.T) {
 	for in, want := range map[string]bool{
 		"don't remember this: my boss is annoying": true,
 		"Это личное, не запоминай":                 true,
-		"my name is Anna":                          false,
+		"my name is Anna": false,
 	} {
 		if got := IsPrivate(in); got != want {
 			t.Errorf("IsPrivate(%q) = %v", in, got)

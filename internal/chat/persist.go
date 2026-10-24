@@ -5,6 +5,7 @@ import (
 	"image"
 
 	"github.com/xlsft/companion/internal/history"
+	"github.com/xlsft/companion/internal/memory"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -55,11 +56,32 @@ func (s *Service) load(ctx context.Context) string {
 		}
 		msgs = append(msgs, m)
 	}
+	if s.cfg.Context != nil {
+		s.cfg.Context.Seed(turnsOf(msgs))
+	}
 	s.mu.Lock()
 	s.title, s.msgs = conv.Title, msgs
 	s.publishLocked()
 	s.mu.Unlock()
 	return conv.ID
+}
+
+// turnsOf pairs each user message with the assistant reply after it. A
+// reply that failed or was cut off is left out: the model should not be
+// shown half an answer as its own.
+func turnsOf(msgs []Message) []memory.Turn {
+	var out []memory.Turn
+	for _, m := range msgs {
+		switch m.Role {
+		case RoleUser:
+			out = append(out, memory.Turn{User: m.Text})
+		case RoleAssistant:
+			if n := len(out); n > 0 && out[n-1].Assistant == "" && !m.Failed && !m.Interrupted {
+				out[n-1].Assistant = m.Text
+			}
+		}
+	}
+	return out
 }
 
 // persistLocked queues m for the history store when saving is allowed.

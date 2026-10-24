@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/memory"
 	"github.com/xlsft/companion/internal/overlay"
 	"github.com/xlsft/companion/internal/session"
 	"github.com/xlsft/companion/internal/speech"
@@ -34,6 +35,13 @@ type Speaker interface {
 type Recorder interface {
 	Start(ctx context.Context, ref contracts.SessionRef, emit session.Emitter) error
 	Finish(ctx context.Context, ref contracts.SessionRef) (string, error)
+}
+
+// Memory supplies conversation context and remembered facts, and learns
+// from finished turns (*memory.Service).
+type Memory interface {
+	Prepare(ctx context.Context, text string) memory.Prepared
+	Record(ctx context.Context, ref contracts.SessionRef, user, answer string)
 }
 
 // ProviderFunc returns the provider for the Talk role (OC-25). It is
@@ -70,6 +78,10 @@ type Orchestrator struct {
 	// KeepScreenshots reports whether the sent screenshot may be handed on
 	// for storing; nil or false keeps pixels out of the sink.
 	KeepScreenshots func() bool
+	// Memory, when set, replaces the per-session history below: earlier
+	// turns come from the open conversation (also after it was reopened)
+	// and the system prompt gets what is known about the user.
+	Memory Memory
 
 	mu sync.Mutex
 	// history keeps the text of previous turns of the current SessionID for
@@ -127,8 +139,18 @@ func (o *Orchestrator) Reason(ctx context.Context, ref contracts.SessionRef, req
 	for _, img := range images {
 		user.Content = append(user.Content, llm.ImagePart(img))
 	}
-	msgs := append([]llm.Message{{Role: llm.RoleSystem, Content: []llm.Part{llm.Text(o.systemPrompt(len(images) > 0))}}},
-		o.priorTurns(ref.ID, req.FollowUp)...)
+	sys := o.systemPrompt(len(images) > 0)
+	var prior []llm.Message
+	if o.Memory != nil {
+		p := o.Memory.Prepare(ctx, req.Text)
+		prior = p.History
+		if p.System != "" {
+			sys += "\n\n" + p.System
+		}
+	} else {
+		prior = o.priorTurns(ref.ID, req.FollowUp)
+	}
+	msgs := append([]llm.Message{{Role: llm.RoleSystem, Content: []llm.Part{llm.Text(sys)}}}, prior...)
 	msgs = append(msgs, user)
 
 	var tools []llm.Tool
@@ -147,7 +169,11 @@ func (o *Orchestrator) Reason(ctx context.Context, ref contracts.SessionRef, req
 	if speechErr != nil && ctx.Err() == nil {
 		emit(session.SpeechFailed{Err: speechErr})
 	}
-	o.remember(ref.ID, req.Text, text)
+	if o.Memory != nil {
+		o.Memory.Record(ctx, ref, req.Text, text)
+	} else {
+		o.remember(ref.ID, req.Text, text)
+	}
 	return session.Reply{Text: text}, nil
 }
 
