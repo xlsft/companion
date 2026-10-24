@@ -13,6 +13,7 @@ const (
 	portalGlobalShortcuts = "org.freedesktop.portal.GlobalShortcuts"
 	portalScreenCast      = "org.freedesktop.portal.ScreenCast"
 	portalRemoteDesktop   = "org.freedesktop.portal.RemoteDesktop"
+	portalScreenshot      = "org.freedesktop.portal.Screenshot"
 )
 
 // Wayland globals that matter for capabilities.
@@ -20,6 +21,7 @@ const (
 	globLayerShell      = "zwlr_layer_shell_v1"
 	globExtToplevelList = "ext_foreign_toplevel_list_v1"
 	globWlrToplevelMgr  = "zwlr_foreign_toplevel_manager_v1"
+	globScreencopy      = "zwlr_screencopy_manager_v1"
 )
 
 // portalProbe is the outcome of reading one portal interface's version.
@@ -174,6 +176,7 @@ func mapLinux(f linuxFacts) contracts.CapabilityReport {
 			r.Facts["wayland.layer_shell"] = boolFact(f.hasGlobal(globLayerShell))
 			r.Facts["wayland.ext_foreign_toplevel_list"] = boolFact(f.hasGlobal(globExtToplevelList))
 			r.Facts["wayland.wlr_foreign_toplevel_manager"] = boolFact(f.hasGlobal(globWlrToplevelMgr))
+			r.Facts["wayland.screencopy"] = boolFact(f.hasGlobal(globScreencopy))
 			names := make([]string, 0, len(f.Globals))
 			for _, g := range f.Globals {
 				names = append(names, g.Interface+"@"+strconv.FormatUint(uint64(g.Version), 10))
@@ -209,7 +212,7 @@ func mapLinux(f linuxFacts) contracts.CapabilityReport {
 	case contracts.SessionX11:
 		set(contracts.CapGlobalHotkey, avail("x11-xinput2"))
 		set(contracts.CapHotkeyRelease, avail("x11-xinput2"))
-		set(contracts.CapScreenCapture, avail("x11-xshm"))
+		set(contracts.CapScreenCapture, avail("x11-getimage"))
 		set(contracts.CapOverlayClickThrough, avail("x11-shape"))
 		set(contracts.CapInputInjection, avail("x11-xtest"))
 		set(contracts.CapTextInsertion, avail("x11-xtest"))
@@ -227,16 +230,21 @@ func mapLinux(f linuxFacts) contracts.CapabilityReport {
 			set(contracts.CapHotkeyRelease, unavail(why, ""))
 		}
 
-		_, whySC := portal(portalScreenCast)
+		// Order matches internal/platform/capture.Candidates: screencopy
+		// needs no consent, the Screenshot portal works everywhere else.
+		// ScreenCast+PipeWire is not a backend yet (DMA-BUF import, OC-6).
+		_, whyShot := portal(portalScreenshot)
 		switch {
-		case !f.Portals[portalScreenCast].Present:
-			set(contracts.CapScreenCapture, unavail(whySC, ""))
-		case !f.PipeWire:
-			set(contracts.CapScreenCapture, unavail("pipewire socket missing", ""))
-		default:
-			s := avail("xdg-portal:ScreenCast+pipewire")
-			s.Reason = "user consent is requested on first use"
+		case f.hasGlobal(globScreencopy):
+			set(contracts.CapScreenCapture, avail("wlr-screencopy"))
+		case f.Portals[portalScreenshot].Present:
+			s := avail("xdg-portal:Screenshot")
+			s.Reason = "whole desktop per capture; permission may be requested once"
 			set(contracts.CapScreenCapture, s)
+		case f.Portals[portalScreenCast].Present:
+			set(contracts.CapScreenCapture, unavail("ScreenCast+PipeWire capture not implemented", ""))
+		default:
+			set(contracts.CapScreenCapture, unavail(whyShot, ""))
 		}
 
 		switch {

@@ -62,7 +62,7 @@ func gatherLinux(ctx context.Context) linuxFacts {
 	defer conn.Close()
 
 	var mu sync.Mutex
-	for _, iface := range []string{portalGlobalShortcuts, portalScreenCast, portalRemoteDesktop} {
+	for _, iface := range []string{portalGlobalShortcuts, portalScreenCast, portalRemoteDesktop, portalScreenshot} {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
