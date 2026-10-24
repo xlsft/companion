@@ -142,3 +142,42 @@ func BenchmarkResampler48k(b *testing.B) {
 		out = r.Process(out[:0], in)
 	}
 }
+
+// Playback goes the other way: 24 kHz provider PCM up to a 48 kHz device.
+func TestResamplerUpsamplesTTS(t *testing.T) {
+	const in, out, amp = 24000, 48000, 0.5
+	for _, freq := range []float64{200, 1000, 4000, 9000} {
+		got := resampleAll(t, sine(in, freq, amp, in), in, out)
+		got = got[2400 : len(got)-2400]
+		a := goertzelAmp(got, out, freq)
+		if db := 20 * math.Log10(a/amp); math.Abs(db) > 0.1 {
+			t.Errorf("24k -> 48k, %.0f Hz tone: gain %.3f dB", freq, db)
+		}
+		// The image mirrored around 12 kHz must be gone, or voices sound
+		// metallic.
+		img := goertzelAmp(got, out, in-freq)
+		if db := 20 * math.Log10(img/amp); db > -70 {
+			t.Errorf("24k -> 48k, %.0f Hz tone: image at %.0f Hz is %.1f dB", freq, in-freq, db)
+		}
+	}
+}
+
+func TestResamplerFlushCompletesOutput(t *testing.T) {
+	tests := []struct{ in, out, n int }{
+		{24000, 48000, 2400}, {24000, 44100, 2400}, {22050, 48000, 1000}, {48000, 16000, 4800},
+	}
+	for _, tt := range tests {
+		r, err := NewResampler(tt.in, tt.out)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := r.Flush(r.Process(nil, make([]float32, tt.n)))
+		want := int(math.Ceil(float64(tt.n) * float64(tt.out) / float64(tt.in)))
+		// The padded tail may add up to one filter delay beyond the input's
+		// span, but never less than the span itself.
+		extra := int(math.Ceil(float64(r.Latency()) * float64(tt.out) / float64(tt.in)))
+		if len(got) < want-1 || len(got) > want+extra+1 {
+			t.Errorf("%d -> %d: %d samples after flush, want %d..%d", tt.in, tt.out, len(got), want, want+extra)
+		}
+	}
+}

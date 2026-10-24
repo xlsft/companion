@@ -128,7 +128,7 @@ func (h *Host) FocusedWindow() (uint32, error) {
 // is missing.
 func (h *Host) Displays() []contracts.Display {
 	root := contracts.Display{
-		ID:     "x11:screen",
+		ID:     "screen",
 		Name:   "screen",
 		Bounds: contracts.RectXYWH(0, 0, float64(h.screen.WidthInPixels), float64(h.screen.HeightInPixels)),
 		Native: contracts.PixelSize{W: int(h.screen.WidthInPixels), H: int(h.screen.HeightInPixels)},
@@ -148,7 +148,7 @@ func (h *Host) Displays() []contracts.Display {
 			name = an.Name
 		}
 		out = append(out, contracts.Display{
-			ID:      contracts.DisplayID("x11:" + name),
+			ID:      contracts.DisplayID(name), // RandR monitor name = output name, as in linuxx11/displays
 			Name:    name,
 			Bounds:  contracts.RectXYWH(float64(m.X), float64(m.Y), float64(m.Width), float64(m.Height)),
 			Native:  contracts.PixelSize{W: int(m.Width), H: int(m.Height)},
