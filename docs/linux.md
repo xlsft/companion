@@ -4,7 +4,56 @@ Companion on Linux is two binaries that must sit in the same directory: `compani
 
 Build and packaging commands are at the end of this page.
 
+## Supported systems
+
+| Platform | Status |
+|---|---|
+| Linux, Wayland (GNOME, KDE Plasma, sway, Hyprland, niri, other wlroots compositors) | Supported; capabilities vary by compositor and portal backend, see [Capability profiles](#capability-profiles) |
+| Linux, X11 | Supported |
+| Windows, macOS | Not yet: platform backends are not implemented, no release builds |
+
+Release binaries are x86_64 and aarch64, built on Ubuntu 24.04, and need glibc 2.39 or newer (Ubuntu 24.04, Debian 13,
+Fedora 40 and later, Arch); on older systems [build from source](development.md#building-from-source).
+
 ## Install
+
+### Install script
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/xlsft/companion/main/install.sh | sh
+```
+
+It downloads the latest release, checks its SHA-256 and, if [cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+is installed, its signature (see [SECURITY.md](../SECURITY.md#verifying-releases)), then installs into `~/.local`.
+
+| Variable | |
+|---|---|
+| `VERSION=0.1.0` | install that release instead of the latest |
+| `PREFIX=/opt/companion` | install somewhere else than `~/.local` |
+| `REQUIRE_SIGNATURE=1` | refuse to install unless cosign verifies the signature |
+| `GITHUB_TOKEN=…` | use a token for the GitHub API (rate limits) |
+
+Run the same command again to upgrade. To remove it (settings and models in `~/.config/openclick` stay):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/xlsft/companion/main/install.sh | sh -s -- --uninstall
+```
+
+### Homebrew
+
+`brew install xlsft/tap/companion` (Homebrew on Linux).
+
+### First run
+
+Run `companion` (or pick Companion in the app menu); the setup wizard opens:
+
+1. **Permissions**: microphone, screen capture, hotkey and overlay are each checked for real. Where the desktop does
+   not let apps grab a key combination, the wizard shows the binding to paste into your compositor or desktop settings
+   (`companion ctl talk-toggle`); see [Binding the hotkey without a portal](#binding-the-hotkey-without-a-portal).
+2. **Model**: enter a base URL, model and API key. The wizard checks text, streaming, vision and tool use.
+3. **Speech recognition**: download the recommended model and say the test phrase.
+4. **Voice**: pick a speech provider and voice, or leave answers as text.
+5. Press **Super+Space** and ask about what is on the screen.
 
 ### Tarball
 

@@ -16,6 +16,18 @@ Especially relevant: anything that sends screen content, audio, transcripts or k
 the user configured, writes them to disk or logs against the settings, or lets another local user drive the control
 socket (`$XDG_RUNTIME_DIR/openclick/control.sock`).
 
+## What leaves your computer
+
+- **No backend, no account, no telemetry.** Companion talks only to the endpoints you configure.
+- **Audio never leaves the computer.** Speech recognition is local; only the recognised text is sent to your model.
+- **Screenshots** are taken only when you ask, one frame, and sent only to your model endpoint. By default they are kept
+  in memory and never written to disk; storing them with the chat history is an opt-in setting.
+- **Spoken answers**: the answer text goes to the speech provider you picked (ElevenLabs or an OpenAI-compatible
+  endpoint); with answers as text, nothing does.
+- **Keys** are stored in the system keychain (Secret Service), never in the database or config files.
+- **Logs** contain technical codes only: no prompts, transcripts, screen content, audio or keys. The diagnostics report
+  you can copy follows the same rule.
+
 ## Verifying releases
 
 Every release has a `checksums.txt` with the SHA-256 of each asset, signed keylessly with
