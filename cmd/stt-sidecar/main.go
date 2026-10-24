@@ -65,10 +65,6 @@ func main() {
 	}
 
 	vcfg.ThresholdDB, vcfg.Hangover = *vadThreshold, *vadHangover
-	newVAD := func() vad.VAD { return vad.NewEnergy(vcfg) }
-	if !*vadOn {
-		newVAD = func() vad.VAD { return &vad.Always{} }
-	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -78,7 +74,8 @@ func main() {
 		PartialInterval: *partialInterval,
 		PartialWindow:   *partialWindow,
 		MaxUtterance:    *maxUtterance,
-		NewVAD:          newVAD,
+		VAD:             vcfg,
+		VADDisabled:     !*vadOn,
 		Log:             log,
 	})
 	log.Info("sidecar started", "version", buildinfo.Version, "engine", *engineName)
