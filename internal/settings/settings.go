@@ -90,7 +90,7 @@ type UI struct {
 
 // UILanguages are the interface languages, English first as the default.
 // The UI's catalogue (internal/ui/i18n) has a translation for each.
-var UILanguages = []string{"en", "es", "pt", "fr", "de", "it", "pl", "tr", "uk", "ru"}
+var UILanguages = []string{"en", "es", "pt", "fr", "de", "it", "pl", "tr", "uk", "ru", "zh", "ja", "ko"}
 
 // Settings is the whole persisted configuration. Only plain values (no
 // slices or maps) so a struct copy is a deep copy.
