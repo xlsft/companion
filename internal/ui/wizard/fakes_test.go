@@ -199,7 +199,9 @@ func (f *fakeSTT) SelectDevice(_ context.Context, id string) error {
 	return nil
 }
 
-func (f *fakeSTT) LastTranscript() string { return "привет это проверка микрофона" }
+func (f *fakeSTT) LastTranscript() string {
+	return "привет это проверка микрофона"
+}
 
 type fakeTTS struct {
 	mu   sync.Mutex
