@@ -40,6 +40,9 @@ type Voice struct {
 	CaptureMoment CaptureMoment `json:"capture_moment"`
 	TTSSpeed      float64       `json:"tts_speed"` // 0.5–1.5
 	Language      string        `json:"language"`  // "auto" or a language code
+	// Microphone is the capture device ID chosen in setup; "" is the
+	// system default.
+	Microphone string `json:"microphone,omitempty"`
 }
 
 // Models holds provider profile ids per role; empty means not configured yet.

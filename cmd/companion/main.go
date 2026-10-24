@@ -26,7 +26,6 @@ import (
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/store"
 	"github.com/xlsft/companion/internal/ui"
-	"github.com/xlsft/companion/internal/ui/wizard"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -52,17 +51,35 @@ func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
-	db, svc, err := openSettings(ctx, *dataDir)
+	dir, err := resolveDataDir(*dataDir)
+	if err != nil {
+		log.Error("data directory", "err", err)
+		os.Exit(1)
+	}
+	db, svc, err := openSettings(ctx, dir)
 	if err != nil {
 		log.Error("open settings", "err", err)
 		os.Exit(1)
 	}
-	gate, err := openGate(ctx, store.NewKV(db))
+	dctx, dcancel := context.WithTimeout(ctx, 10*time.Second)
+	report, err := detect.New().Detect(dctx)
+	dcancel()
+	if err != nil {
+		log.Warn("capability detection", "err", err)
+	}
+	c, err := newCore(ctx, log, dir, db, svc, report)
+	if err != nil {
+		log.Error("start core", "err", err)
+		db.Close()
+		os.Exit(1)
+	}
+	gate, err := openGate(ctx, store.NewKV(db), c.setupChecks())
 	if err != nil {
 		log.Error("open readiness gate", "err", err)
 		db.Close()
 		os.Exit(1)
 	}
+	c.gate = gate
 	// Only a Ready gate gets the main UI; there is no flag around setup
 	// (FR-ONB-004).
 	mode := ui.ModeSetup
@@ -77,9 +94,8 @@ func main() {
 		Mode:     mode,
 		Settings: svc,
 		Gate:     gate,
-		// Step backends are wired with the real checks later; nil ones
-		// leave their controls disabled.
-		Setup:    wizard.Backends{},
+		Setup:    c.setupBackends(),
+		Chat:     c.chat,
 		Tray:     tr,
 		Diagnose: detect.New().Detect,
 		Quit:     stop,
@@ -92,7 +108,7 @@ func main() {
 	// the lifecycle runs beside it and ends the process when it returns.
 	go func() {
 		code := 0
-		if err := app.New(log, shell).Run(ctx); err != nil {
+		if err := app.New(log, c, shell).Run(ctx); err != nil {
 			log.Error("companion exited with error", "err", err)
 			code = 1
 		}
@@ -105,17 +121,19 @@ func main() {
 	gioapp.Main()
 }
 
-func openSettings(ctx context.Context, dir string) (*store.DB, *settings.Service, error) {
+// resolveDataDir is dir, or the user config dir's openclick folder.
+func resolveDataDir(dir string) (string, error) {
 	if dir == "" {
 		base, err := os.UserConfigDir()
 		if err != nil {
-			return nil, nil, err
+			return "", err
 		}
 		dir = filepath.Join(base, "openclick")
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, nil, err
-	}
+	return dir, os.MkdirAll(dir, 0o700)
+}
+
+func openSettings(ctx context.Context, dir string) (*store.DB, *settings.Service, error) {
 	db, err := store.Open(ctx, filepath.Join(dir, "companion.db"))
 	if err != nil {
 		return nil, nil, err
