@@ -7,16 +7,13 @@ import (
 	"slices"
 	"strings"
 
+	"gioui.org/io/key"
 	"gioui.org/layout"
 	"gioui.org/widget"
-	"gioui.org/widget/material"
 
 	"github.com/xlsft/companion/internal/llm"
 	"github.com/xlsft/companion/internal/providers"
 	"github.com/xlsft/companion/internal/readiness"
-	"github.com/xlsft/companion/internal/ui/i18n"
-	"github.com/xlsft/companion/internal/ui/kit"
-	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 // byokState is the provider form. Widgets are UI-goroutine only; the
@@ -25,6 +22,8 @@ type byokState struct {
 	kind                     widget.Enum
 	baseURL, model, key, hdr widget.Editor
 	dirty                    bool // edited since the last save
+	replacing                bool // the key editor is shown over a stored key
+	showHeaders              bool
 
 	// async
 	loaded  bool
@@ -109,6 +108,7 @@ func (b *byokState) update(w *Wizard, gtx layout.Context, s snapshot) {
 			changed(gtx, e)
 		}
 		b.dirty = false
+		b.showHeaders = b.showHeaders || len(info.Input.Headers) > 0
 	}
 	if b.kind.Update(gtx) {
 		b.dirty = true
@@ -117,6 +117,13 @@ func (b *byokState) update(w *Wizard, gtx layout.Context, s snapshot) {
 		if changed(gtx, e) {
 			b.dirty = true
 		}
+	}
+	if w.clicked(gtx, ActReplaceKey) {
+		b.replacing = true
+		gtx.Execute(key.FocusCmd{Tag: &b.key})
+	}
+	if w.clicked(gtx, ActHeaders) {
+		b.showHeaders = !b.showHeaders
 	}
 	if w.clicked(gtx, ActSave) {
 		b.save(w, gtx)
@@ -154,6 +161,7 @@ func (b *byokState) save(w *Wizard, gtx layout.Context) {
 	}
 	b.key.SetText("")
 	changed(gtx, &b.key)
+	b.replacing = false
 	w.mu.Lock()
 	b.saving, b.saveErr = true, ""
 	id := ""
@@ -194,114 +202,4 @@ func saveErrCode(err error) string {
 		return k
 	}
 	return "save_failed"
-}
-
-func (b *byokState) rows(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) []layout.Widget {
-	w.mu.Lock()
-	info, saving, saveErr, loaded := b.info, b.saving, b.saveErr, b.loaded
-	w.mu.Unlock()
-	enabled := w.cfg.Backends.Provider != nil && !saving && !s.running
-	rows := []layout.Widget{
-		w.text(kit.Muted(th, i18n.T(l, "wiz.byok.kind"))),
-		column(
-			material.RadioButton(th.Theme, &b.kind, string(llm.KindOpenAI), i18n.T(l, "wiz.byok.kind.openai")).Layout,
-			material.RadioButton(th.Theme, &b.kind, string(llm.KindAnthropic), i18n.T(l, "wiz.byok.kind.anthropic")).Layout,
-		),
-		gap(10),
-		field(w, th, i18n.T(l, "wiz.byok.baseURL"), "https://api.example.com/v1", &b.baseURL, enabled),
-		field(w, th, i18n.T(l, "wiz.byok.model"), i18n.T(l, "wiz.byok.model.hint"), &b.model, enabled),
-		field(w, th, i18n.T(l, "wiz.byok.key"), i18n.T(l, "wiz.byok.key.hint"), &b.key, enabled),
-	}
-	keyState := "wiz.byok.key.none"
-	if info != nil && info.HasKey {
-		keyState = "wiz.byok.key.saved"
-	}
-	rows = append(rows,
-		w.text(th.StatusLabel(keyStatus(info), i18n.T(l, keyState))),
-		gap(10),
-		field(w, th, i18n.T(l, "wiz.byok.headers"), i18n.T(l, "wiz.byok.headers.hint"), &b.hdr, enabled),
-	)
-	if w.cfg.Backends.Provider == nil {
-		rows = append(rows, w.text(th.StatusLabel(theme.StatusError, i18n.T(l, "wiz.notWired"))))
-	} else if !loaded && saveErr == "" {
-		rows = append(rows, w.text(kit.Muted(th, i18n.T(l, "wiz.loading"))))
-	}
-	if saveErr != "" {
-		rows = append(rows, w.text(th.StatusLabel(theme.StatusError, i18n.Tf(l, "wiz.byok.saveFailed", saveErr))),
-			w.text(kit.Muted(th, fixText(l, saveErr))))
-	}
-	if info != nil {
-		rows = append(rows, gap(6), w.text(kit.Body(th, i18n.Tf(l, "wiz.byok.inUse", hostOf(info.Input.BaseURL), info.Input.Model))))
-	}
-	saved := info != nil
-	rows = append(rows, gap(10), row(
-		func(gtx layout.Context) layout.Dimensions {
-			return w.button(gtx, th, ActSave, i18n.T(l, "wiz.save"), enabled)
-		},
-		func(gtx layout.Context) layout.Dimensions {
-			return w.button(gtx, th, ActTest, i18n.T(l, "wiz.byok.test"), enabled && saved && !b.dirty)
-		},
-	))
-	if b.dirty && saved {
-		rows = append(rows, w.text(kit.Muted(th, i18n.T(l, "wiz.byok.saveFirst"))))
-	}
-	rows = append(rows, gap(12))
-	rows = append(rows, b.testRows(w, th, l, s)...)
-	return rows
-}
-
-func keyStatus(info *providers.Info) theme.Status {
-	if info != nil && info.HasKey {
-		return theme.StatusOK
-	}
-	return theme.StatusUnknown
-}
-
-// providerSteps are the provider test steps in order.
-var providerSteps = []string{providers.StepConnection, providers.StepAuthModel, providers.StepCapabilities}
-
-// providerCaps are the probed capabilities shown under the capability step.
-var providerCaps = []string{"text", "stream", "vision", "tools"}
-
-func providerStatus(l i18n.Lang, v string) (theme.Status, string) {
-	switch providers.Status(v) {
-	case providers.StatusOK:
-		return theme.StatusOK, i18n.T(l, "wiz.state.passed")
-	case providers.StatusFailed:
-		return theme.StatusError, i18n.T(l, "wiz.state.failed")
-	}
-	return theme.StatusUnknown, i18n.T(l, "wiz.state.skipped")
-}
-
-// testRows renders the three provider test steps from Result.Detail.
-func (b *byokState) testRows(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) []layout.Widget {
-	r, ok := s.result(readiness.StepBYOK)
-	if !ok || r.Detail == nil {
-		return nil
-	}
-	var rows []layout.Widget
-	for _, id := range providerSteps {
-		ds, word := providerStatus(l, r.Detail[id])
-		line := i18n.T(l, "wiz.byok.step."+id) + " — " + word
-		if c := r.Detail[id+providers.DetailCode]; c != "" {
-			line += " (" + c + ")"
-		}
-		rows = append(rows, w.text(th.StatusLabel(ds, line)))
-		if k := r.Detail[id+providers.DetailMessage]; k != "" {
-			rows = append(rows, indent(w.text(kit.Muted(th, i18n.T(l, k)))))
-		}
-		if id == providers.StepCapabilities {
-			for _, c := range providerCaps {
-				ds, word := providerStatus(l, r.Detail[providers.DetailCapPrefix+c])
-				rows = append(rows, indent(w.text(th.StatusLabel(ds, i18n.T(l, "wiz.byok.cap."+c)+" — "+word))))
-			}
-		}
-	}
-	return rows
-}
-
-func indent(wd layout.Widget) layout.Widget {
-	return func(gtx layout.Context) layout.Dimensions {
-		return layout.Inset{Left: 24}.Layout(gtx, wd)
-	}
 }

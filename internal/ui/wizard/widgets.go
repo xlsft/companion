@@ -2,22 +2,15 @@ package wizard
 
 import (
 	"gioui.org/layout"
-	"gioui.org/unit"
 	"gioui.org/widget"
-	"gioui.org/widget/material"
 
+	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
 )
 
-func monospace(th *theme.Theme, txt string) material.LabelStyle {
-	l := material.Label(th.Theme, th.Sp(0.9), txt)
-	l.Font.Typeface = theme.Mono
-	return l
-}
-
-// dropdown is a button showing the current choice that expands into the
-// option list; Gio has no native select widget. UI goroutine only.
+// dropdown is the prototypes' select box that expands into the option
+// list; Gio has no native select widget. UI goroutine only.
 type dropdown struct {
 	open    bool
 	toggle  widget.Clickable
@@ -57,107 +50,64 @@ func (d *dropdown) layout(w *Wizard, gtx layout.Context, th *theme.Theme, labels
 	if len(d.options) < len(labels) {
 		d.options = append(d.options, make([]widget.Clickable, len(labels)-len(d.options))...)
 	}
-	children := []layout.FlexChild{
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			b := material.Button(th.Theme, &d.toggle, cur+"  ▾")
-			b.Background = th.Pal.Surface
-			b.Color = th.Pal.Fg
-			return kit.FocusRing(gtx, th, gtx.Focused(&d.toggle), func(gtx layout.Context) layout.Dimensions {
-				return widget.Border{Color: th.Pal.Divider, Width: 1, CornerRadius: 4}.Layout(gtx, b.Layout)
-			})
-		}),
+	fg := th.Pal.Fg
+	if !gtx.Enabled() {
+		fg = th.Pal.Subtle
 	}
-	if d.open {
-		for i, lbl := range labels {
-			w.frame.texts = append(w.frame.texts, lbl)
-			children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				o := &d.options[i]
-				return kit.FocusRing(gtx, th, gtx.Focused(o), func(gtx layout.Context) layout.Dimensions {
-					return o.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-						txt := lbl
-						if i == sel {
-							txt = theme.SelectedMarker + " " + txt
+	gtx.Constraints.Min.X = gtx.Constraints.Max.X
+	head := func(gtx layout.Context) layout.Dimensions {
+		return kit.FocusRing(gtx, th, gtx.Focused(&d.toggle), func(gtx layout.Context) layout.Dimensions {
+			return d.toggle.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				border := th.Pal.Divider
+				if d.open {
+					border = th.Pal.AccentLine
+				}
+				bg := th.Pal.Bg
+				if d.toggle.Hovered() && gtx.Enabled() {
+					bg = th.Pal.Hover
+				}
+				return box(gtx, th, 4, bg, border, func(gtx layout.Context) layout.Dimensions {
+					return layout.Inset{Left: th.Dp(10), Right: th.Dp(10)}.Layout(gtx, fixedH(th, 36, func(gtx layout.Context) layout.Dimensions {
+						arrow := icon.Down
+						if d.open {
+							arrow = icon.Up
 						}
-						return layout.Inset{Top: 6, Bottom: 6, Left: 12}.Layout(gtx, kit.Body(th, txt).Layout)
-					})
+						return spread(func(gtx layout.Context) layout.Dimensions {
+							l := label(th, 14, cur, fg)
+							l.MaxLines = 1
+							return l.Layout(gtx)
+						}, iconW(th, arrow, 14, th.Pal.Muted))(gtx)
+					}))
 				})
-			}))
-		}
-	}
-	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
-}
-
-// field is a labelled single- or multi-line editor.
-func field(w *Wizard, th *theme.Theme, label, hint string, ed *widget.Editor, enabled bool) layout.Widget {
-	lbl := w.text(kit.Muted(th, label))
-	return func(gtx layout.Context) layout.Dimensions {
-		return layout.Inset{Bottom: 10}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				layout.Rigid(lbl),
-				kit.VSpace(4),
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					if !enabled {
-						gtx = gtx.Disabled()
-					}
-					gtx.Constraints.Min.X = gtx.Constraints.Max.X
-					e := material.Editor(th.Theme, ed, hint)
-					return kit.FocusRing(gtx, th, gtx.Focused(ed), func(gtx layout.Context) layout.Dimensions {
-						return widget.Border{Color: th.Pal.Divider, Width: 1, CornerRadius: 4}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-							return layout.UniformInset(8).Layout(gtx, e.Layout)
-						})
-					})
-				}),
-			)
+			})
 		})
 	}
-}
-
-// changed drains the editor's events and reports whether its text changed.
-func changed(gtx layout.Context, ed *widget.Editor) bool {
-	ch := false
-	for {
-		ev, ok := ed.Update(gtx)
-		if !ok {
-			return ch
-		}
-		if _, isChange := ev.(widget.ChangeEvent); isChange {
-			ch = true
+	if !d.open {
+		return head(gtx)
+	}
+	opts := make([]layout.Widget, len(labels))
+	for i, lbl := range labels {
+		w.frame.texts = append(w.frame.texts, lbl)
+		opts[i] = func(gtx layout.Context) layout.Dimensions {
+			o := &d.options[i]
+			return kit.FocusRing(gtx, th, gtx.Focused(o), func(gtx layout.Context) layout.Dimensions {
+				return o.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					gtx.Constraints.Min.X = gtx.Constraints.Max.X
+					if o.Hovered() {
+						fillRect(gtx, th.Pal.Hover)
+					}
+					// The chosen option carries a check, not only a tint.
+					mark := layout.Spacer{Width: th.Dp(14), Height: th.Dp(14)}.Layout
+					if i == sel {
+						mark = iconW(th, icon.Check, 14, th.Pal.AccentText)
+					}
+					return layout.Inset{Left: th.Dp(10), Right: th.Dp(10)}.Layout(gtx, fixedH(th, 34,
+						hstack(th, 8, mark, label(th, 14, lbl, th.Pal.Fg).Layout)))
+				})
+			})
 		}
 	}
-}
-
-// bar is a labelled progress bar; p in [0, 1].
-func bar(th *theme.Theme, p float32) layout.Widget {
-	return func(gtx layout.Context) layout.Dimensions {
-		pb := material.ProgressBar(th.Theme, max(0, min(1, p)))
-		pb.Height = unit.Dp(8 * th.Scale)
-		pb.TrackColor = th.Pal.Divider
-		return pb.Layout(gtx)
-	}
-}
-
-// column stacks widgets vertically, e.g. radio choices that would not fit
-// side by side at large text sizes.
-func column(ws ...layout.Widget) layout.Widget {
-	return func(gtx layout.Context) layout.Dimensions {
-		ch := make([]layout.FlexChild, len(ws))
-		for i, w := range ws {
-			ch[i] = layout.Rigid(w)
-		}
-		return layout.Flex{Axis: layout.Vertical}.Layout(gtx, ch...)
-	}
-}
-
-// row lays out widgets horizontally with spacing.
-func row(ws ...layout.Widget) layout.Widget {
-	return func(gtx layout.Context) layout.Dimensions {
-		var ch []layout.FlexChild
-		for i, w := range ws {
-			if i > 0 {
-				ch = append(ch, layout.Rigid(layout.Spacer{Width: 12}.Layout))
-			}
-			ch = append(ch, layout.Rigid(w))
-		}
-		return layout.Flex{Alignment: layout.Middle}.Layout(gtx, ch...)
-	}
+	return vstack(th, 4, head, func(gtx layout.Context) layout.Dimensions {
+		return kit.Rows(gtx, th, opts...)
+	})(gtx)
 }
