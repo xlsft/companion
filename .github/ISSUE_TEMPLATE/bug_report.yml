@@ -1,0 +1,56 @@
+name: Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please do not paste API keys, prompts, transcripts or screenshots with private content.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start companion
+        2. Press Mod+Space and ask …
+        3. …
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `companion -version`
+    validations:
+      required: true
+  - type: input
+    id: desktop
+    attributes:
+      label: Distribution and desktop
+      placeholder: e.g. Fedora 43, GNOME 49 on Wayland
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed with
+      options: [install.sh, Homebrew, tarball, AppImage, PKGBUILD, built from source]
+  - type: textarea
+    id: diagnose
+    attributes:
+      label: Diagnostics
+      description: Output of `companion -diagnose` (capability report; contains no personal data).
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant log lines, if any. Logs contain technical codes only.
+      render: text
