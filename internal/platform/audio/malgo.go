@@ -224,6 +224,12 @@ func (r *rawStream) finish(err error) {
 
 func (r *rawStream) Close() error {
 	r.closer.Do(func() {
+		// Stop before Uninit: ma_device_uninit only signals the worker's
+		// wakeup event, but the PulseAudio worker sits in a blocking
+		// pa_mainloop_iterate. On a live stream data wakes it every period;
+		// on a killed one (source unplugged) nothing ever does and Uninit
+		// hangs forever. Stop wakes the mainloop explicitly.
+		_ = r.dev.Stop()
 		r.dev.Uninit() // waits for the audio thread; no callbacks after this
 		freeContext(r.mctx)
 		r.finish(nil)
