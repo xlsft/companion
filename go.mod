@@ -3,6 +3,7 @@ module github.com/xlsft/openclick
 go 1.27.3
 
 require (
+	github.com/gen2brain/malgo v0.11.26
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/jezek/xgb v1.3.1
 	github.com/zalando/go-keyring v0.2.8
