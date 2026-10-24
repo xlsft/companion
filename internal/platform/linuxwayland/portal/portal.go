@@ -27,7 +27,13 @@ const (
 	IfScreenCast      = "org.freedesktop.portal.ScreenCast"
 	IfRemoteDesktop   = "org.freedesktop.portal.RemoteDesktop"
 	IfScreenshot      = "org.freedesktop.portal.Screenshot"
+
+	ifRegistry = "org.freedesktop.host.portal.Registry"
 )
+
+// AppID names Companion to the portal; it matches companion.desktop, from
+// which the portal and its dialogs take the name and icon.
+const AppID = "companion"
 
 // Response codes of org.freedesktop.portal.Request.Response.
 const (
@@ -66,7 +72,18 @@ func Connect() (*Conn, error) {
 	}
 	bus.Signal(c.sigs)
 	go c.dispatch()
+	c.register()
 	return c, nil
+}
+
+// register tells the portal which app this connection is. Apps outside a
+// sandbox have no app id the portal can see, and since 1.19 some
+// interfaces (GlobalShortcuts) refuse them ("An app id is required"). It
+// must come before any other portal call on the connection. Older portals
+// lack the registry, and a sandboxed process is refused: both keep
+// working as before, so the outcome is ignored.
+func (c *Conn) register() {
+	_ = c.obj.Call(ifRegistry+".Register", 0, AppID, map[string]dbus.Variant{}).Err
 }
 
 func (c *Conn) Close() error { return c.bus.Close() }
@@ -182,7 +199,7 @@ func (c *Conn) Property(iface, name string) (dbus.Variant, error) {
 func Token() string {
 	b := make([]byte, 6)
 	_, _ = rand.Read(b)
-	return "openclick_" + hex.EncodeToString(b)
+	return "companion_" + hex.EncodeToString(b)
 }
 
 func (c *Conn) requestPath(token string) dbus.ObjectPath {

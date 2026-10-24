@@ -221,6 +221,13 @@ func mapErr(op string, err error) error {
 	case errors.Is(err, portal.ErrFailed):
 		return fmt.Errorf("global shortcuts: %s refused by portal backend: %w", op, contracts.Unsupported(contracts.CapGlobalHotkey))
 	}
+	// The portal refusing to even start a session (no app id, not allowed)
+	// will not change on retry: report it as unsupported, so the hotkey
+	// service falls back to the compositor's own binds.
+	var de dbus.Error
+	if op == "CreateSession" && errors.As(err, &de) {
+		return fmt.Errorf("global shortcuts: %s: %v: %w", op, err, contracts.Unsupported(contracts.CapGlobalHotkey))
+	}
 	return fmt.Errorf("global shortcuts: %s: %w", op, err)
 }
 

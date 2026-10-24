@@ -5,6 +5,7 @@ package hotkeys
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -19,10 +20,11 @@ import (
 // fakeBus plays the portal frontend: it answers requests from a table and
 // lets the test fire signals.
 type fakeBus struct {
-	version uint32
-	bindErr error
-	bindRes map[string]dbus.Variant
-	listRes map[string]dbus.Variant
+	version   uint32
+	createErr error
+	bindErr   error
+	bindRes   map[string]dbus.Variant
+	listRes   map[string]dbus.Variant
 
 	mu      sync.Mutex
 	sigs    chan *dbus.Signal
@@ -42,6 +44,9 @@ func (f *fakeBus) CreateSession(context.Context, string, map[string]dbus.Variant
 	defer f.mu.Unlock()
 	f.nextSes++
 	f.calls = append(f.calls, "CreateSession")
+	if f.createErr != nil {
+		return "", f.createErr
+	}
 	return dbus.ObjectPath("/session/" + string(rune('0'+f.nextSes))), nil
 }
 
@@ -94,19 +99,21 @@ func shortcutsRes(kv ...string) map[string]dbus.Variant {
 
 func TestRegisterErrors(t *testing.T) {
 	tests := []struct {
-		name    string
-		version uint32
-		bindErr error
-		want    error
+		name      string
+		version   uint32
+		createErr error
+		bindErr   error
+		want      error
 	}{
-		{"portal absent", 0, nil, contracts.ErrUnsupported},
-		{"backend refuses (niri)", 2, portal.ErrFailed, contracts.ErrUnsupported},
-		{"user dismissed dialog", 2, portal.ErrCancelled, contracts.ErrPermissionDenied},
+		{"portal absent", 0, nil, nil, contracts.ErrUnsupported},
+		{"no app id", 2, fmt.Errorf("portal: CreateSession: %w", dbus.Error{Name: "org.freedesktop.portal.Error.NotAllowed", Body: []any{"An app id is required"}}), nil, contracts.ErrUnsupported},
+		{"backend refuses (niri)", 2, nil, portal.ErrFailed, contracts.ErrUnsupported},
+		{"user dismissed dialog", 2, nil, portal.ErrCancelled, contracts.ErrPermissionDenied},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := newFakeBus()
-			b.version, b.bindErr = tt.version, tt.bindErr
+			b.version, b.createErr, b.bindErr = tt.version, tt.createErr, tt.bindErr
 			s, err := newService(b)
 			if err == nil {
 				defer s.Close()
@@ -119,7 +126,7 @@ func TestRegisterErrors(t *testing.T) {
 			if !errors.As(err, &ce) || ce.Capability != contracts.CapGlobalHotkey {
 				t.Errorf("err %v does not name %s", err, contracts.CapGlobalHotkey)
 			}
-			if tt.version != 0 && len(b.closed) != 1 {
+			if tt.version != 0 && tt.createErr == nil && len(b.closed) != 1 {
 				t.Errorf("session not closed after failure: %v", b.closed)
 			}
 		})
