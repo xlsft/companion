@@ -90,6 +90,9 @@ type fakeSTT struct {
 	startErr  error
 	final     stt.Final
 	finishErr error
+	// noEndpoint: the utterance never ends on its own, so the check waits
+	// for the mic stream; otherwise an early endpoint races a mic error.
+	noEndpoint bool
 }
 
 func (f *fakeSTT) start(ctx context.Context, opts ...stt.SessionOption) (talk.STTSession, error) {
@@ -106,7 +109,9 @@ type fakeSession struct {
 }
 
 func (s *fakeSession) Write([]int16) error {
-	s.once.Do(func() { s.endpoint <- stt.EndpointEvent{Reason: stt.EndpointSilence} })
+	if !s.f.noEndpoint {
+		s.once.Do(func() { s.endpoint <- stt.EndpointEvent{Reason: stt.EndpointSilence} })
+	}
 	return nil
 }
 func (s *fakeSession) Finish(context.Context) (stt.Final, error) { return s.f.final, s.f.finishErr }
