@@ -29,8 +29,9 @@ type Provider interface {
 // context passed to Stream ends the stream with Failed promptly.
 type EventStream interface {
 	Recv() (Event, error)
-	// Close releases the connection. It is safe to call at any time and
-	// more than once; reading the stream to the end closes it as well.
+	// Close releases the connection. It is safe to call at any time, from
+	// any goroutine and more than once; reading the stream to the end
+	// closes it as well. After Close, Recv returns io.EOF.
 	Close() error
 }
 
