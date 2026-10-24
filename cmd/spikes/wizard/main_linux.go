@@ -251,7 +251,7 @@ type stt struct {
 }
 
 func (s *stt) Hardware(ctx context.Context) hw.Profile { return hw.Detect(ctx, s.dir) }
-func (s *stt) Catalog() (models.Catalog, error)       { return models.BuiltinCatalog() }
+func (s *stt) Catalog() (models.Catalog, error)        { return models.BuiltinCatalog() }
 
 func (s *stt) Installed() ([]models.InstalledModel, error) {
 	s.mu.Lock()
@@ -277,7 +277,9 @@ func (s *stt) Install(ctx context.Context, m models.Manifest, progress func(mode
 }
 
 func (s *stt) SelectDevice(context.Context, string) error { return nil }
-func (s *stt) LastTranscript() string                     { return "привет это проверка микрофона" }
+func (s *stt) LastTranscript() string {
+	return "привет это проверка микрофона"
+}
 
 type voices struct {
 	mu  sync.Mutex
