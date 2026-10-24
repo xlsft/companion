@@ -5,7 +5,7 @@
 // (OC-71). It never talks to a model: the conversation is canned, Send only
 // appends the typed turn, and Stop ends the canned reply.
 //
-//	mainui -dark -lang ru -state chat   # chat | empty | offline
+//	mainui -theme dark -lang ru -state chat   # chat | empty | offline
 //	mainui -route settings -section voice
 //	                                     # route: home | settings
 //	                                     # section: general | voice | screen | privacy | diagnostics
@@ -30,6 +30,7 @@ import (
 
 	"github.com/xlsft/companion/internal/app"
 	"github.com/xlsft/companion/internal/chat"
+	"github.com/xlsft/companion/internal/platform/appearance"
 	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/store"
@@ -38,7 +39,7 @@ import (
 )
 
 func main() {
-	dark := flag.Bool("dark", true, "dark theme")
+	themeMode := flag.String("theme", "auto", "auto (follow the system), dark or light")
 	lang := flag.String("lang", "ru", "interface language (en, ru, de, …)")
 	state := flag.String("state", "chat", "chat, empty or offline")
 	route := flag.String("route", "home", "page to open: home or settings")
@@ -51,7 +52,13 @@ func main() {
 		os.Exit(2)
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	scheme, err := appearance.Choose(*themeMode)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "mainui:", err)
+		os.Exit(2)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	_ = scheme.Start(ctx) // Unsupported keeps the light theme
 
 	dir, err := os.MkdirTemp("", "mainui-spike")
 	if err != nil {
@@ -82,7 +89,7 @@ func main() {
 		be = newDemo(chat.View{})
 	}
 	diagnose := func(ctx context.Context) (contracts.CapabilityReport, error) { return detect.New().Detect(ctx) }
-	shell := ui.New(ui.Options{Mode: ui.ModeMain, Settings: svc, Chat: be, Diagnose: diagnose, Quit: stop, Log: log, Dark: *dark, Version: "spike"})
+	shell := ui.New(ui.Options{Mode: ui.ModeMain, Settings: svc, Chat: be, Diagnose: diagnose, Quit: stop, Log: log, Appearance: scheme, Version: "spike"})
 	go func() {
 		// The main window exists once the app has started the shell.
 		time.Sleep(300 * time.Millisecond)

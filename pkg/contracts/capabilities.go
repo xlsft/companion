@@ -18,6 +18,7 @@ const (
 	CapMicrophone           Capability = "microphone"
 	CapAudioOutput          Capability = "audio_output" // speech playback
 	CapTray                 Capability = "tray"
+	CapColorScheme          Capability = "color_scheme" // system light/dark preference
 
 	// FallbackToggleTalk is the UX used instead of CapHotkeyRelease: one
 	// press starts recording, the next one stops it.
