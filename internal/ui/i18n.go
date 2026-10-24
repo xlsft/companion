@@ -31,13 +31,8 @@ var catalog = map[string][2]string{
 	"tray.diagnostics": {"Diagnostics", "Диагностика"},
 	"tray.quit":        {"Quit", "Выход"},
 
-	"wizard.title":       {"Companion setup", "Настройка Companion"},
-	"wizard.heading":     {"Let's set up Companion", "Настроим Companion"},
-	"wizard.body":        {"The setup wizard will check permissions, the speech model and providers. Until setup is complete only this window is available.", "Мастер проверит разрешения, модель распознавания речи и провайдеров. Пока настройка не завершена, доступно только это окно."},
-	"wizard.placeholder": {"Setup steps are not implemented yet.", "Шаги настройки пока не реализованы."},
-	"wizard.continue":    {"Finish setup (debug)", "Завершить настройку (отладка)"},
-	"wizard.diagnostics": {"Diagnostics", "Диагностика"},
-	"wizard.back":        {"Back to setup", "Назад к настройке"},
+	"wizard.title": {"Companion setup", "Настройка Companion"},
+	"wizard.back":  {"Back to setup", "Назад к настройке"},
 
 	"home.heading":  {"Companion", "Companion"},
 	"home.body":     {"Voice and screen assistant. Talk, chats and history arrive in later versions.", "Голосовой и экранный помощник. Разговор, чаты и история появятся в следующих версиях."},

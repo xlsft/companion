@@ -26,6 +26,7 @@ import (
 	"github.com/xlsft/openclick/internal/settings"
 	"github.com/xlsft/openclick/internal/store"
 	"github.com/xlsft/openclick/internal/ui"
+	"github.com/xlsft/openclick/internal/ui/wizard"
 	"github.com/xlsft/openclick/pkg/contracts"
 )
 
@@ -37,8 +38,6 @@ func main() {
 	}
 	showVersion := flag.Bool("version", false, "print version and exit")
 	diagnose := flag.Bool("diagnose", false, "print the platform capability report as JSON and exit")
-	// Until onboarding (OC-70) decides readiness, the mode is chosen by hand.
-	modeFlag := flag.String("mode", "setup", "debug: UI mode, setup or main")
 	dataDir := flag.String("data", "", "data directory (default: user config dir/openclick)")
 	dark := flag.Bool("dark", false, "use the dark theme")
 	flag.Parse()
@@ -50,12 +49,6 @@ func main() {
 		runDiagnose()
 		return
 	}
-	mode, err := ui.ParseMode(*modeFlag)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
-
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
@@ -64,6 +57,18 @@ func main() {
 		log.Error("open settings", "err", err)
 		os.Exit(1)
 	}
+	gate, err := openGate(ctx, store.NewKV(db))
+	if err != nil {
+		log.Error("open readiness gate", "err", err)
+		db.Close()
+		os.Exit(1)
+	}
+	// Only a Ready gate gets the main UI; there is no flag around setup
+	// (FR-ONB-004).
+	mode := ui.ModeSetup
+	if gate.IsReady() {
+		mode = ui.ModeMain
+	}
 	var tr contracts.Tray
 	if svc.Get().Platform.TrayIcon {
 		tr = tray.New()
@@ -71,6 +76,10 @@ func main() {
 	shell := ui.New(ui.Options{
 		Mode:     mode,
 		Settings: svc,
+		Gate:     gate,
+		// Step backends are wired with the real checks later; nil ones
+		// leave their controls disabled.
+		Setup:    wizard.Backends{},
 		Tray:     tr,
 		Diagnose: detect.New().Detect,
 		Quit:     stop,
