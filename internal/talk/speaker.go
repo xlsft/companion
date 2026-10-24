@@ -12,8 +12,8 @@ import (
 // Prefetcher is an optional Speaker extension. Prefetch starts producing the
 // audio for text before its Say, so the next segment is already streaming
 // while the current one plays and consecutive segments hand off without a
-// synthesis round trip of silence in between. A Say for other text discards
-// the prefetch; so does ctx ending.
+// synthesis round trip of silence in between. Prefetches may be issued before
+// or during the Say of the segment ahead of them; ctx ending discards them.
 type Prefetcher interface {
 	Prefetch(ctx context.Context, text string)
 }
@@ -40,8 +40,12 @@ type TTSSpeaker struct {
 	Format tts.Format
 
 	mu  sync.Mutex
-	pre *prefetch
+	pre []*prefetch // oldest first, at most maxPrefetch
 }
+
+// maxPrefetch bounds the open synthesis requests kept for segments not yet
+// said: the next one, plus one that raced ahead of the current Say.
+const maxPrefetch = 2
 
 var (
 	_ Speaker    = (*TTSSpeaker)(nil)
@@ -103,10 +107,13 @@ func (s *TTSSpeaker) Prefetch(ctx context.Context, text string) {
 	p := &prefetch{text: text, cancel: cancel, ready: make(chan struct{})}
 	req := s.request(text)
 	s.mu.Lock()
-	old := s.pre
-	s.pre = p
+	var evicted *prefetch
+	if len(s.pre) == maxPrefetch {
+		evicted, s.pre = s.pre[0], s.pre[1:]
+	}
+	s.pre = append(s.pre, p)
 	s.mu.Unlock()
-	old.discard()
+	evicted.discard()
 	go func() {
 		defer close(p.ready)
 		p.stream, p.err = s.Provider.SynthesizeStream(pctx, req)
@@ -148,14 +155,25 @@ func (s *TTSSpeaker) Say(ctx context.Context, text string, started func()) error
 }
 
 // open returns the stream for text, taking over a matching prefetch.
-// release must be called once the stream is no longer used.
+// Prefetches older than the match were skipped and are discarded; newer ones
+// are for later segments and stay. release must be called once the stream is
+// no longer used.
 func (s *TTSSpeaker) open(ctx context.Context, text string) (tts.Stream, func(), error) {
+	var p *prefetch
+	var skipped []*prefetch
 	s.mu.Lock()
-	p := s.pre
-	s.pre = nil
+	for i, q := range s.pre {
+		if q.text == text {
+			p, skipped = q, s.pre[:i:i]
+			s.pre = append([]*prefetch(nil), s.pre[i+1:]...)
+			break
+		}
+	}
 	s.mu.Unlock()
-	if p == nil || p.text != text {
-		p.discard()
+	for _, q := range skipped {
+		q.discard()
+	}
+	if p == nil {
 		st, err := s.Provider.SynthesizeStream(ctx, s.request(text))
 		return st, func() {}, err
 	}

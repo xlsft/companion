@@ -174,9 +174,13 @@ func TestTTSSpeakerPrefetch(t *testing.T) {
 		t.Errorf("%d synthesis requests for a prefetched segment, want 1", n)
 	}
 
-	// A prefetch that is not what gets said is discarded, not played.
-	sp.Prefetch(ctx, "Stale.")
+	// A prefetch issued before the Say of the segment ahead of it (the
+	// pipeline races like this) survives that Say and is used afterwards.
+	sp.Prefetch(ctx, "Third.")
 	if err := sp.Say(ctx, "Other.", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := sp.Say(ctx, "Third.", nil); err != nil {
 		t.Fatal(err)
 	}
 	// The discarded prefetch may reach the provider before or after Say.
@@ -184,11 +188,25 @@ func TestTTSSpeakerPrefetch(t *testing.T) {
 	for _, r := range prov.Requests() {
 		texts = append(texts, r.Text)
 	}
-	if j := strings.Join(texts, ","); j != "Second.,Stale.,Other." && j != "Second.,Other.,Stale." {
+	if j := strings.Join(texts, ","); j != "Second.,Third.,Other." && j != "Second.,Other.,Third." {
 		t.Fatalf("requests %s", j)
 	}
-	if plays := player.Plays(); len(plays) != 2 || plays[1].Bytes != 2*4800 {
+	if plays := player.Plays(); len(plays) != 3 || plays[2].Bytes != 2*4800 {
 		t.Fatalf("plays %+v", plays)
+	}
+
+	// Prefetches that were skipped over are discarded, and their streams
+	// closed, when a later segment is said.
+	sp.Prefetch(ctx, "Skipped.")
+	sp.Prefetch(ctx, "Fourth.")
+	if err := sp.Say(ctx, "Fourth.", nil); err != nil {
+		t.Fatal(err)
+	}
+	sp.mu.Lock()
+	left := len(sp.pre)
+	sp.mu.Unlock()
+	if left != 0 {
+		t.Errorf("%d prefetches left after the skipped one", left)
 	}
 }
 
