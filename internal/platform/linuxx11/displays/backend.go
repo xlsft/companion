@@ -180,16 +180,18 @@ func buildDisplays(outs []outputInfo, crtcs map[randr.Crtc]crtcInfo, primary ran
 	return ds
 }
 
-// rotationDegrees maps the RandR rotation bit to degrees; reflection bits
-// are ignored.
+// rotationDegrees maps the RandR rotation bit to clockwise degrees as
+// contracts.Display expects. RandR rotations are counter-clockwise
+// (Rotate_90 is "xrandr --rotate left"), so 90 and 270 swap. Reflection
+// bits are ignored.
 func rotationDegrees(r uint16) int {
 	switch {
 	case r&randr.RotationRotate90 != 0:
-		return 90
+		return 270
 	case r&randr.RotationRotate180 != 0:
 		return 180
 	case r&randr.RotationRotate270 != 0:
-		return 270
+		return 90
 	}
 	return 0
 }

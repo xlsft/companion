@@ -39,7 +39,7 @@ func TestBuildDisplays(t *testing.T) {
 					t.Fatalf("primary wrong: %+v", ds)
 				}
 			}
-			if ds[1].Rotation != 90 || ds[1].Native != (contracts.PixelSize{W: 1080, H: 1920}) || ds[1].Scale != 1 {
+			if ds[1].Rotation != 270 || ds[1].Native != (contracts.PixelSize{W: 1080, H: 1920}) || ds[1].Scale != 1 {
 				t.Fatalf("rotated display: %+v", ds[1])
 			}
 			if ds[1].Bounds != contracts.RectXYWH(1920, 0, 1080, 1920) {

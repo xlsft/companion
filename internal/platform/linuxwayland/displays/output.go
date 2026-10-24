@@ -110,10 +110,12 @@ func (o *output) ready(haveXDG bool) bool {
 	return o.done && o.modeW > 0 && o.modeH > 0 && (o.hasLogical || !haveXDG)
 }
 
-// rotation maps wl_output.transform to degrees. Flipped variants (4-7)
-// carry the same rotation in their low two bits.
+// rotation maps wl_output.transform to clockwise degrees as
+// contracts.Display expects. Wayland transforms rotate counter-clockwise
+// ("90" = 90° CCW), so 90 and 270 swap. Flipped variants (4-7) carry the
+// same rotation in their low two bits; the mirroring itself is ignored.
 func rotation(transform int32) int {
-	return int(transform&3) * 90
+	return (360 - int(transform&3)*90) % 360
 }
 
 // display converts the accumulated state. Native is reported in the

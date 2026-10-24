@@ -119,7 +119,7 @@ func TestOutputEvents(t *testing.T) {
 				Native: contracts.PixelSize{W: 2560, H: 1440}, Scale: 1.5},
 		},
 		{
-			name: "rotated 270 swaps native",
+			name: "transform 270 (CCW) is 90 clockwise and swaps native",
 			build: func(t *testing.T, o *output) {
 				apply(t, o, opOutputGeometry, int32(0), int32(0), int32(0), int32(0), int32(0), "", "", int32(3))
 				apply(t, o, opOutputMode, uint32(modeCurrent), int32(1920), int32(1080), int32(60000))
@@ -128,10 +128,10 @@ func TestOutputEvents(t *testing.T) {
 				apply(t, o, opOutputDone)
 			},
 			want: contracts.Display{ID: "HDMI-A-1", Name: "HDMI-A-1", Bounds: contracts.RectXYWH(0, 0, 1080, 1920),
-				Native: contracts.PixelSize{W: 1080, H: 1920}, Scale: 1, Rotation: 270},
+				Native: contracts.PixelSize{W: 1080, H: 1920}, Scale: 1, Rotation: 90},
 		},
 		{
-			name: "flipped-90 keeps rotation bits",
+			name: "flipped-90 (CCW) is 270 clockwise",
 			build: func(t *testing.T, o *output) {
 				apply(t, o, opOutputGeometry, int32(0), int32(0), int32(0), int32(0), int32(0), "", "", int32(5))
 				apply(t, o, opOutputMode, uint32(modeCurrent), int32(100), int32(50), int32(0))
@@ -139,7 +139,7 @@ func TestOutputEvents(t *testing.T) {
 				apply(t, o, opOutputDone)
 			},
 			want: contracts.Display{ID: "X", Name: "X", Bounds: contracts.RectXYWH(0, 0, 50, 100),
-				Native: contracts.PixelSize{W: 50, H: 100}, Scale: 1, Rotation: 90},
+				Native: contracts.PixelSize{W: 50, H: 100}, Scale: 1, Rotation: 270},
 		},
 		{
 			name: "no xdg-output falls back to wl_output",
