@@ -382,5 +382,8 @@
   "wiz.fix.overlay_failed": "Non è stato possibile mostrare suggerimenti sopra le finestre. Ricontrolla; i dettagli sono in Diagnostica.",
   "wiz.fix.stale": "Gli schermi sono cambiati durante il controllo. Eseguilo di nuovo.",
   "wiz.fix.hotkey_conflict": "Un’altra app usa già questa scorciatoia. Liberala o assegnane un’altra.",
-  "wiz.fix.detect_failed": "Il controllo del sistema non è terminato. Eseguilo di nuovo."
+  "wiz.fix.detect_failed": "Il controllo del sistema non è terminato. Eseguilo di nuovo.",
+  "chat.shot.attached": "Screenshot allegato",
+  "chat.shot.kept": "Screenshot salvato con questo messaggio",
+  "screen.keepShots.needsSave": "Gli screenshot vengono conservati solo se «Salva le conversazioni» è attivo in Privacy."
 }

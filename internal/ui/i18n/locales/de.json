@@ -382,5 +382,8 @@
   "wiz.fix.overlay_failed": "Hinweise konnten nicht über Fenstern angezeigt werden. Prüfe erneut; Details unter Diagnose.",
   "wiz.fix.stale": "Die Bildschirme haben sich während der Prüfung geändert. Starte sie erneut.",
   "wiz.fix.hotkey_conflict": "Eine andere App nutzt dieses Kürzel bereits. Gib es frei oder lege ein anderes fest.",
-  "wiz.fix.detect_failed": "Die Systemprüfung wurde nicht abgeschlossen. Starte sie erneut."
+  "wiz.fix.detect_failed": "Die Systemprüfung wurde nicht abgeschlossen. Starte sie erneut.",
+  "chat.shot.attached": "Screenshot angehängt",
+  "chat.shot.kept": "Screenshot mit dieser Nachricht gespeichert",
+  "screen.keepShots.needsSave": "Screenshots werden nur gespeichert, wenn unter Datenschutz „Gespräche speichern“ aktiv ist."
 }

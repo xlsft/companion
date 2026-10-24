@@ -382,5 +382,8 @@
   "wiz.fix.overlay_failed": "Não foi possível desenhar dicas sobre as janelas. Verifique de novo; o Diagnóstico mostra os detalhes.",
   "wiz.fix.stale": "As telas mudaram durante a verificação. Execute-a de novo.",
   "wiz.fix.hotkey_conflict": "Outro app já usa este atalho. Libere-o ou defina outro.",
-  "wiz.fix.detect_failed": "A verificação do sistema não terminou. Execute-a de novo."
+  "wiz.fix.detect_failed": "A verificação do sistema não terminou. Execute-a de novo.",
+  "chat.shot.attached": "Captura de tela anexada",
+  "chat.shot.kept": "Captura salva com esta mensagem",
+  "screen.keepShots.needsSave": "As capturas só são mantidas se «Salvar conversas» estiver ativado em Privacidade."
 }
