@@ -26,7 +26,11 @@ func loadEngine(t *testing.T) (*Engine, engine.Info) {
 		t.Skip("OPENCLICK_SHERPA_MODEL not set")
 	}
 	t0 := time.Now()
-	e, info, err := New(engine.Config{ModelPath: dir, Language: "auto", Backend: "cpu", Threads: 2})
+	lang := os.Getenv("OPENCLICK_SHERPA_LANG")
+	if lang == "" {
+		lang = "auto"
+	}
+	e, info, err := New(engine.Config{ModelPath: dir, Language: lang, Backend: "cpu", Threads: 2})
 	if err != nil {
 		t.Fatal(err)
 	}
