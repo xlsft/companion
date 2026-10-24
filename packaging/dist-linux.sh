@@ -17,7 +17,9 @@ mode=${APPIMAGE:-required}
 
 # Pinned: a moving "continuous" release would break the checksum.
 AIT_VERSION=1.9.1
+# shellcheck disable=SC2034 # read through eval below, by arch name
 AIT_SHA256_x86_64=ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+# shellcheck disable=SC2034
 AIT_SHA256_aarch64=f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158
 
 die() { echo "dist-linux: $*" >&2; exit 1; }
@@ -44,7 +46,7 @@ stage() { # stage DIR: fills DIR with the files common to both formats
 	install -m 644 internal/ui/icon/LICENSE.mingcute "$d/licenses/LICENSE.mingcute"
 }
 
-rm -rf "$dist/$name" "$dist/AppDir"
+rm -rf "${dist:?}/$name" "$dist/AppDir"
 mkdir -p "$dist"
 
 # --- tarball -----------------------------------------------------------------

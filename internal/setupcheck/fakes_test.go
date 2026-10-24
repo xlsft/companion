@@ -90,9 +90,6 @@ type fakeSTT struct {
 	startErr  error
 	final     stt.Final
 	finishErr error
-
-	mu   sync.Mutex
-	lang string
 }
 
 func (f *fakeSTT) start(ctx context.Context, opts ...stt.SessionOption) (talk.STTSession, error) {
@@ -124,9 +121,6 @@ func listener(mic *fakeMic, f *fakeSTT) *Listener {
 type fakeCapturer struct {
 	err   error
 	empty bool
-
-	mu       sync.Mutex
-	released []*contracts.Capture
 }
 
 func (c *fakeCapturer) Capture(context.Context, contracts.CaptureRequest) ([]*contracts.Capture, error) {

@@ -149,7 +149,7 @@ func (s *Server) path() string {
 func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	raw, _ := io.ReadAll(r.Body) // draining lets the server notice hang-ups
 	rec := Recorded{Path: r.URL.Path, Header: r.Header.Clone()}
-	json.Unmarshal(raw, &rec.Body)
+	_ = json.Unmarshal(raw, &rec.Body) // non-JSON requests are recorded without a body
 	s.mu.Lock()
 	s.requests = append(s.requests, rec)
 	resp := s.resp
@@ -177,7 +177,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	if resp.Status != 0 {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(resp.Status)
-		w.Write(s.errorBody(resp))
+		_, _ = w.Write(s.errorBody(resp))
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")

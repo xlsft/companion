@@ -431,10 +431,9 @@ func sessionSettings(s settings.Settings) session.Settings {
 // speakerSwitch is the Talk speaker; it is rebuilt when the speech
 // settings change, so the next reply uses the new provider or voice.
 type speakerSwitch struct {
-	mu    sync.Mutex
-	cur   *talk.TTSSpeaker
-	name  string
-	speed func() float64
+	mu   sync.Mutex
+	cur  *talk.TTSSpeaker
+	name string
 }
 
 var errNoVoice = errors.New("speech output not configured")

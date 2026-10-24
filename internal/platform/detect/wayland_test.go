@@ -72,7 +72,7 @@ func TestRequestRegistry(t *testing.T) {
 	want = order.AppendUint32(want, 12<<16|1)
 	want = order.AppendUint32(want, 2)
 	want = order.AppendUint32(want, 1)
-	want = order.AppendUint32(want, 12<<16|0)
+	want = order.AppendUint32(want, 12<<16|0) //nolint:staticcheck // size<<16|opcode, opcode 0 spelled out
 	want = order.AppendUint32(want, 3)
 	if got := requestRegistry(); !bytes.Equal(got, want) {
 		t.Fatalf("got % x want % x", got, want)
