@@ -10,7 +10,7 @@ request, and you sign by replying with the sentence it quotes. Maintainers and b
 
 ## Development setup
 
-See [Building from source](README.md#building-from-source). The usual loop:
+See [Building from source](docs/development.md#building-from-source). The usual loop:
 
 ```sh
 make vet test cross     # must pass before every commit

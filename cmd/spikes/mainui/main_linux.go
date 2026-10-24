@@ -2,8 +2,9 @@
 
 // Command mainui opens the main window with a scripted chat so the Home
 // page can be looked at and screenshotted without a configured assistant
-// (OC-71). It never talks to a model: the conversation is canned, Send only
-// appends the typed turn, and Stop ends the canned reply.
+// (OC-71). It never talks to a model: the conversation is canned (Russian
+// for -lang ru, English otherwise), Send only appends the typed turn, and
+// Stop ends the canned reply.
 //
 //	mainui -theme dark -lang ru -state chat   # chat | empty | offline
 //	mainui -guide running                     # walkthrough card: running | paused | none
@@ -49,6 +50,7 @@ func main() {
 	section := flag.String("section", "general", "settings section: general, voice, screen, privacy, diagnostics")
 	guideState := flag.String("guide", "none", "walkthrough card: running, paused or none")
 	flag.Parse()
+	lines = scripts[*lang == "ru"]
 	routes := map[string]ui.Route{"home": ui.RouteHome, "settings": ui.RouteSettings}
 	start, ok := routes[*route]
 	if !ok {
@@ -88,7 +90,7 @@ func main() {
 	var be ui.ChatBackend
 	switch *state {
 	case "chat":
-		be = newDemo(demoView())
+		be = newDemo(demoView(*guideState != "none"))
 	case "empty":
 		be = newDemo(chat.View{})
 	}
@@ -119,6 +121,9 @@ func main() {
 	gioapp.Main()
 }
 
+// lines is the canned content for the chosen language.
+var lines script
+
 // demo is a ChatBackend over a fixed conversation.
 type demo struct {
 	mu   sync.Mutex
@@ -129,7 +134,7 @@ type demo struct {
 func newDemo(v chat.View) *demo { return &demo{view: v} }
 
 func (d *demo) Capabilities() chat.Capabilities {
-	return chat.Capabilities{Text: true, Voice: true, Hotkey: "Mod+Space", Model: "claude-sonnet-5-5", Speech: "ElevenLabs · Алиса"}
+	return chat.Capabilities{Text: true, Voice: true, Hotkey: "Mod+Space", Model: "claude-sonnet-5-5", Speech: lines.speech}
 }
 
 func (d *demo) Subscribe() (<-chan chat.View, func()) {
@@ -170,7 +175,7 @@ func (d *demo) ToggleVoice(context.Context) error {
 			v.Phase, v.Partial = chat.PhaseIdle, ""
 			return
 		}
-		v.Phase, v.Partial = chat.PhaseListening, "Как сделать"
+		v.Phase, v.Partial = chat.PhaseListening, lines.partial
 	})
 }
 
@@ -189,16 +194,87 @@ func (d *demo) NewChat(context.Context) error {
 	return d.update(func(v *chat.View) { *v = chat.View{} })
 }
 
-func demoView() chat.View {
+// script is the canned content in one language: Russian for -lang ru,
+// English otherwise, so screenshots of any UI language read naturally.
+type script struct {
+	speech, partial, title string
+	turns                  [4]string
+	goal                   string
+	steps                  [5][2]string
+	// guideTitle and guideTurns are the chat that starts the walkthrough,
+	// shown instead of turns when its card is on screen.
+	guideTitle string
+	guideTurns [2]string
+}
+
+var scripts = map[bool]script{
+	true: {
+		speech: "ElevenLabs · Алиса", partial: "Как сделать", title: "Прозрачный фон в Figma",
+		turns: [4]string{
+			"Как сделать фон у этого фрейма прозрачным?",
+			"Выделите фрейм и в правой панели в блоке Fill уберите заливку кнопкой «−». Я обвёл этот блок на экране.",
+			"А чтобы при экспорте в PNG тоже было прозрачно?",
+			"При экспорте оставьте формат PNG — пустая заливка сохранится как прозрачность. Внизу правой панели в блоке Export",
+		},
+		goal: "бит в стиле house",
+		steps: [5][2]string{
+			{"Бочка на каждую долю", "В строке Kick включите шаги 1, 5, 9 и 13."},
+			{"Хэт между бочками", "В строке Hat включите шаги 3, 7, 11 и 15 — я отметил их пунктиром. Скажите «дальше», когда закончите."},
+			{"Хлопок на вторую и четвёртую", "В строке Clap включите шаги 5 и 13."},
+			{"Темп 124", "Нажмите на поле BPM и введите 124."},
+			{"Запуск", "Нажмите пробел, чтобы послушать бит."},
+		},
+		guideTitle: "Бит в стиле house",
+		guideTurns: [2]string{
+			"Помоги собрать бит в стиле house в этой драм-машине",
+			"Давайте по шагам, их пять. Каждый я покажу на экране — бочку уже поставили, теперь хэт.",
+		},
+	},
+	false: {
+		speech: "ElevenLabs · Rachel", partial: "How do I", title: "Transparent background in Figma",
+		turns: [4]string{
+			"How do I make this frame's background transparent?",
+			"Select the frame, then in the right panel find Fill and remove it with the \"−\" button. I've circled that section on your screen.",
+			"And will it stay transparent when I export a PNG?",
+			"Yes — keep the format set to PNG and the empty fill is saved as transparency. The Export section is at the bottom of the right panel",
+		},
+		goal: "a house beat",
+		steps: [5][2]string{
+			{"Kick on every beat", "In the Kick row, turn on steps 1, 5, 9 and 13."},
+			{"Hi-hat between kicks", "In the Hat row, turn on steps 3, 7, 11 and 15 — I've marked them with dashed circles. Say \"next\" when you're done."},
+			{"Clap on two and four", "In the Clap row, turn on steps 5 and 13."},
+			{"Tempo 124", "Click the BPM field and type 124."},
+			{"Play", "Press Space to hear your beat."},
+		},
+		guideTitle: "A house beat",
+		guideTurns: [2]string{
+			"Help me make a house beat in this drum machine",
+			"Let's do it in five steps. I'll show each one on your screen — the kick is in, now the hi-hat.",
+		},
+	},
+}
+
+func demoView(guided bool) chat.View {
 	at := time.Now().Add(-2 * time.Minute)
+	if guided {
+		return chat.View{
+			Title: lines.guideTitle,
+			Phase: chat.PhaseSpeaking,
+			Messages: []chat.Message{
+				{Role: chat.RoleUser, Text: lines.guideTurns[0], Via: chat.ViaVoice, STTModel: "whisper medium", At: at},
+				{Role: chat.RoleAssistant, Text: lines.guideTurns[1], Streaming: true},
+			},
+		}
+	}
+	t := lines.turns
 	return chat.View{
-		Title: "Прозрачный фон в Figma",
+		Title: lines.title,
 		Phase: chat.PhaseSpeaking,
 		Messages: []chat.Message{
-			{Role: chat.RoleUser, Text: "Как сделать фон у этого фрейма прозрачным?", Via: chat.ViaVoice, STTModel: "whisper medium", At: at},
-			{Role: chat.RoleAssistant, Text: "Выделите фрейм и в правой панели в блоке Fill уберите заливку кнопкой «−». Я обвёл этот блок на экране."},
-			{Role: chat.RoleUser, Text: "А чтобы при экспорте в PNG тоже было прозрачно?", At: at.Add(time.Minute)},
-			{Role: chat.RoleAssistant, Text: "При экспорте оставьте формат PNG — пустая заливка сохранится как прозрачность. Внизу правой панели в блоке Export", Streaming: true},
+			{Role: chat.RoleUser, Text: t[0], Via: chat.ViaVoice, STTModel: "whisper medium", At: at},
+			{Role: chat.RoleAssistant, Text: t[1]},
+			{Role: chat.RoleUser, Text: t[2], At: at.Add(time.Minute)},
+			{Role: chat.RoleAssistant, Text: t[3], Streaming: true},
 		},
 	}
 }
@@ -212,14 +288,11 @@ type demoGuide struct {
 }
 
 func newDemoGuide(status walkthrough.Status) *demoGuide {
-	steps := []walkthrough.Step{
-		{Title: "Бочка на каждую долю", Say: "В строке Kick включите шаги 1, 5, 9 и 13."},
-		{Title: "Хэт между бочками", Say: "В строке Hat включите шаги 3, 7, 11 и 15 — я отметил их пунктиром. Скажите «дальше», когда закончите."},
-		{Title: "Хлопок на вторую и четвёртую", Say: "В строке Clap включите шаги 5 и 13."},
-		{Title: "Темп 124", Say: "Нажмите на поле BPM и введите 124."},
-		{Title: "Запуск", Say: "Нажмите пробел, чтобы послушать бит."},
+	var steps []walkthrough.Step
+	for _, s := range lines.steps {
+		steps = append(steps, walkthrough.Step{Title: s[0], Say: s[1]})
 	}
-	return &demoGuide{st: walkthrough.State{Plan: walkthrough.Plan{Goal: "бит в стиле house", Steps: steps}, Status: status, Index: 1}}
+	return &demoGuide{st: walkthrough.State{Plan: walkthrough.Plan{Goal: lines.goal, Steps: steps}, Status: status, Index: 1}}
 }
 
 func (d *demoGuide) view() walkthrough.View {
