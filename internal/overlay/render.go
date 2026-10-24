@@ -6,9 +6,11 @@ import (
 	"image/draw"
 	"math"
 	"strconv"
+	"sync"
 
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font/gofont/gomedium"
+	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/image/vector"
 
@@ -192,16 +194,46 @@ func cursor(p *painter, at contracts.Point, size float64) {
 	})
 }
 
+const labelPt = 15 // logical size; multiplied by the display scale
+
+var labelFont = func() *opentype.Font {
+	f, err := opentype.Parse(gomedium.TTF)
+	if err != nil {
+		panic(err) // embedded font; cannot fail at runtime
+	}
+	return f
+}()
+
+// labelFaces caches faces per pixel size; scales are few and fixed.
+var labelFaces sync.Map // float64 → font.Face
+
+func labelFace(scale float64) font.Face {
+	size := labelPt * scale
+	if f, ok := labelFaces.Load(size); ok {
+		return f.(font.Face)
+	}
+	f, err := opentype.NewFace(labelFont, &opentype.FaceOptions{Size: size, DPI: 72, Hinting: font.HintingFull})
+	if err != nil {
+		panic(err)
+	}
+	labelFaces.Store(size, f)
+	return f
+}
+
 func label(dst *image.RGBA, at contracts.Point, text string, scale float64) {
-	face := basicfont.Face7x13
+	face := labelFace(scale)
+	m := face.Metrics()
 	d := font.Drawer{Face: face}
 	tw := d.MeasureString(text).Ceil()
 	pad := int(6 * scale)
-	bg := image.Rect(int(at.X), int(at.Y), int(at.X)+tw+2*pad, int(at.Y)+face.Height+2*pad)
+	h := (m.Ascent + m.Descent).Ceil()
+	// Center the label vertically on the anchor so it sits beside a ring.
+	top := int(at.Y) - h/2 - pad
+	bg := image.Rect(int(at.X), top, int(at.X)+tw+2*pad, top+h+2*pad)
 	draw.Draw(dst, bg, image.NewUniform(labelBg), image.Point{}, draw.Over)
 	d.Dst = dst
 	d.Src = image.NewUniform(labelFg)
-	d.Dot = fixed.P(bg.Min.X+pad, bg.Min.Y+pad+face.Ascent)
+	d.Dot = fixed.Point26_6{X: fixed.I(bg.Min.X + pad), Y: fixed.I(bg.Min.Y+pad) + m.Ascent}
 	d.DrawString(text)
 }
 
