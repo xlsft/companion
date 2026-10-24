@@ -3,6 +3,8 @@ Companion (Linux)
 Layout
   companion       the app (Gio UI)
   stt-sidecar     speech recognition process; must stay next to companion
+  libsherpa-onnx-c-api.so, libonnxruntime.so
+                  speech recognition runtime; must stay next to stt-sidecar
   share/          desktop entry, icon, AppStream metainfo
   licenses/       third-party licences, see NOTICE
   install.sh      copies everything under a prefix (default ~/.local)
@@ -20,4 +22,5 @@ dependencies, portals and per-desktop capabilities: docs/linux.md in the
 source tree, or https://github.com/xlsft/companion once published.
 
 No speech model is included. Companion downloads one on first run into
-~/.config/openclick.
+~/.config/openclick: Parakeet, SenseVoice or a streaming zipformer
+(sherpa-onnx), or whisper for languages those do not cover.

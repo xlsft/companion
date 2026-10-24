@@ -12,6 +12,8 @@ install -d "$lib" "$prefix/bin" \
 	"$prefix/share/applications" "$prefix/share/metainfo" \
 	"$prefix/share/icons/hicolor/scalable/apps" "$prefix/share/icons/hicolor/256x256/apps"
 install -m 755 "$here/companion" "$here/stt-sidecar" "$lib/"
+# sherpa-onnx's libraries are found next to the sidecar ($ORIGIN).
+install -m 644 "$here/libsherpa-onnx-c-api.so" "$here/libonnxruntime.so" "$lib/"
 ln -sf "$lib/companion" "$prefix/bin/companion"
 install -m 644 "$here/share/applications/companion.desktop" "$prefix/share/applications/"
 install -m 644 "$here/share/metainfo/companion.metainfo.xml" "$prefix/share/metainfo/"

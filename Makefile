@@ -137,10 +137,11 @@ build-stt:
 
 # --- Linux packaging (OC-75) ---------------------------------------------------
 # dist/companion-VERSION-linux-ARCH.tar.gz and an AppImage. The sidecar must be
-# the whisper build, so this target builds that itself (needs `make whisper`
-# once). APPIMAGE=skip builds the tarball only; the default fails when
-# appimagetool cannot be found or fetched with a verified checksum.
+# the release build (sherpa-onnx + whisper.cpp, its libraries beside it), so
+# this target builds that itself (needs `make whisper` once). APPIMAGE=skip
+# builds the tarball only; the default fails when appimagetool cannot be found
+# or fetched with a verified checksum.
 dist-linux:
-	@test -f $(WHISPER_PREFIX)/lib/libwhisper.a || { echo "run 'make whisper' first: the sidecar must be the whisper build" >&2; exit 1; }
-	$(MAKE) build build-whisper
+	@test -f $(WHISPER_PREFIX)/lib/libwhisper.a || { echo "run 'make whisper' first: the sidecar must include whisper.cpp" >&2; exit 1; }
+	$(MAKE) build build-stt
 	sh packaging/dist-linux.sh $(VERSION)
