@@ -5,12 +5,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 
 	"github.com/xlsft/openclick/internal/app"
 	"github.com/xlsft/openclick/internal/buildinfo"
+	"github.com/xlsft/openclick/internal/platform/control"
 	"github.com/xlsft/openclick/internal/platform/detect"
 	"github.com/xlsft/openclick/internal/platform/tray"
 	"github.com/xlsft/openclick/internal/settings"
@@ -27,6 +30,11 @@ import (
 )
 
 func main() {
+	// "companion ctl ..." is run by compositor keybindings once per key
+	// press, so it must stay a quick client and never start the UI.
+	if len(os.Args) > 1 && os.Args[1] == "ctl" {
+		os.Exit(runCtl(os.Args[2:]))
+	}
 	showVersion := flag.Bool("version", false, "print version and exit")
 	diagnose := flag.Bool("diagnose", false, "print the platform capability report as JSON and exit")
 	// Until onboarding (OC-70) decides readiness, the mode is chosen by hand.
@@ -126,4 +134,41 @@ func runDiagnose() {
 		fmt.Fprintln(os.Stderr, "diagnose:", err)
 		os.Exit(1)
 	}
+}
+
+// runCtl sends one command to the running core's control socket.
+func runCtl(args []string) int {
+	fs := flag.NewFlagSet("ctl", flag.ContinueOnError)
+	socket := fs.String("socket", "", "control socket path (default $XDG_RUNTIME_DIR/openclick/control.sock)")
+	fs.Usage = func() {
+		fmt.Fprintf(fs.Output(), "usage: companion ctl [-socket path] <%s>\n", strings.Join(control.CtlCommands(), "|"))
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() != 1 {
+		fs.Usage()
+		return 2
+	}
+	path := *socket
+	if path == "" {
+		p, err := control.DefaultPath()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "companion ctl:", err)
+			return 1
+		}
+		path = p
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := control.Ctl(ctx, path, fs.Arg(0)); err != nil {
+		fmt.Fprintln(os.Stderr, "companion ctl:", err)
+		if errors.Is(err, control.ErrUnknownCtl) {
+			fs.Usage()
+			return 2
+		}
+		return 1
+	}
+	return 0
 }
