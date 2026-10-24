@@ -7,6 +7,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/widget"
 
+	"github.com/xlsft/companion/internal/models/hw"
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/kit"
@@ -36,7 +37,8 @@ func newWizardUI(sh *Shell) *wizardUI {
 		Backends: sh.opts.Setup,
 		Diagnose: sh.opts.Diagnose,
 		SpeechLanguage: func() string {
-			return sh.opts.Settings.Get().Voice.Language
+			s := sh.opts.Settings.Get()
+			return hw.SpeechLanguage(s.Voice.Language, s.UI.Language)
 		},
 		OnReady: func() {
 			// EnterMain closes the wizard window; never on its goroutine.

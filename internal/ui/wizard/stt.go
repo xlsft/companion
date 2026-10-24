@@ -3,6 +3,7 @@ package wizard
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"gioui.org/layout"
@@ -53,21 +54,17 @@ func (t *sttState) load(w *Wizard, _ context.Context) {
 		cat, cerr := b.Catalog()
 		inst, ierr := b.Installed()
 		devs, derr := b.Devices(ctx)
-		var whisper models.Catalog
-		for _, m := range cat {
-			if m.Family == "whisper" {
-				whisper = append(whisper, m)
-			}
-		}
 		rec, _ := hw.Recommend(prof, cat, lang)
+		installed := map[string]bool{}
+		for _, m := range inst {
+			installed[m.ID] = true
+		}
 		w.mu.Lock()
 		defer w.mu.Unlock()
 		t.loaded = true
-		t.profile, t.catalog, t.devices, t.recommended = prof, whisper, devs, rec
-		t.installed = map[string]bool{}
-		for _, m := range inst {
-			t.installed[m.ID] = true
-		}
+		t.profile, t.devices, t.recommended = prof, devs, rec
+		t.installed = installed
+		t.catalog = PickerModels(cat, installed, rec.ID, t.selected)
 		if t.selected == "" {
 			t.selected = rec.ID
 		}
@@ -154,6 +151,20 @@ func (t *sttState) install(w *Wizard) {
 		}
 		t.installed[m.ID] = true
 	})
+}
+
+// PickerModels are the catalogue entries a model picker offers, in
+// catalogue order (primary models first): every listed model, plus hidden
+// ones that are recommended, selected or installed, so whatever the user
+// has or is told to get is always visible.
+func PickerModels(cat models.Catalog, installed map[string]bool, keep ...string) models.Catalog {
+	var out models.Catalog
+	for _, m := range cat {
+		if !m.Hidden || installed[m.ID] || slices.Contains(keep, m.ID) {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 func installErrCode(err error) string {
