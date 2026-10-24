@@ -8,6 +8,7 @@ type Route int
 const (
 	RouteHome Route = iota
 	RouteHistory
+	RouteMemory
 	RouteAgents
 	RouteSkills
 	RouteSettings
@@ -15,7 +16,7 @@ const (
 
 // Routes lists the sidebar in display order. Diagnostics is a section of
 // Settings, not a route.
-var Routes = []Route{RouteHome, RouteHistory, RouteAgents, RouteSkills, RouteSettings}
+var Routes = []Route{RouteHome, RouteHistory, RouteMemory, RouteAgents, RouteSkills, RouteSettings}
 
 func (r Route) labelKey() string {
 	switch r {
@@ -23,6 +24,8 @@ func (r Route) labelKey() string {
 		return "nav.home"
 	case RouteHistory:
 		return "nav.history"
+	case RouteMemory:
+		return "nav.memory"
 	case RouteAgents:
 		return "nav.agents"
 	case RouteSkills:
@@ -37,6 +40,8 @@ func (r Route) icon() icon.Name {
 	switch r {
 	case RouteHistory:
 		return icon.History
+	case RouteMemory:
+		return icon.Brain
 	case RouteAgents:
 		return icon.Robot
 	case RouteSkills:

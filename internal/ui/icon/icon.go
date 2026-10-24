@@ -31,6 +31,7 @@ const (
 	ArrowRight  Name = "arrow-right-line"
 	ArrowUp     Name = "arrow-up-line"
 	Attachment  Name = "attachment-line"
+	Brain       Name = "brain-line"
 	Chat1       Name = "chat-1-line"
 	CheckCircle Name = "check-circle-line"
 	Check       Name = "check-line"

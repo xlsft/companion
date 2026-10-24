@@ -106,6 +106,7 @@
   "home.about": "Companion について",
   "memory.enabled": "会話をまたいで事実を記憶する",
   "memory.enabled.d": "話した内容を以降の回答で活用します",
+  "nav.memory": "メモリー",
   "nav.agents": "エージェント",
   "nav.hint": "Ctrl+1 チャット · Ctrl+2 設定 · Ctrl+N 新規チャット · Ctrl+± 文字サイズ · Ctrl+Q 終了",
   "nav.history": "履歴",

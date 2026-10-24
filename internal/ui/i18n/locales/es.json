@@ -106,6 +106,7 @@
   "home.about": "Acerca de Companion",
   "memory.enabled": "Recordar datos entre conversaciones",
   "memory.enabled.d": "Los datos que menciones se usan en respuestas posteriores",
+  "nav.memory": "Memoria",
   "nav.agents": "Agentes",
   "nav.hint": "Ctrl+1 chat · Ctrl+2 ajustes · Ctrl+N chat nuevo · Ctrl+± tamaño del texto · Ctrl+Q salir",
   "nav.history": "Historial",

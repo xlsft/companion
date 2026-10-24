@@ -106,6 +106,7 @@
   "home.about": "Companion hakkında",
   "memory.enabled": "Konuşmalar arasında bilgileri hatırla",
   "memory.enabled.d": "Bahsettiğiniz bilgiler sonraki yanıtlarda kullanılır",
+  "nav.memory": "Hafıza",
   "nav.agents": "Ajanlar",
   "nav.hint": "Ctrl+1 sohbet · Ctrl+2 ayarlar · Ctrl+N yeni sohbet · Ctrl+± metin boyutu · Ctrl+Q çık",
   "nav.history": "Geçmiş",

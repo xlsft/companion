@@ -106,6 +106,7 @@
   "home.about": "Über Companion",
   "memory.enabled": "Fakten zwischen Gesprächen merken",
   "memory.enabled.d": "Fakten, die du erwähnst, fließen in spätere Antworten ein",
+  "nav.memory": "Gedächtnis",
   "nav.agents": "Agenten",
   "nav.hint": "Ctrl+1 Chat · Ctrl+2 Einstellungen · Ctrl+N neuer Chat · Ctrl+± Textgröße · Ctrl+Q beenden",
   "nav.history": "Verlauf",

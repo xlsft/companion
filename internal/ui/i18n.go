@@ -19,6 +19,7 @@ var catalog = map[string][2]string{
 
 	"nav.home":     {"Chat", "Чат"},
 	"nav.history":  {"History", "История"},
+	"nav.memory":   {"Memory", "Память"},
 	"nav.agents":   {"Agents", "Агенты"},
 	"nav.skills":   {"Skills", "Навыки"},
 	"nav.settings": {"Settings", "Настройки"},

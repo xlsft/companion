@@ -106,6 +106,7 @@
   "home.about": "Про Companion",
   "memory.enabled": "Пам'ятати факти між розмовами",
   "memory.enabled.d": "Факти, які ви згадуєте, використовуються в пізніших відповідях",
+  "nav.memory": "Пам’ять",
   "nav.agents": "Агенти",
   "nav.hint": "Ctrl+1 чат · Ctrl+2 налаштування · Ctrl+N новий чат · Ctrl+± розмір тексту · Ctrl+Q вийти",
   "nav.history": "Історія",

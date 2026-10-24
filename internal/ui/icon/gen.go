@@ -17,7 +17,7 @@ import (
 
 var names = []string{
 	"add-line", "aiming-2-line", "alert-line", "arrow-right-line", "arrow-up-line",
-	"attachment-line", "chat-1-line", "check-circle-line", "check-line", "close-circle-line",
+	"attachment-line", "brain-line", "chat-1-line", "check-circle-line", "check-line", "close-circle-line",
 	"close-line", "computer-line", "copy-2-line", "dashboard-2-line", "delete-2-line",
 	"down-line", "download-2-line", "edit-line", "exit-line", "eye-close-line", "eye-line",
 	"heartbeat-line", "history-line", "information-line", "key-2-line", "keyboard-line",

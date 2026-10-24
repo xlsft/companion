@@ -303,7 +303,7 @@ func TestMainModeIsLazy(t *testing.T) {
 func TestSoonRoutesUnreachable(t *testing.T) {
 	h := newHarness(t, ModeMain, &fakeTray{})
 	m, _ := h.mainBuilt()
-	for _, r := range []Route{RouteHistory, RouteAgents, RouteSkills} {
+	for _, r := range []Route{RouteHistory, RouteMemory, RouteAgents, RouteSkills} {
 		if r.Implemented() {
 			t.Errorf("route %d should be Soon", r)
 		}

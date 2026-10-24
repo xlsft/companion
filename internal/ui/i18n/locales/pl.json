@@ -106,6 +106,7 @@
   "home.about": "O aplikacji Companion",
   "memory.enabled": "Pamiętaj fakty między rozmowami",
   "memory.enabled.d": "Fakty, o których wspomnisz, są używane w kolejnych odpowiedziach",
+  "nav.memory": "Pamięć",
   "nav.agents": "Agenci",
   "nav.hint": "Ctrl+1 czat · Ctrl+2 ustawienia · Ctrl+N nowy czat · Ctrl+± rozmiar tekstu · Ctrl+Q wyjście",
   "nav.history": "Historia",

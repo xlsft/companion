@@ -106,6 +106,7 @@
   "home.about": "Companion 정보",
   "memory.enabled": "대화 간에 사실 기억하기",
   "memory.enabled.d": "언급한 내용이 이후 답변에 사용됩니다",
+  "nav.memory": "기억",
   "nav.agents": "에이전트",
   "nav.hint": "Ctrl+1 채팅 · Ctrl+2 설정 · Ctrl+N 새 채팅 · Ctrl+± 글자 크기 · Ctrl+Q 종료",
   "nav.history": "기록",

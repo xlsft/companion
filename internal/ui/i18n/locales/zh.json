@@ -106,6 +106,7 @@
   "home.about": "关于 Companion",
   "memory.enabled": "在对话之间记住事实",
   "memory.enabled.d": "您提到的事实会用于之后的回答",
+  "nav.memory": "记忆",
   "nav.agents": "智能体",
   "nav.hint": "Ctrl+1 对话 · Ctrl+2 设置 · Ctrl+N 新对话 · Ctrl+± 字号 · Ctrl+Q 退出",
   "nav.history": "历史",

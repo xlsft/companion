@@ -116,7 +116,7 @@ func TestNonzeroMatchesEvenOdd(t *testing.T) {
 }
 
 func TestNamesExist(t *testing.T) {
-	for _, n := range []Name{Add, Aiming2, Alert, ArrowRight, ArrowUp, Attachment, Chat1, CheckCircle, Check,
+	for _, n := range []Name{Add, Aiming2, Alert, ArrowRight, ArrowUp, Attachment, Brain, Chat1, CheckCircle, Check,
 		CloseCircle, Close, Computer, Copy2, Dashboard2, Delete2, Down, Download2, Edit, Exit, EyeClose, Eye,
 		Heartbeat, History, Information, Key2, Keyboard, Layers, Left, ListCheck, Loading3, Lock, Mic, More2,
 		PauseFill, Pin, PlayFill, Refresh2, Right, Robot, Search, Settings3, Sparkles, StopFill, Time,
