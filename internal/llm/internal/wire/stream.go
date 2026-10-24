@@ -1,6 +1,8 @@
 package wire
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"sync/atomic"
@@ -76,4 +78,25 @@ func (s *Stream) finish() {
 func (s *Stream) Close() error {
 	s.closed.Store(true)
 	return s.body.Close()
+}
+
+// ToolCall accumulates one streamed tool call.
+type ToolCall struct {
+	Index    int
+	ID, Name string
+	Args     []byte
+}
+
+// Complete validates the accumulated arguments; models sometimes stop
+// mid-JSON (e.g. at max tokens), and such a call must not be executed.
+func (c *ToolCall) Complete() (llm.ToolCallCompleted, error) {
+	args := bytes.TrimSpace(c.Args)
+	if len(args) == 0 {
+		args = []byte("{}")
+	}
+	var obj map[string]json.RawMessage
+	if json.Unmarshal(args, &obj) != nil || obj == nil {
+		return llm.ToolCallCompleted{}, Malformed("tool call arguments are not a JSON object")
+	}
+	return llm.ToolCallCompleted{Index: c.Index, ID: c.ID, Name: c.Name, Arguments: json.RawMessage(append([]byte(nil), args...))}, nil
 }
