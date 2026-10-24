@@ -13,8 +13,20 @@ import (
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/store"
+	"github.com/xlsft/companion/internal/ui/wizard"
 	"github.com/xlsft/companion/pkg/contracts"
 )
+
+// stubHotkeys reports applied shortcuts and accepts every apply.
+type stubHotkeys struct{}
+
+func (stubHotkeys) Hotkeys() wizard.HotkeyStatus {
+	return wizard.HotkeyStatus{Talk: "super+space", Cancel: "super+backspace", State: wizard.HotkeyApplied, ToggleOnly: true}
+}
+
+func (stubHotkeys) ApplyHotkeys(_ context.Context, talk, cancel string) wizard.HotkeyStatus {
+	return wizard.HotkeyStatus{Talk: talk, Cancel: cancel, State: wizard.HotkeyApplied}
+}
 
 type fakeWindow struct {
 	spec                       windowSpec
@@ -157,6 +169,7 @@ func newHarnessWith(t *testing.T, mode Mode, tray *fakeTray, mut func(*Options))
 		Gate:     g,
 		Mode:     mode,
 		Settings: newSettings(t),
+		Setup:    wizard.Backends{Permissions: stubHotkeys{}},
 		Quit:     func() { h.quits.Add(1) },
 		Diagnose: func(context.Context) (contracts.CapabilityReport, error) {
 			return contracts.CapabilityReport{OS: "linux"}, nil

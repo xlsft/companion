@@ -94,6 +94,8 @@ var catalog = map[string][2]string{
 	"platform.login":    {"Launch at login", "Запускать при входе"},
 	"platform.login.d":  {"Start Companion when you sign in", "Запускать Companion при входе в систему"},
 
+	"voice.shortcuts":    {"Shortcuts", "Сочетания клавиш"},
+	"voice.shortcuts.d":  {"Talk and Cancel work from any window", "Разговор и отмена работают из любого окна"},
 	"voice.hotkeyMode":   {"Talk hotkey", "Клавиша разговора"},
 	"voice.hotkeyMode.d": {"How the hotkey starts and ends a request", "Как клавиша начинает и заканчивает запрос"},
 	"voice.hold":         {"Hold", "Удержание"},

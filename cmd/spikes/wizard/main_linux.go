@@ -38,6 +38,7 @@ import (
 	"github.com/xlsft/companion/internal/providers"
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/settings"
+	"github.com/xlsft/companion/internal/shortcut"
 	"github.com/xlsft/companion/internal/store"
 	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui"
@@ -116,7 +117,7 @@ func run(step int, failed bool, themeMode, lang string, log *slog.Logger) error 
 			Input: providers.Input{Kind: llm.KindAnthropic, BaseURL: "https://api.anthropic.com", Model: "claude-sonnet-5-5"}}
 	}
 	backends := wizard.Backends{
-		Permissions: hotkey{},
+		Permissions: newHotkey(),
 		Provider:    prov,
 		STT:         &stt{Capturer: audio.NewCapturer(paudio.New()), dir: dir},
 		TTS:         &voices{cfg: wizard.TTSConfig{Provider: wizard.TTSElevenLabs, Speed: 1, HasKey: step > 4}},
@@ -207,10 +208,33 @@ func (c *checks) gate() map[readiness.Step]readiness.Check {
 	return m
 }
 
-type hotkey struct{}
+// hotkey keeps the shortcuts in memory and pretends the system took
+// them after a short delay; the real binding is the companion's.
+type hotkey struct {
+	mu sync.Mutex
+	st wizard.HotkeyStatus
+}
 
-func (hotkey) HotkeyInstructions() string {
-	return "binds {\n    Mod+Space  { spawn \"companion\" \"ctl\" \"talk-toggle\"; }\n    Mod+Escape { spawn \"companion\" \"ctl\" \"cancel\"; }\n}"
+func newHotkey() *hotkey {
+	return &hotkey{st: wizard.HotkeyStatus{Talk: shortcut.DefaultTalk, Cancel: shortcut.DefaultCancel}}
+}
+
+func (h *hotkey) Hotkeys() wizard.HotkeyStatus {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.st
+}
+
+func (h *hotkey) ApplyHotkeys(ctx context.Context, talk, cancel string) wizard.HotkeyStatus {
+	select {
+	case <-time.After(600 * time.Millisecond):
+	case <-ctx.Done():
+		return wizard.HotkeyStatus{Talk: talk, Cancel: cancel, State: wizard.HotkeyFailed, Code: "canceled"}
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.st = wizard.HotkeyStatus{Talk: talk, Cancel: cancel, State: wizard.HotkeyApplied, ToggleOnly: true}
+	return h.st
 }
 
 // provider keeps the configured endpoint in memory; keys are dropped.

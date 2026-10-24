@@ -31,25 +31,25 @@ import (
 type Action string
 
 const (
-	ActBack        Action = "back"
-	ActNext        Action = "next" // only to an unlocked step
-	ActCheck       Action = "check"
-	ActRecheck     Action = "recheck"
-	ActDiagnostics Action = "diagnostics"
-	ActQuit        Action = "quit"
-	ActSelectStep  Action = "select_step" // sidebar: an unlocked step
-	ActCopy        Action = "copy_instructions"
-	ActSave        Action = "save"
-	ActTest        Action = "test" // BYOK check
-	ActDownload    Action = "download"
-	ActCancel      Action = "cancel_download"
-	ActMicTest     Action = "test_microphone"
-	ActLoadVoices  Action = "load_voices"
-	ActChoose      Action = "choose" // a dropdown
-	ActRunFull     Action = "run_full_test"
-	ActLanguage    Action = "language"
-	ActReplaceKey  Action = "replace_key" // show the key editor over a stored key
-	ActHeaders     Action = "headers"     // expand the extra headers field
+	ActBack         Action = "back"
+	ActNext         Action = "next" // only to an unlocked step
+	ActCheck        Action = "check"
+	ActRecheck      Action = "recheck"
+	ActDiagnostics  Action = "diagnostics"
+	ActQuit         Action = "quit"
+	ActSelectStep   Action = "select_step" // sidebar: an unlocked step
+	ActApplyHotkeys Action = "apply_hotkeys"
+	ActSave         Action = "save"
+	ActTest         Action = "test" // BYOK check
+	ActDownload     Action = "download"
+	ActCancel       Action = "cancel_download"
+	ActMicTest      Action = "test_microphone"
+	ActLoadVoices   Action = "load_voices"
+	ActChoose       Action = "choose" // a dropdown
+	ActRunFull      Action = "run_full_test"
+	ActLanguage     Action = "language"
+	ActReplaceKey   Action = "replace_key" // show the key editor over a stored key
+	ActHeaders      Action = "headers"     // expand the extra headers field
 )
 
 // Config wires the wizard. Gate is required; the callbacks may be nil.
@@ -166,8 +166,14 @@ func New(cfg Config) *Wizard {
 	return w
 }
 
-// Close cancels all running work: checks, downloads, the level meter.
-func (w *Wizard) Close() { w.cancel() }
+// Close cancels all running work: checks, downloads, the level meter,
+// a shortcut apply.
+func (w *Wizard) Close() {
+	w.cancel()
+	if w.perm.hotkeys != nil {
+		w.perm.hotkeys.Close()
+	}
+}
 
 type snapshot struct {
 	prog    readiness.Progress

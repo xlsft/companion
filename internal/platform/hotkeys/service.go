@@ -69,8 +69,8 @@ func newService(primary backend, primaryName string, ipc backend) *Service {
 	return s
 }
 
-// Backend names the mechanism delivering hotkeys. BackendIPC means the user
-// has to bind compositor keys to "companion ctl" (control.Instructions).
+// Backend names the mechanism delivering hotkeys. BackendIPC means the
+// desktop's own binds run "companion ctl" (internal/platform/keybind).
 func (s *Service) Backend() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()

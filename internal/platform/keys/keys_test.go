@@ -3,6 +3,7 @@ package keys
 import (
 	"testing"
 
+	"github.com/xlsft/companion/internal/shortcut"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -90,5 +91,15 @@ func TestFormat(t *testing.T) {
 	}
 	if _, err := PortalTrigger(contracts.Hotkey{Key: "nope"}); err == nil {
 		t.Error("PortalTrigger accepted an unknown key")
+	}
+}
+
+// Every key a stored shortcut may name must have a keysym, or a backend
+// could not bind what the settings accepted.
+func TestShortcutKeysKnown(t *testing.T) {
+	for _, k := range shortcut.Keys() {
+		if _, ok := Keysym(k); !ok {
+			t.Errorf("shortcut key %q has no keysym", k)
+		}
 	}
 }

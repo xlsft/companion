@@ -282,25 +282,3 @@ func TestSendRejectsInjection(t *testing.T) {
 		t.Errorf("multi-line accepted: %v", err)
 	}
 }
-
-func TestInstructions(t *testing.T) {
-	tests := []struct {
-		comp, exe string
-		want      []string
-	}{
-		{"niri", "", []string{`Mod+Space repeat=false { spawn "companion" "ctl" "talk-toggle"; }`, `Mod+Escape repeat=false { spawn "companion" "ctl" "cancel"; }`}},
-		{"niri", "/opt/my apps/companion", []string{`spawn "/opt/my apps/companion" "ctl" "talk-toggle";`}},
-		{"sway", "/usr/bin/companion", []string{"bindsym $mod+space exec /usr/bin/companion ctl talk-press", "bindsym --release $mod+space exec /usr/bin/companion ctl talk-release"}},
-		{"sway", "/opt/my apps/companion", []string{"exec '/opt/my apps/companion' ctl cancel"}},
-		{"hyprland", "", []string{"bind = SUPER, SPACE, exec, companion ctl talk-press", "bindr = SUPER, SPACE, exec, companion ctl talk-release", "bind = SUPER, ESCAPE, exec, companion ctl cancel"}},
-		{"kwin", "", []string{"companion ctl talk-toggle", "companion ctl cancel"}},
-	}
-	for _, tt := range tests {
-		got := Instructions(tt.comp, tt.exe)
-		for _, w := range tt.want {
-			if !strings.Contains(got, w) {
-				t.Errorf("Instructions(%q, %q) lacks %q:\n%s", tt.comp, tt.exe, w, got)
-			}
-		}
-	}
-}

@@ -97,10 +97,34 @@ func (c *checks) gateChecks() map[readiness.Step]readiness.Check {
 	return m
 }
 
-type fakePerm struct{}
+// fakePerm stores the chords and answers applies with result.
+type fakePerm struct {
+	mu      sync.Mutex
+	st      HotkeyStatus
+	result  HotkeyStatus // State and Code of the next apply
+	applies int
+}
 
-func (fakePerm) HotkeyInstructions() string {
-	return `binds { Mod+Space { spawn "companion" "--talk"; } }`
+func newFakePerm() *fakePerm {
+	return &fakePerm{st: HotkeyStatus{Talk: "super+space", Cancel: "super+backspace"}, result: HotkeyStatus{State: HotkeyApplied}}
+}
+
+func (f *fakePerm) Hotkeys() HotkeyStatus {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.st
+}
+
+func (f *fakePerm) ApplyHotkeys(_ context.Context, talk, cancel string) HotkeyStatus {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.applies++
+	st := f.result
+	st.Talk, st.Cancel = talk, cancel
+	if st.State != HotkeyFailed {
+		f.st = st
+	}
+	return st
 }
 
 type fakeProvider struct {
@@ -259,12 +283,13 @@ type harness struct {
 	provider *fakeProvider
 	stt      *fakeSTT
 	tts      *fakeTTS
+	perm     *fakePerm
 }
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	h := &harness{t: t, checks: newChecks(), r: new(input.Router), th: theme.New(false, 1), lang: i18n.EN,
-		size: image.Pt(1100, 4000), provider: &fakeProvider{}, stt: newFakeSTT(), tts: &fakeTTS{}}
+		size: image.Pt(1100, 4000), provider: &fakeProvider{}, stt: newFakeSTT(), tts: &fakeTTS{}, perm: newFakePerm()}
 	g, err := readiness.Open(context.Background(), &memStore{}, h.checks.gateChecks())
 	if err != nil {
 		t.Fatal(err)
@@ -273,7 +298,7 @@ func newHarness(t *testing.T) *harness {
 	h.w = New(Config{
 		Gate: g,
 		Backends: Backends{
-			Permissions: fakePerm{},
+			Permissions: h.perm,
 			Provider:    h.provider,
 			STT:         h.stt,
 			TTS:         h.tts,

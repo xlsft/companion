@@ -24,12 +24,42 @@ type Backends struct {
 	TTS         TTS
 }
 
-// Permissions serves the permissions step. The StepPermissions check
-// reports per-capability codes in Result.Detail (readiness.Perm*).
+// Permissions serves the permissions step and the shortcut editor in
+// Settings. The StepPermissions check reports per-capability codes in
+// Result.Detail (readiness.Perm*).
 type Permissions interface {
-	// HotkeyInstructions is the compositor binding text shown when the
-	// check reports global_hotkey = needs_compositor_binding.
-	HotkeyInstructions() string
+	// Hotkeys is the stored Talk and Cancel chords and how the last apply
+	// went.
+	Hotkeys() HotkeyStatus
+	// ApplyHotkeys validates and stores the chords (internal/shortcut
+	// syntax) and makes them work on this system, however it binds keys.
+	// It may show a system dialog, so ctx should allow for the user.
+	ApplyHotkeys(ctx context.Context, talk, cancel string) HotkeyStatus
+}
+
+// HotkeyState is the outcome of applying the shortcuts.
+type HotkeyState int
+
+const (
+	HotkeyNotApplied HotkeyState = iota
+	HotkeyApplied
+	HotkeyFailed
+	// HotkeyManual: this system cannot be set up automatically; the user
+	// binds Commands in its keyboard settings.
+	HotkeyManual
+)
+
+// HotkeyStatus is what the shortcut editor shows.
+type HotkeyStatus struct {
+	Talk, Cancel string // stored chords
+	State        HotkeyState
+	// Code is the technical reason of a failure (HotkeyFailed).
+	Code string
+	// ToggleOnly: the system's binds fire on press only, so Talk is
+	// press to start, press again to send.
+	ToggleOnly bool
+	// Commands are the commands to bind by hand (HotkeyManual).
+	Commands []string
 }
 
 // Provider manages the LLM endpoint configured in setup; *providers.Service

@@ -10,6 +10,7 @@ import (
 	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/internal/ui/wizard"
 )
 
 // page is one main-window section.
@@ -104,6 +105,9 @@ func (m *mainUI) page(r Route) page {
 		sp := newSettingsPage(m.sh.opts.Settings)
 		sp.diag = newDiagView(m.sh.diag, m.sh.opts.Version)
 		sp.jump = m.takeSection
+		if be := m.sh.opts.Setup.Permissions; be != nil {
+			sp.hotkeys = &wizard.HotkeyEditor{Backend: be, Invalidate: m.sh.invalidateAll}
+		}
 		p = sp
 	default:
 		// Only implemented routes are ever current.

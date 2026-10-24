@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 
+	"github.com/xlsft/companion/internal/shortcut"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -43,6 +44,10 @@ type Voice struct {
 	// Microphone is the capture device ID chosen in setup; "" is the
 	// system default.
 	Microphone string `json:"microphone,omitempty"`
+	// TalkHotkey and CancelHotkey are portable chords ("super+space",
+	// internal/shortcut); each platform binds them its own way.
+	TalkHotkey   string `json:"talk_hotkey"`
+	CancelHotkey string `json:"cancel_hotkey"`
 }
 
 // Models holds provider profile ids per role; empty means not configured yet.
@@ -109,8 +114,9 @@ type Settings struct {
 // Defaults favour privacy: nothing is kept unless the user opts in.
 func Defaults() Settings {
 	return Settings{
-		Version:  CurrentVersion,
-		Voice:    Voice{HotkeyMode: HotkeyHold, CaptureMoment: CaptureStart, TTSSpeed: 1.0, Language: "auto"},
+		Version: CurrentVersion,
+		Voice: Voice{HotkeyMode: HotkeyHold, CaptureMoment: CaptureStart, TTSSpeed: 1.0, Language: "auto",
+			TalkHotkey: shortcut.DefaultTalk, CancelHotkey: shortcut.DefaultCancel},
 		Screen:   Screen{Target: ScreenActive},
 		Memory:   Memory{Enabled: true},
 		Platform: Platform{TrayIcon: true},
@@ -137,6 +143,9 @@ func (s Settings) Validate() error {
 	}
 	if s.Voice.Language != "auto" && !langCode.MatchString(s.Voice.Language) {
 		return fmt.Errorf("settings: voice.language %q invalid", s.Voice.Language)
+	}
+	if _, _, err := shortcut.ValidatePair(s.Voice.TalkHotkey, s.Voice.CancelHotkey); err != nil {
+		return fmt.Errorf("settings: voice hotkeys: %w", err)
 	}
 	switch s.Screen.Target {
 	case ScreenActive, ScreenAll:

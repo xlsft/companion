@@ -74,7 +74,7 @@ func TestStepLocking(t *testing.T) {
 }
 
 // allowedActions is everything the wizard may ever offer (FR-ONB-004).
-var allowedActions = []Action{ActBack, ActCheck, ActRecheck, ActDiagnostics, ActQuit, ActSelectStep, ActCopy,
+var allowedActions = []Action{ActBack, ActCheck, ActRecheck, ActDiagnostics, ActQuit, ActSelectStep, ActApplyHotkeys,
 	ActSave, ActTest, ActDownload, ActCancel, ActMicTest, ActLoadVoices, ActChoose, ActRunFull,
 	ActNext, ActLanguage, ActReplaceKey, ActHeaders}
 
@@ -153,19 +153,14 @@ func TestFailureKeepsStepAndExplains(t *testing.T) {
 	for _, want := range []string{
 		"Subsystem: permissions", "Status: denied", "How to fix:",
 		"Denied", "Works", "Action needed", "Fallback",
-		fakePerm{}.HotkeyInstructions(),
+		"Talk", "Cancel", "Super", "Space", "Backspace", "Apply",
 	} {
 		if !h.shows(want) {
 			t.Errorf("missing %q", want)
 		}
 	}
-	if !h.has(ActRecheck) || !h.has(ActCopy) {
+	if !h.has(ActRecheck) || !h.has(ActApplyHotkeys) {
 		t.Errorf("actions = %v", h.w.frame.actions)
-	}
-	h.click(ActCopy)
-	h.frame()
-	if !h.shows("Copied") {
-		t.Error("copy not confirmed")
 	}
 }
 

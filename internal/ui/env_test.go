@@ -43,7 +43,7 @@ func TestNoEnvironmentNamesInMainWindow(t *testing.T) {
 		texts = append(texts, diagTexts(l, snap)...)
 		// Every main-window label, whatever is on screen right now.
 		for k := range i18n.Keys() {
-			for _, p := range []string{"nav.", "chat.", "settings.", "platform.", "voice.", "tts.", "screen.", "privacy.", "memory.", "diag.", "cap.", "about."} {
+			for _, p := range []string{"nav.", "chat.", "settings.", "platform.", "voice.", "tts.", "screen.", "privacy.", "memory.", "diag.", "cap.", "about.", "hotkey."} {
 				if strings.HasPrefix(k, p) {
 					texts = append(texts, T(l, k))
 				}

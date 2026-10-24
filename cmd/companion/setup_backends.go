@@ -5,13 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 
 	"github.com/xlsft/companion/internal/audio"
 	"github.com/xlsft/companion/internal/models"
 	"github.com/xlsft/companion/internal/models/hw"
-	"github.com/xlsft/companion/internal/platform/control"
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui/wizard"
@@ -31,22 +28,10 @@ func (c *core) setupBackends() wizard.Backends {
 
 type setupPermissions struct{ c *core }
 
-// HotkeyInstructions binds the compositor's keys to this very binary, so
-// the snippet works without companion on $PATH.
-func (p setupPermissions) HotkeyInstructions() string {
-	exe, err := os.Executable()
-	if err == nil {
-		if r, rerr := filepath.EvalSymlinks(exe); rerr == nil {
-			exe = r
-		}
-	} else {
-		exe = ""
-	}
-	comp := p.c.report.Compositor
-	if comp == "" {
-		comp = p.c.report.Desktop
-	}
-	return control.Instructions(comp, exe)
+func (p setupPermissions) Hotkeys() wizard.HotkeyStatus { return p.c.hotkeyStatus() }
+
+func (p setupPermissions) ApplyHotkeys(ctx context.Context, talk, cancel string) wizard.HotkeyStatus {
+	return p.c.applyHotkeys(ctx, talk, cancel)
 }
 
 type setupSTT struct{ c *core }

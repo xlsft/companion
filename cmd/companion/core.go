@@ -22,10 +22,8 @@ import (
 	"github.com/xlsft/companion/internal/overlay"
 	paudio "github.com/xlsft/companion/internal/platform/audio"
 	"github.com/xlsft/companion/internal/platform/capture"
-	"github.com/xlsft/companion/internal/platform/control"
 	pdisplays "github.com/xlsft/companion/internal/platform/displays"
 	"github.com/xlsft/companion/internal/platform/hotkeys"
-	"github.com/xlsft/companion/internal/platform/keys"
 	poverlay "github.com/xlsft/companion/internal/platform/overlay"
 	"github.com/xlsft/companion/internal/providers"
 	"github.com/xlsft/companion/internal/readiness"
@@ -42,9 +40,6 @@ import (
 	"github.com/xlsft/companion/internal/ui/wizard"
 	"github.com/xlsft/companion/pkg/contracts"
 )
-
-// talkChord is the default Talk shortcut; Escape-like cancel follows it.
-const talkChord = "super+space"
 
 // core holds every long-lived service of the process and their wiring.
 // Platform pieces that are unavailable on this machine stay nil with the
@@ -88,6 +83,11 @@ type core struct {
 	// ctlSeen: a command arrived through the control socket, so the
 	// compositor binding the setup asks for exists (StepPermissions).
 	ctlSeen atomic.Bool
+	// hkMu serialises registering and applying the shortcuts; hkBound
+	// are the chords registered, hkStatus how binding them went.
+	hkMu     sync.Mutex
+	hkBound  [2]string
+	hkStatus wizard.HotkeyStatus
 
 	sttCheck *setupcheck.STT // keeps the last setup transcript in memory
 
@@ -265,53 +265,7 @@ func (c *core) applySettings(ctx context.Context, s settings.Settings) {
 		c.log.Warn("session settings", "err", err)
 	}
 	c.rebuildSpeaker(ctx, s)
-}
-
-// startHotkeys registers Talk and Cancel and forwards presses to the
-// session. Without any hotkey backend the app still works from the chat.
-func (c *core) startHotkeys(ctx context.Context) {
-	hk, err := hotkeys.New(ctx, c.report)
-	if err != nil {
-		c.hotkeysErr = err
-		c.log.Warn("hotkeys unavailable", "err", err)
-		return
-	}
-	c.hotkeys = hk
-	talkKey, err := keys.Parse(talkChord)
-	if err != nil {
-		c.hotkeysErr = err
-		return
-	}
-	// Escape alone is fine where the app grabs keys itself; through a
-	// portal it would claim Escape for the whole desktop.
-	cancelKey := contracts.Hotkey{Mods: talkKey.Mods, Key: "escape"}
-	if c.report.Session == contracts.SessionX11 {
-		cancelKey = contracts.Hotkey{Key: "escape"}
-	}
-	if _, err := hk.Register(ctx, []contracts.HotkeyBinding{
-		{ID: control.TalkID, Hotkey: talkKey, Description: "Talk to Companion"},
-		{ID: control.CancelID, Hotkey: cancelKey, Description: "Cancel"},
-	}); err != nil {
-		c.hotkeysErr = err
-		c.log.Warn("hotkey registration", "err", err)
-	}
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		for ev := range hk.Events() {
-			if hk.Backend() == hotkeys.BackendIPC {
-				c.ctlSeen.Store(true)
-			}
-			if c.gate != nil && !c.gate.IsReady() {
-				continue // setup is not finished: Talk does not exist yet
-			}
-			if e, ok := session.FromHotkey(ev, control.TalkID, control.CancelID); ok {
-				if err := c.ctl.Post(e); err != nil {
-					return
-				}
-			}
-		}
-	}()
+	c.rebindHotkeys(ctx, s)
 }
 
 // launchSTT starts the sidecar on the active model; the supervisor calls
@@ -385,7 +339,7 @@ func (c *core) caps() chat.Capabilities {
 		cp.Voice = true
 	}
 	if c.hotkeys != nil && c.hotkeysErr == nil {
-		cp.Hotkey = "Mod+Space"
+		cp.Hotkey = c.talkLabel()
 	}
 	cp.Speech = c.speaker.label()
 	return cp
