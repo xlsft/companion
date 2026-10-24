@@ -172,6 +172,11 @@ func (c *guideCard) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.D
 			rows = append(rows, func(gtx layout.Context) layout.Dimensions {
 				return metaRow(gtx, th, icon.Loading3, T(l, "guide.preparing"), th.Pal.Muted)
 			})
+		case v.Watching:
+			// Auto-advance is armed: doing the step moves the card on.
+			rows = append(rows, func(gtx layout.Context) layout.Dimensions {
+				return metaRow(gtx, th, icon.Eye, T(l, "guide.watching"), th.Pal.Muted)
+			})
 		}
 		return kit.VStack(th, 10, rows...)(gtx)
 	}

@@ -495,5 +495,6 @@
   "guide.finish": "完了",
   "guide.stop": "ガイドを終了",
   "guide.preparing": "画面を確認しています…",
+  "guide.watching": "ステップの操作を見守っています",
   "guide.error": "できませんでした。もう一度お試しください。"
 }

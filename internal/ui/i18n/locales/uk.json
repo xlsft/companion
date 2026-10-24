@@ -495,5 +495,6 @@
   "guide.finish": "Готово",
   "guide.stop": "Завершити",
   "guide.preparing": "Дивлюся на екран…",
+  "guide.watching": "Стежу, коли ви виконаєте крок",
   "guide.error": "Не вийшло. Спробуйте ще раз."
 }

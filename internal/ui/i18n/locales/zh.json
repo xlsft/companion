@@ -495,5 +495,6 @@
   "guide.finish": "完成",
   "guide.stop": "结束引导",
   "guide.preparing": "正在查看屏幕…",
+  "guide.watching": "正在等待你完成这一步",
   "guide.error": "操作失败，请重试。"
 }

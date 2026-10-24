@@ -495,5 +495,6 @@
   "guide.finish": "Fertig",
   "guide.stop": "Anleitung beenden",
   "guide.preparing": "Ich sehe mir den Bildschirm an…",
+  "guide.watching": "Ich achte darauf, wenn Sie den Schritt erledigen",
   "guide.error": "Das hat nicht geklappt. Versuchen Sie es erneut."
 }

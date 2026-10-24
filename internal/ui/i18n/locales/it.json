@@ -495,5 +495,6 @@
   "guide.finish": "Fine",
   "guide.stop": "Termina la guida",
   "guide.preparing": "Guardo lo schermo…",
+  "guide.watching": "Aspetto che tu faccia il passo",
   "guide.error": "Non è riuscito. Riprova."
 }

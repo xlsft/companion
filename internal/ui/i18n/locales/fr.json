@@ -495,5 +495,6 @@
   "guide.finish": "Terminer",
   "guide.stop": "Arrêter le guide",
   "guide.preparing": "Je regarde l’écran…",
+  "guide.watching": "J’attends que vous fassiez l’étape",
   "guide.error": "Impossible. Réessayez."
 }

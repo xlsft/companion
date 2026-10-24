@@ -495,5 +495,6 @@
   "guide.finish": "Bitir",
   "guide.stop": "Rehberi bitir",
   "guide.preparing": "Ekrana bakıyorum…",
+  "guide.watching": "Adımı yapmanızı bekliyorum",
   "guide.error": "Yapılamadı. Tekrar deneyin."
 }
