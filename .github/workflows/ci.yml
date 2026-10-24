@@ -63,6 +63,9 @@ jobs:
       - name: System packages
         # Mesa's software renderer lets the headless Gio render tests run.
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends $GIO_DEPS libgl1-mesa-dri libegl-mesa0
+      - name: go test
+        # Without -race too: timing budgets (FR-VOICE-005) only hold uninstrumented.
+        run: make test
       - name: go test -race
         shell: bash
         run: |
