@@ -292,7 +292,10 @@ func TestCrashLoopDegradesAndResetRecovers(t *testing.T) {
 	defer cancel()
 	s.Start(context.Background())
 	st := waitState(t, states, Degraded)
-	if st.Reason != ReasonCrashLoop || st.LastFailure != ReasonSidecarExited {
+	// The stub exits right after answering initialize; depending on
+	// scheduling the client sees the exit before or after Initialize
+	// returns, so the last failure is either one. Both are crashes.
+	if st.Reason != ReasonCrashLoop || (st.LastFailure != ReasonSidecarExited && st.LastFailure != ReasonLaunchFailed) {
 		t.Fatalf("degraded %+v", st)
 	}
 	// MaxRestarts=3 restarts, so the 4th failure degrades: 4 launches.
