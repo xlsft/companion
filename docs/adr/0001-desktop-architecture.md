@@ -2,12 +2,10 @@
 
 - Status: Accepted
 - Date: 2026-10-24
-- Ticket: OC-1
-- Source: PRD — локальный аналог HeyClicky (YouTrack OC-A-1), §9
 
 ## Context
 
-Companion (repo `openclick`) is a local desktop assistant for Windows, macOS and Linux. Hard constraints from the PRD:
+Companion is a local desktop assistant for Windows, macOS and Linux. Hard constraints:
 
 - one codebase, as much Go as possible, UI on Gio, no WebView/Electron/TS UI;
 - speech recognition is local (whisper.cpp; sherpa-onnx since amendment 2), LLM is BYOK (OpenAI/Anthropic-compatible), TTS is an external provider;
@@ -22,9 +20,9 @@ Companion (repo `openclick`) is a local desktop assistant for Windows, macOS and
 |---|---|---|
 | Core | `cmd/companion` | Gio UI, orchestration, sessions, LLM/TTS clients, storage, platform bridges |
 | STT sidecar | `cmd/stt-sidecar` | whisper.cpp runtime, VAD, partial/final decode, hardware backend |
-| Browser host (P2) | `cmd/browser-host` | Chrome native messaging host |
+| Browser host (planned) | `cmd/browser-host` | Chrome native messaging host |
 
-The sidecar is isolated so that a native crash in whisper.cpp (or GPU backend init) never takes down the core (FR-STT-010, NFR-003). The core supervises it with bounded restarts (OC-36).
+The sidecar is isolated so that a native crash in whisper.cpp (or GPU backend init) never takes down the core. The core supervises it with bounded restarts.
 
 ### IPC
 
@@ -45,9 +43,9 @@ pkg/contracts         – stable interfaces and value types shared across module
 Rules:
 
 1. Domain packages depend on `pkg/contracts`, never on `internal/platform/*`.
-2. `internal/platform/*` contain no business logic: they expose narrow OS operations (PRD §9.3).
+2. `internal/platform/*` contain no business logic: they expose narrow OS operations.
 3. Platform selection happens in `internal/platform` via build tags (`linux`, `windows`, `darwin`) and runtime detection (X11 vs Wayland, compositor, portals).
-4. Every platform operation that may be missing returns `contracts.ErrUnsupported` wrapped with the capability name; callers consult the capability report first and present a fallback (PRD §4.2).
+4. Every platform operation that may be missing returns `contracts.ErrUnsupported` wrapped with the capability name; callers consult the capability report first and present a fallback.
 5. All long operations take `context.Context` and honour cancellation.
 6. cgo is allowed only inside `internal/platform/*`, `cmd/stt-sidecar` and the build-tagged `internal/stt/engine/whisper` (imported only by the sidecar). The rest of the core stays pure Go so it cross-compiles.
 
@@ -71,11 +69,11 @@ SQLite (pure Go driver `modernc.org/sqlite`, no cgo) for metadata, files in the 
 ## Consequences
 
 - Core cross-compiles for all three OSes from any host; only platform bridges and the sidecar need native toolchains.
-- Each platform spike (OC-3…OC-6) validates its row of the table above before mass implementation; a failed spike changes this ADR, not the domain code.
+- Each platform spike validates its row of the table above before mass implementation; a failed spike changes this ADR, not the domain code.
 - A whisper.cpp crash costs one request, not the app.
 - Overlay drawing code is shared Go; only window creation and buffer presentation are per platform.
 
-## Amendment 1 (2026-10-24, OC-12): Gio UI needs cgo
+## Amendment 1 (2026-10-24): Gio UI needs cgo
 
 Gio's Linux (Wayland/X11/EGL) and macOS backends are cgo, so rule 6 cannot hold for the UI. Amended rule 6: cgo is allowed in `internal/platform/*`, `cmd/stt-sidecar`, the build-tagged `internal/stt/engine/whisper`, `internal/ui/...` (Gio) and therefore `cmd/companion`, which links the UI. Everything else stays pure Go.
 
@@ -85,7 +83,7 @@ Gio's Linux (Wayland/X11/EGL) and macOS backends are cgo, so rule 6 cannot hold 
 - Gio's event loop must own the main goroutine (`app.Main()`); `cmd/companion` runs the `internal/app` lifecycle in a goroutine and exits the process when it returns.
 - Gio is built with `-tags novulkan` (set via `GOFLAGS` in the Makefile): its Vulkan backend needs vulkan-headers at build time, while the GL/EGL backend (Linux), Metal (macOS) and D3D11 (Windows) cover every target. Bare `go build/test` outside make needs the same tag unless vulkan-headers are installed.
 
-## Amendment 2 (2026-10-25, OC-29): sherpa-onnx is the primary STT engine
+## Amendment 2 (2026-10-25): sherpa-onnx is the primary STT engine
 
 whisper.cpp alone no longer meets the product bar: NVIDIA Parakeet TDT (25 European languages, punctuation and casing) and SenseVoice (zh/en/ja/ko/yue) are newer, more accurate models that run in real time on a desktop CPU with int8 weights, and streaming zipformer transducers give true incremental partials. They run on sherpa-onnx (k2-fsa, Apache-2.0) through its official Go bindings `github.com/k2-fsa/sherpa-onnx-go`.
 
