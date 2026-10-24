@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/xlsft/companion/internal/history"
+	"github.com/xlsft/companion/internal/memory"
 	"github.com/xlsft/companion/internal/session"
 	"github.com/xlsft/companion/pkg/contracts"
 )
@@ -32,6 +33,15 @@ type Store interface {
 	SetKeepScreenshots(ctx context.Context, id string, keep bool) error
 }
 
+// ContextSink receives the conversation the chat shows, so the model sees
+// it too (*memory.Service).
+type ContextSink interface {
+	// Seed replaces the context with the turns of a stored conversation.
+	Seed(turns []memory.Turn)
+	// Reset starts over, for a new chat.
+	Reset()
+}
+
 // Config wires a Service. Only Talk is required.
 type Config struct {
 	Talk Talk
@@ -43,6 +53,9 @@ type Config struct {
 	// Caps reports voice availability and the header labels; Text is
 	// derived from Talk. nil means text only, without labels.
 	Caps func() Capabilities
+	// Context, when set, is told about the loaded conversation and about
+	// new chats.
+	Context ContextSink
 	// STTModel names the recogniser for voice turns, e.g. "whisper medium".
 	STTModel func() string
 	Now      func() time.Time
@@ -236,6 +249,9 @@ func (s *Service) NewChat(ctx context.Context) error {
 	s.early = nil
 	s.ignore = s.ref
 	s.title, s.msgs, s.reply, s.pendingQ, s.partial = "", nil, -1, false, ""
+	if s.cfg.Context != nil {
+		s.cfg.Context.Reset()
+	}
 	s.publishLocked()
 	s.enqueueLocked(func(_ context.Context, conv *string) { *conv = "" })
 	s.mu.Unlock()

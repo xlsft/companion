@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/xlsft/companion/internal/llm"
+	"github.com/xlsft/companion/internal/memory"
 	"github.com/xlsft/companion/internal/overlay"
 	"github.com/xlsft/companion/internal/session"
 	"github.com/xlsft/companion/pkg/contracts"
@@ -284,6 +285,76 @@ func TestFollowUpCarriesHistory(t *testing.T) {
 	}
 	if n := len(p.reqs[2].Messages); n != 2 {
 		t.Fatalf("new session leaked history: %d messages", n)
+	}
+}
+
+type fakeMemory struct {
+	prepared memory.Prepared
+	texts    []string
+	recorded [][2]string
+}
+
+func (m *fakeMemory) Prepare(_ context.Context, text string) memory.Prepared {
+	m.texts = append(m.texts, text)
+	return m.prepared
+}
+
+func (m *fakeMemory) Record(_ context.Context, _ contracts.SessionRef, user, answer string) {
+	m.recorded = append(m.recorded, [2]string{user, answer})
+}
+
+// With memory the earlier turns come from it, whether or not the request
+// is a follow-up, and the facts block joins the system prompt.
+func TestMemoryFeedsContextAndFacts(t *testing.T) {
+	hist := []llm.Message{
+		{Role: llm.RoleUser, Content: []llm.Part{llm.Text("earlier question")}},
+		{Role: llm.RoleAssistant, Content: []llm.Part{llm.Text("earlier answer")}},
+	}
+	tests := []struct {
+		name      string
+		prepared  memory.Prepared
+		prompt    string
+		wantMsgs  int
+		wantInSys string
+	}{
+		{"context and facts", memory.Prepared{History: hist, System: "What you know about the user: Anna"}, "", 4, "Anna"},
+		{"nothing to add", memory.Prepared{}, "", 2, ""},
+		{"custom prompt keeps facts", memory.Prepared{System: "FACTS"}, "custom", 2, "FACTS"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &scriptedProvider{rounds: [][]llm.Event{{llm.TextDelta{Text: "Answer."}, llm.Completed{}}}}
+			mem := &fakeMemory{prepared: tt.prepared}
+			o := &Orchestrator{Provider: func(context.Context) (llm.Provider, error) { return p, nil }, Memory: mem, SystemPrompt: tt.prompt}
+			if _, err := o.Reason(context.Background(), ref, session.Request{Text: "now"}, (&events{}).emit); err != nil {
+				t.Fatal(err)
+			}
+			msgs := p.reqs[0].Messages
+			if len(msgs) != tt.wantMsgs {
+				t.Fatalf("%d messages, want %d", len(msgs), tt.wantMsgs)
+			}
+			if sys := msgs[0].Content[0].Text; !strings.Contains(sys, tt.wantInSys) {
+				t.Errorf("system prompt lacks %q", tt.wantInSys)
+			}
+			if last := msgs[len(msgs)-1]; last.Role != llm.RoleUser || last.Content[0].Text != "now" {
+				t.Errorf("last message = %+v", last)
+			}
+			if len(mem.recorded) != 1 || mem.recorded[0] != [2]string{"now", "Answer."} {
+				t.Errorf("recorded %v", mem.recorded)
+			}
+		})
+	}
+}
+
+func TestMemoryNotRecordedOnFailure(t *testing.T) {
+	p := &scriptedProvider{failErr: errors.New("boom")}
+	mem := &fakeMemory{}
+	o := &Orchestrator{Provider: func(context.Context) (llm.Provider, error) { return p, nil }, Memory: mem}
+	if _, err := o.Reason(context.Background(), ref, session.Request{Text: "now"}, (&events{}).emit); err == nil {
+		t.Fatal("want error")
+	}
+	if len(mem.recorded) != 0 {
+		t.Errorf("failed turn recorded: %v", mem.recorded)
 	}
 }
 

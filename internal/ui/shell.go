@@ -93,6 +93,9 @@ type Options struct {
 	// Updates is the in-app updater; nil shows no update banner and leaves
 	// the update settings without a status.
 	Updates UpdateBackend
+	// Memory is the remembered-facts store; nil leaves the Memory settings
+	// with only the on/off switch.
+	Memory MemoryBackend
 	// Diagnose produces the capability report for Diagnostics.
 	Diagnose func(ctx context.Context) (contracts.CapabilityReport, error)
 	// Quit asks the process to shut down; the app lifecycle then calls Stop.

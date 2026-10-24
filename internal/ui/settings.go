@@ -48,10 +48,11 @@ const (
 	secVoice
 	secScreen
 	secPrivacy
+	secMemory
 	secDiagnostics
 )
 
-var settingsSections = []settingsSection{secGeneral, secVoice, secScreen, secPrivacy, secDiagnostics}
+var settingsSections = []settingsSection{secGeneral, secVoice, secScreen, secPrivacy, secMemory, secDiagnostics}
 
 func (s settingsSection) key() string {
 	switch s {
@@ -61,6 +62,8 @@ func (s settingsSection) key() string {
 		return "settings.sec.screen"
 	case secPrivacy:
 		return "settings.sec.privacy"
+	case secMemory:
+		return "settings.sec.memory"
 	case secDiagnostics:
 		return "settings.sec.diagnostics"
 	}
@@ -75,6 +78,8 @@ func (s settingsSection) icon() icon.Name {
 		return icon.Computer
 	case secPrivacy:
 		return icon.Lock
+	case secMemory:
+		return icon.Sparkles
 	case secDiagnostics:
 		return icon.Heartbeat
 	}
@@ -104,7 +109,7 @@ type settingsPage struct {
 	jump func() (settingsSection, bool)
 
 	section settingsSection
-	secBtns [5]widget.Clickable
+	secBtns [6]widget.Clickable
 	// secDD stands in for the section list in a narrow page.
 	secDD kit.Dropdown
 
@@ -123,6 +128,10 @@ type settingsPage struct {
 	checkNow        widget.Clickable
 
 	saveErr bool
+
+	// mem lists the remembered facts; nil leaves the section with only its
+	// switch.
+	mem *memView
 
 	// hotkeys edits the Talk and Cancel shortcuts; nil without a backend.
 	hotkeys *wizard.HotkeyEditor
@@ -235,7 +244,7 @@ func (p *settingsPage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layou
 		actions = p.diag.actions(th, l, s)
 		rows = p.diag.rows(th, l, s)
 	} else {
-		rows = p.sectionRows(th, l, cur)
+		rows = p.sectionRows(gtx, th, l, cur)
 	}
 	title := T(l, p.section.key())
 	rows = append([]layout.Widget{kit.Title(th, title).Layout}, rows...)
@@ -334,7 +343,7 @@ func panelOf(th *theme.Theme, rows ...layout.Widget) layout.Widget {
 
 // sectionRows are a section's panels. ready marks what the app acts on
 // today; the rest is disabled and tagged.
-func (p *settingsPage) sectionRows(th *theme.Theme, l Lang, cur settings.Settings) []layout.Widget {
+func (p *settingsPage) sectionRows(gtx layout.Context, th *theme.Theme, l Lang, cur settings.Settings) []layout.Widget {
 	toggle := func(b *widget.Bool, desc string) layout.Widget {
 		return func(gtx layout.Context) layout.Dimensions { return kit.Toggle(gtx, th, b, T(l, desc)) }
 	}
@@ -394,9 +403,19 @@ func (p *settingsPage) sectionRows(th *theme.Theme, l Lang, cur settings.Setting
 	case secPrivacy:
 		return []layout.Widget{panelOf(th,
 			setting(th, l, "privacy.saveText", "privacy.saveText.d", true, toggle(&p.saveText, "privacy.saveText")),
-			setting(th, l, "memory.enabled", "memory.enabled.d", false, toggle(&p.memory, "memory.enabled")),
 			setting(th, l, "privacy.shareDiag", "privacy.shareDiag.d", false, toggle(&p.shareDiag, "privacy.shareDiag")),
 		), kit.Small(th, T(l, "privacy.note")).Layout}
+	case secMemory:
+		rows := []layout.Widget{panelOf(th,
+			setting(th, l, "memory.enabled", "memory.enabled.d", true, toggle(&p.memory, "memory.enabled")),
+		)}
+		if !cur.Memory.Enabled {
+			rows = append(rows, kit.Small(th, T(l, "memory.off")).Layout)
+		}
+		if p.mem != nil {
+			rows = append(rows, p.mem.rows(gtx, th, l)...)
+		}
+		return rows
 	}
 	names := make([]string, len(i18n.Languages))
 	sel := 0

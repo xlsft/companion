@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"image"
 	"log/slog"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/xlsft/companion/internal/history"
+	"github.com/xlsft/companion/internal/memory"
 	"github.com/xlsft/companion/internal/session"
 	"github.com/xlsft/companion/pkg/contracts"
 )
@@ -476,4 +478,61 @@ func (s *syncBuf) String() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.b.String()
+}
+
+type fakeContext struct {
+	mu     sync.Mutex
+	seeded [][]memory.Turn
+	resets int
+}
+
+func (f *fakeContext) Seed(t []memory.Turn) {
+	f.mu.Lock()
+	f.seeded = append(f.seeded, t)
+	f.mu.Unlock()
+}
+func (f *fakeContext) Reset() { f.mu.Lock(); f.resets++; f.mu.Unlock() }
+
+// A reopened conversation reaches the model's context, and a new chat
+// clears it again.
+func TestContextSeededFromStoredConversation(t *testing.T) {
+	tests := []struct {
+		name string
+		msgs []history.Message
+		want []memory.Turn
+	}{
+		{"pairs", []history.Message{
+			{Role: history.RoleUser, Text: "q1"}, {Role: history.RoleAssistant, Text: "a1"},
+			{Role: history.RoleUser, Text: "q2"}, {Role: history.RoleAssistant, Text: "a2"},
+		}, []memory.Turn{{User: "q1", Assistant: "a1"}, {User: "q2", Assistant: "a2"}}},
+		{"unanswered turn and tool messages", []history.Message{
+			{Role: history.RoleUser, Text: "q1"}, {Role: history.RoleTool, Text: "t"},
+			{Role: history.RoleUser, Text: "q2"}, {Role: history.RoleAssistant, Text: "a2"},
+		}, []memory.Turn{{User: "q1"}, {User: "q2", Assistant: "a2"}}},
+		{"leading assistant ignored", []history.Message{
+			{Role: history.RoleAssistant, Text: "hello"}, {Role: history.RoleUser, Text: "q"},
+		}, []memory.Turn{{User: "q"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &fakeStore{convs: []*history.Conversation{{ID: "c1", Title: "t", Messages: tt.msgs}}}
+			fc := &fakeContext{}
+			s, _, ch := start(t, Config{History: st, Context: fc})
+			settle(t, ch, func(v View) bool { return len(v.Messages) > 0 })
+			fc.mu.Lock()
+			got := fc.seeded
+			fc.mu.Unlock()
+			if len(got) != 1 || !reflect.DeepEqual(got[0], tt.want) {
+				t.Fatalf("seeded %+v, want %+v", got, tt.want)
+			}
+			if err := s.NewChat(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			fc.mu.Lock()
+			defer fc.mu.Unlock()
+			if fc.resets != 1 {
+				t.Errorf("resets = %d", fc.resets)
+			}
+		})
+	}
 }

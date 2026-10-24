@@ -108,6 +108,9 @@ func (m *mainUI) page(r Route) page {
 		sp.updates = m.sh.opts.Updates
 		sp.diag = newDiagView(m.sh.diag, m.sh.opts.Version)
 		sp.jump = m.takeSection
+		if be := m.sh.opts.Memory; be != nil {
+			sp.mem = newMemView(be, m.sh.invalidateAll)
+		}
 		if be := m.sh.opts.Setup.Permissions; be != nil {
 			sp.hotkeys = &wizard.HotkeyEditor{Backend: be, Invalidate: m.sh.invalidateAll}
 		}

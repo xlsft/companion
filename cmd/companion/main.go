@@ -119,6 +119,7 @@ func main() {
 		Tray:       tr,
 		Diagnose:   detect.New().Detect,
 		Updates:    upd,
+		Memory:     c.memory,
 		Quit:       stop,
 		Log:        log,
 		Appearance: scheme,
