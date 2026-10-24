@@ -1,6 +1,9 @@
 Companion third-party notices
 =============================
 
+Companion itself is licensed under the Functional Source License 1.1 with
+Apache 2.0 future license (FSL-1.1-ALv2), see LICENSE.md.
+
 Fonts (internal/assets/fonts, embedded in the companion binary)
   Google Sans, Google Sans Code, Unbounded: SIL Open Font License 1.1.
   Full text and copyright lines: licenses/OFL.txt
