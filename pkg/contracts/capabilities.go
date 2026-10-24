@@ -17,6 +17,10 @@ const (
 	CapSecretStore          Capability = "secret_store"
 	CapMicrophone           Capability = "microphone"
 	CapTray                 Capability = "tray"
+
+	// FallbackToggleTalk is the UX used instead of CapHotkeyRelease: one
+	// press starts recording, the next one stops it.
+	FallbackToggleTalk Capability = "toggle_talk"
 )
 
 // Status is how usable a capability is right now.
