@@ -27,6 +27,10 @@ type HotkeyBinding struct {
 	Hotkey Hotkey
 	// Description is shown by portal-based backends in the system UI.
 	Description string
+	// TriggerDescription is the system's human-readable form of the chord
+	// it actually granted (portal backends), e.g. "Ctrl+Alt+Space". Empty
+	// when the backend binds Hotkey exactly as requested.
+	TriggerDescription string
 }
 
 type HotkeyEventKind int
@@ -34,6 +38,10 @@ type HotkeyEventKind int
 const (
 	HotkeyPressed HotkeyEventKind = iota
 	HotkeyReleased
+	// HotkeyToggled is a press from a source that never sends the matching
+	// release, e.g. a compositor keybinding running "companion ctl
+	// talk-toggle". It means "start or stop", whatever the voice mode.
+	HotkeyToggled
 )
 
 type HotkeyEvent struct {

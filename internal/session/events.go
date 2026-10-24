@@ -154,7 +154,9 @@ func FromHotkey(ev contracts.HotkeyEvent, talk, cancel contracts.HotkeyID) (Even
 		return HotkeyDown{}, true
 	case ev.ID == talk && ev.Kind == contracts.HotkeyReleased:
 		return HotkeyUp{}, true
-	case ev.ID == cancel && ev.Kind == contracts.HotkeyPressed:
+	case ev.ID == talk && ev.Kind == contracts.HotkeyToggled:
+		return ToggleTalk{}, true
+	case ev.ID == cancel && (ev.Kind == contracts.HotkeyPressed || ev.Kind == contracts.HotkeyToggled):
 		return Cancel{}, true
 	}
 	return nil, false

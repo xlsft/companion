@@ -24,6 +24,23 @@ const (
 	globScreencopy      = "zwlr_screencopy_manager_v1"
 )
 
+// Hotkey backend names reported in CapabilityState.Backend; the chooser in
+// internal/platform/hotkeys reports the same names at runtime.
+const (
+	BackendX11Grab = "x11-grabkey"
+	BackendPortal  = "xdg-portal:GlobalShortcuts"
+	BackendIPC     = "ipc+compositor-binding"
+)
+
+// ipcHotkey is the control-socket fallback: it always works, but only after
+// the user binds a compositor key to "companion ctl".
+func ipcHotkey(why string) contracts.CapabilityState {
+	return contracts.CapabilityState{
+		Status: contracts.StatusDegraded, Backend: BackendIPC,
+		Reason: why + "; bind a compositor key to companion ctl",
+	}
+}
+
 // portalProbe is the outcome of reading one portal interface's version.
 type portalProbe struct {
 	Present bool
@@ -210,24 +227,41 @@ func mapLinux(f linuxFacts) contracts.CapabilityReport {
 
 	switch sess {
 	case contracts.SessionX11:
-		set(contracts.CapGlobalHotkey, avail("x11-xinput2"))
-		set(contracts.CapHotkeyRelease, avail("x11-xinput2"))
+		set(contracts.CapGlobalHotkey, avail(BackendX11Grab))
+		set(contracts.CapHotkeyRelease, avail(BackendX11Grab))
 		set(contracts.CapScreenCapture, avail("x11-getimage"))
 		set(contracts.CapOverlayClickThrough, avail("x11-shape"))
 		set(contracts.CapInputInjection, avail("x11-xtest"))
 		set(contracts.CapTextInsertion, avail("x11-xtest"))
 
 	case contracts.SessionWayland:
-		if p, why := portal(portalGlobalShortcuts); p.Present {
-			set(contracts.CapGlobalHotkey, avail("xdg-portal:GlobalShortcuts"))
+		p, why := portal(portalGlobalShortcuts)
+		switch comp := compositorName(f); {
+		case comp == "niri":
+			// The portal is exported, but its GNOME backend refuses
+			// BindShortcuts on niri (OC-6), and niri binds fire on press
+			// only.
+			set(contracts.CapGlobalHotkey, ipcHotkey("GlobalShortcuts portal has no working backend on niri"))
+			set(contracts.CapHotkeyRelease, contracts.CapabilityState{
+				Status: contracts.StatusUnavailable, Backend: BackendIPC,
+				Reason: "niri binds fire on key press only", Fallback: contracts.FallbackToggleTalk,
+			})
+		case p.Present:
+			set(contracts.CapGlobalHotkey, avail(BackendPortal))
 			// Hold-to-talk needs the Deactivated signal; backends differ and
 			// the version number does not tell, so do not claim it.
 			s := unknown("Deactivated delivery depends on portal backend")
-			s.Backend = "xdg-portal:GlobalShortcuts"
+			s.Backend = BackendPortal
+			s.Fallback = contracts.FallbackToggleTalk
 			set(contracts.CapHotkeyRelease, s)
-		} else {
-			set(contracts.CapGlobalHotkey, unavail(why, ""))
-			set(contracts.CapHotkeyRelease, unavail(why, ""))
+		default:
+			// Sway and others: release binds exist on some compositors
+			// (bindsym --release), so release is known only once one fires.
+			set(contracts.CapGlobalHotkey, ipcHotkey(why))
+			s := unknown("depends on compositor release bindings")
+			s.Backend = BackendIPC
+			s.Fallback = contracts.FallbackToggleTalk
+			set(contracts.CapHotkeyRelease, s)
 		}
 
 		// Order matches internal/platform/capture.Candidates: screencopy
