@@ -32,15 +32,15 @@ const (
 
 // CapabilityState is the detected state of one capability.
 type CapabilityState struct {
-	Status Status
+	Status Status `json:"status"`
 	// Backend names the mechanism in use, e.g. "wlr-layer-shell",
 	// "xdg-portal:GlobalShortcuts", "windows-graphics-capture".
-	Backend string
+	Backend string `json:"backend,omitempty"`
 	// Reason is a short technical explanation for non-available states. It
 	// never contains user content.
-	Reason string
+	Reason string `json:"reason,omitempty"`
 	// Fallback names the capability or UX used instead, if any.
-	Fallback Capability
+	Fallback Capability `json:"fallback,omitempty"`
 }
 
 // SessionKind is the windowing system family.
@@ -55,15 +55,15 @@ const (
 
 // CapabilityReport is the result of runtime platform detection (OC-13).
 type CapabilityReport struct {
-	OS         string // runtime.GOOS
-	OSVersion  string
-	Session    SessionKind
-	Desktop    string // e.g. "GNOME", "KDE", "niri"; empty if unknown
-	Compositor string
+	OS         string      `json:"os"` // runtime.GOOS
+	OSVersion  string      `json:"os_version,omitempty"`
+	Session    SessionKind `json:"session"`
+	Desktop    string      `json:"desktop,omitempty"` // e.g. "GNOME", "KDE", "niri"; empty if unknown
+	Compositor string      `json:"compositor,omitempty"`
 	// Facts holds raw probe results for diagnostics, e.g.
 	// "portal.GlobalShortcuts.version" -> "1", "pipewire" -> "1.4.2".
-	Facts        map[string]string
-	Capabilities map[Capability]CapabilityState
+	Facts        map[string]string              `json:"facts,omitempty"`
+	Capabilities map[Capability]CapabilityState `json:"capabilities"`
 }
 
 // State returns the state of c, or StatusUnknown if it was not probed.
