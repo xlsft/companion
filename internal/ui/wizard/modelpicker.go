@@ -134,7 +134,13 @@ func (p *ModelPicker) install(m models.Manifest) {
 		if err != nil {
 			p.errCode = installErrCode(err)
 		} else {
-			p.installed[m.ID], p.active = true, m.ID
+			// Copy on write: Layout reads the map after releasing the lock.
+			next := make(map[string]bool, len(p.installed)+1)
+			for id := range p.installed {
+				next[id] = true
+			}
+			next[m.ID] = true
+			p.installed, p.active = next, m.ID
 		}
 		p.mu.Unlock()
 		p.invalidate()
