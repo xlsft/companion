@@ -484,5 +484,16 @@
   "memory.cancel": "İptal",
   "memory.hint": "Yeni öğrenileni silmek için “bunu unut” deyin. Sırlar, ödeme ve sağlık bilgileri asla hatırlanmaz.",
   "memory.loadError": "Bellek okunamadı",
-  "memory.loadError.d": "Birazdan tekrar deneyin."
+  "memory.loadError.d": "Birazdan tekrar deneyin.",
+  "guide.step": "Adım %d / %d",
+  "guide.prevDone": "Adım %d: %s — tamam",
+  "guide.prev": "Önceki adım",
+  "guide.repeat": "Tekrarla",
+  "guide.pause": "Duraklat",
+  "guide.resume": "Devam et",
+  "guide.next": "İleri",
+  "guide.finish": "Bitir",
+  "guide.stop": "Rehberi bitir",
+  "guide.preparing": "Ekrana bakıyorum…",
+  "guide.error": "Yapılamadı. Tekrar deneyin."
 }

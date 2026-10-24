@@ -484,5 +484,16 @@
   "memory.cancel": "Anuluj",
   "memory.hint": "Powiedz „zapomnij to”, aby usunąć właśnie zapamiętane. Sekrety, dane płatnicze i zdrowotne nigdy nie są zapamiętywane.",
   "memory.loadError": "Nie udało się odczytać pamięci",
-  "memory.loadError.d": "Spróbuj ponownie za chwilę."
+  "memory.loadError.d": "Spróbuj ponownie za chwilę.",
+  "guide.step": "Krok %d z %d",
+  "guide.prevDone": "Krok %d: %s — gotowe",
+  "guide.prev": "Poprzedni krok",
+  "guide.repeat": "Powtórz",
+  "guide.pause": "Pauza",
+  "guide.resume": "Wznów",
+  "guide.next": "Dalej",
+  "guide.finish": "Zakończ",
+  "guide.stop": "Zakończ przewodnik",
+  "guide.preparing": "Patrzę na ekran…",
+  "guide.error": "Nie udało się. Spróbuj ponownie."
 }

@@ -484,5 +484,16 @@
   "memory.cancel": "Cancelar",
   "memory.hint": "Diga “esqueça isso” para apagar o que acabou de ser aprendido. Segredos, dados de pagamento e de saúde nunca são lembrados.",
   "memory.loadError": "Não foi possível ler a memória",
-  "memory.loadError.d": "Tente novamente em instantes."
+  "memory.loadError.d": "Tente novamente em instantes.",
+  "guide.step": "Passo %d de %d",
+  "guide.prevDone": "Passo %d: %s — feito",
+  "guide.prev": "Passo anterior",
+  "guide.repeat": "Repetir",
+  "guide.pause": "Pausar",
+  "guide.resume": "Retomar",
+  "guide.next": "Próximo",
+  "guide.finish": "Concluir",
+  "guide.stop": "Encerrar o guia",
+  "guide.preparing": "Olhando a tela…",
+  "guide.error": "Não foi possível. Tente de novo."
 }

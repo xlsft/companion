@@ -484,5 +484,16 @@
   "memory.cancel": "Abbrechen",
   "memory.hint": "Sagen Sie „vergiss das“, um das gerade Gelernte zu löschen. Geheimnisse sowie Zahlungs- und Gesundheitsdaten werden nie gemerkt.",
   "memory.loadError": "Das Gedächtnis konnte nicht gelesen werden",
-  "memory.loadError.d": "Versuchen Sie es gleich noch einmal."
+  "memory.loadError.d": "Versuchen Sie es gleich noch einmal.",
+  "guide.step": "Schritt %d von %d",
+  "guide.prevDone": "Schritt %d: %s — erledigt",
+  "guide.prev": "Vorheriger Schritt",
+  "guide.repeat": "Wiederholen",
+  "guide.pause": "Pause",
+  "guide.resume": "Fortsetzen",
+  "guide.next": "Weiter",
+  "guide.finish": "Fertig",
+  "guide.stop": "Anleitung beenden",
+  "guide.preparing": "Ich sehe mir den Bildschirm an…",
+  "guide.error": "Das hat nicht geklappt. Versuchen Sie es erneut."
 }

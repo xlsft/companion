@@ -491,6 +491,29 @@ func ProgressBar(gtx layout.Context, th *theme.Theme, h float32, frac float32) l
 	return layout.Dimensions{Size: size}
 }
 
+// StepTrack is the segmented progress of a multi-step flow: one 16×4
+// segment per step, passed ones in the OK colour, the current one in the
+// accent, the rest on the track.
+func StepTrack(gtx layout.Context, th *theme.Theme, current, total int) layout.Dimensions {
+	w, h, gap := gtx.Dp(th.Dp(16)), gtx.Dp(th.Dp(4)), gtx.Dp(th.Dp(4))
+	for i := range total {
+		col := th.Pal.Hover
+		switch {
+		case i < current:
+			col = th.Pal.OK
+		case i == current:
+			col = th.Pal.AccentLine
+		}
+		st := op.Offset(image.Pt(i*(w+gap), 0)).Push(gtx.Ops)
+		paint.FillShape(gtx.Ops, col, clip.UniformRRect(image.Rect(0, 0, w, h), h/2).Op(gtx.Ops))
+		st.Pop()
+	}
+	if total == 0 {
+		return layout.Dimensions{}
+	}
+	return layout.Dimensions{Size: image.Pt(total*w+(total-1)*gap, h)}
+}
+
 // CodeBlock is a bordered monospace block; lines keep their indentation.
 func CodeBlock(gtx layout.Context, th *theme.Theme, src string) layout.Dimensions {
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X

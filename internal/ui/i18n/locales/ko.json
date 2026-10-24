@@ -484,5 +484,16 @@
   "memory.cancel": "취소",
   "memory.hint": "“그거 잊어줘”라고 말하면 방금 기억한 내용을 삭제합니다. 비밀번호, 결제 및 건강 정보는 절대 기억하지 않습니다.",
   "memory.loadError": "기억을 읽을 수 없습니다",
-  "memory.loadError.d": "잠시 후 다시 시도하세요."
+  "memory.loadError.d": "잠시 후 다시 시도하세요.",
+  "guide.step": "%d단계 / 총 %d단계",
+  "guide.prevDone": "%d단계: %s — 완료",
+  "guide.prev": "이전 단계",
+  "guide.repeat": "다시 듣기",
+  "guide.pause": "일시 정지",
+  "guide.resume": "계속",
+  "guide.next": "다음",
+  "guide.finish": "완료",
+  "guide.stop": "안내 종료",
+  "guide.preparing": "화면을 확인하는 중…",
+  "guide.error": "실패했습니다. 다시 시도하세요."
 }

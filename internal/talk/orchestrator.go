@@ -16,6 +16,7 @@ import (
 	"github.com/xlsft/companion/internal/overlay"
 	"github.com/xlsft/companion/internal/session"
 	"github.com/xlsft/companion/internal/speech"
+	"github.com/xlsft/companion/internal/walkthrough"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -82,6 +83,8 @@ type Orchestrator struct {
 	// turns come from the open conversation (also after it was reopened)
 	// and the system prompt gets what is known about the user.
 	Memory Memory
+	// Guide runs walkthroughs (OC-68); nil: the model cannot start one.
+	Guide Guide
 
 	mu sync.Mutex
 	// history keeps the text of previous turns of the current SessionID for
@@ -93,6 +96,10 @@ type Orchestrator struct {
 var _ session.Steps = (*Orchestrator)(nil)
 
 func (o *Orchestrator) StartRecording(ctx context.Context, ref contracts.SessionRef, emit session.Emitter) error {
+	if o.Guide != nil {
+		// The user talks over the step: let them be heard.
+		o.Guide.Hush()
+	}
 	if o.Recorder == nil {
 		return contracts.Unsupported(contracts.CapMicrophone)
 	}
@@ -123,6 +130,20 @@ func (o *Orchestrator) Speak(ctx context.Context, _ contracts.SessionRef, text s
 }
 
 func (o *Orchestrator) Reason(ctx context.Context, ref contracts.SessionRef, req session.Request, emit session.Emitter) (session.Reply, error) {
+	var guide walkthrough.View
+	if o.Guide != nil {
+		guide = o.Guide.View()
+		if cmd, ok := walkthrough.ParseIntent(req.Text); ok && guide.Active() {
+			// "Next", "repeat"… steer the walkthrough; the model is not asked.
+			releaseAll(req.Captures)
+			if err := o.Guide.Do(ctx, cmd); err != nil && !errors.Is(err, walkthrough.ErrNotActive) {
+				return session.Reply{}, fmt.Errorf("walkthrough: %w", err)
+			}
+			return session.Reply{}, nil
+		}
+		// A question in the middle of a step: the answer takes the floor.
+		o.Guide.Hush()
+	}
 	provider, err := o.Provider(ctx)
 	if err != nil {
 		releaseAll(req.Captures)
@@ -139,7 +160,7 @@ func (o *Orchestrator) Reason(ctx context.Context, ref contracts.SessionRef, req
 	for _, img := range images {
 		user.Content = append(user.Content, llm.ImagePart(img))
 	}
-	sys := o.systemPrompt(len(images) > 0)
+	sys := o.systemPrompt(len(images) > 0, guide)
 	var prior []llm.Message
 	if o.Memory != nil {
 		p := o.Memory.Prepare(ctx, req.Text)
@@ -159,15 +180,26 @@ func (o *Orchestrator) Reason(ctx context.Context, ref contracts.SessionRef, req
 			tools = append(tools, llm.Tool{Name: t.Name, Description: t.Description, Schema: t.Schema})
 		}
 	}
+	if o.Guide != nil {
+		t := walkthrough.StartTool()
+		tools = append(tools, llm.Tool{Name: t.Name, Description: t.Description, Schema: t.Schema})
+	}
 
 	sp := o.startSpeech(ctx, emit)
-	text, err := o.converse(ctx, provider, ref, primary, msgs, tools, emit, sp)
+	text, plan, err := o.converse(ctx, provider, ref, primary, msgs, tools, emit, sp)
 	speechErr := sp.finish()
 	if err != nil {
 		return session.Reply{}, err
 	}
 	if speechErr != nil && ctx.Err() == nil {
 		emit(session.SpeechFailed{Err: speechErr})
+	}
+	if plan != nil && ctx.Err() == nil {
+		// Started only now, after the answer was spoken, so the first
+		// step is not talked over.
+		if err := o.Guide.Start(ctx, *plan, primary); err != nil {
+			return session.Reply{}, fmt.Errorf("walkthrough: %w", err)
+		}
 	}
 	if o.Memory != nil {
 		o.Memory.Record(ctx, ref, req.Text, text)
@@ -177,9 +209,11 @@ func (o *Orchestrator) Reason(ctx context.Context, ref contracts.SessionRef, req
 	return session.Reply{Text: text}, nil
 }
 
-// converse runs model rounds until the model stops calling tools.
+// converse runs model rounds until the model stops calling tools, or has
+// planned a walkthrough: then the steps speak for themselves and plan is
+// returned for starting.
 func (o *Orchestrator) converse(ctx context.Context, p llm.Provider, ref contracts.SessionRef, capture contracts.CaptureID,
-	msgs []llm.Message, tools []llm.Tool, emit session.Emitter, sp *speechPipe) (string, error) {
+	msgs []llm.Message, tools []llm.Tool, emit session.Emitter, sp *speechPipe) (string, *walkthrough.Plan, error) {
 	rounds := o.MaxToolRounds
 	if rounds <= 0 {
 		rounds = defaultMaxToolRounds
@@ -188,17 +222,17 @@ func (o *Orchestrator) converse(ctx context.Context, p llm.Provider, ref contrac
 	for round := 0; ; round++ {
 		res, err := o.stream(ctx, p, llm.ChatRequest{Messages: msgs, Tools: tools, Policy: o.Policy, Session: ref}, emit, sp)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 		answer += res.text
 		if len(res.calls) == 0 {
 			sp.flush()
-			return answer, nil
+			return answer, nil, nil
 		}
 		if round+1 >= rounds {
 			// Out of tool budget: keep what was said rather than failing.
 			sp.flush()
-			return answer, nil
+			return answer, nil, nil
 		}
 		assistant := llm.Message{Role: llm.RoleAssistant, ToolCalls: res.calls}
 		if res.thinking.Text != "" || res.thinking.Signature != "" {
@@ -208,14 +242,39 @@ func (o *Orchestrator) converse(ctx context.Context, p llm.Provider, ref contrac
 			assistant.Content = append(assistant.Content, llm.Text(res.text))
 		}
 		msgs = append(msgs, assistant)
+		var plan *walkthrough.Plan
 		for _, call := range res.calls {
 			// A cancelled generation must not start another action.
 			if err := ctx.Err(); err != nil {
-				return "", err
+				return "", nil, err
+			}
+			if call.Name == walkthrough.ToolStart && o.Guide != nil {
+				var msg llm.Message
+				msg, plan = startTool(capture, call)
+				msgs = append(msgs, msg)
+				continue
 			}
 			msgs = append(msgs, o.runTool(ctx, ref, capture, call))
 		}
+		if plan != nil {
+			sp.flush()
+			return answer, plan, nil
+		}
 	}
+}
+
+// startTool validates a start_walkthrough call. An invalid plan goes back
+// to the model so it can correct it.
+func startTool(capture contracts.CaptureID, call llm.ToolCall) (llm.Message, *walkthrough.Plan) {
+	plan, err := walkthrough.FromToolCall(call.Arguments, capture != "")
+	if err != nil {
+		return toolResult(call, err.Error(), true), nil
+	}
+	return toolResult(call, "started", false), &plan
+}
+
+func toolResult(call llm.ToolCall, text string, isErr bool) llm.Message {
+	return llm.Message{Role: llm.RoleTool, ToolCallID: call.ID, IsError: isErr, Content: []llm.Part{llm.Text(text)}}
 }
 
 type roundResult struct {
@@ -290,7 +349,7 @@ func (o *Orchestrator) runTool(ctx context.Context, ref contracts.SessionRef, ca
 	return result("shown", false)
 }
 
-func (o *Orchestrator) systemPrompt(withScreen bool) string {
+func (o *Orchestrator) systemPrompt(withScreen bool, guide walkthrough.View) string {
 	if o.SystemPrompt != "" {
 		return o.SystemPrompt
 	}
@@ -301,6 +360,15 @@ func (o *Orchestrator) systemPrompt(withScreen bool) string {
 			"what to click, call point_at with the element's position on the screenshot and say in one " +
 			"sentence what it is. Use annotate to explain with arrows or outlines. Never invent elements " +
 			"that are not visible; say so if you can't find it."
+	}
+	if o.Guide != nil {
+		p += " When the task takes several actions on screen, guide the user with start_walkthrough instead of " +
+			"listing every step at once."
+		if guide.Active() {
+			p += fmt.Sprintf(" A walkthrough is in progress: %q, at step %d of %d, %q. The user moves on by saying "+
+				"next, back, repeat, pause or stop; answer questions about the step briefly.",
+				guide.Goal, guide.Index+1, guide.Total, guide.Title)
+		}
 	}
 	return p
 }

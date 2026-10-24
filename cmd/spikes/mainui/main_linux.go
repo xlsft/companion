@@ -6,6 +6,7 @@
 // appends the typed turn, and Stop ends the canned reply.
 //
 //	mainui -theme dark -lang ru -state chat   # chat | empty | offline
+//	mainui -guide running                     # walkthrough card: running | paused | none
 //	mainui -route settings -section voice
 //	                                     # route: home | settings
 //	                                     # section: general | voice | screen | privacy | diagnostics
@@ -36,6 +37,7 @@ import (
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/store"
 	"github.com/xlsft/companion/internal/ui"
+	"github.com/xlsft/companion/internal/walkthrough"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -45,6 +47,7 @@ func main() {
 	state := flag.String("state", "chat", "chat, empty or offline")
 	route := flag.String("route", "home", "page to open: home or settings")
 	section := flag.String("section", "general", "settings section: general, voice, screen, privacy, diagnostics")
+	guideState := flag.String("guide", "none", "walkthrough card: running, paused or none")
 	flag.Parse()
 	routes := map[string]ui.Route{"home": ui.RouteHome, "settings": ui.RouteSettings}
 	start, ok := routes[*route]
@@ -89,8 +92,13 @@ func main() {
 	case "empty":
 		be = newDemo(chat.View{})
 	}
+	var guide ui.GuideBackend
+	switch *guideState {
+	case "running", "paused":
+		guide = newDemoGuide(walkthrough.Status(*guideState))
+	}
 	diagnose := func(ctx context.Context) (contracts.CapabilityReport, error) { return detect.New().Detect(ctx) }
-	shell := ui.New(ui.Options{Mode: ui.ModeMain, Settings: svc, Chat: be, Diagnose: diagnose, Quit: stop, Log: log, Appearance: scheme, Version: buildinfo.Version})
+	shell := ui.New(ui.Options{Mode: ui.ModeMain, Settings: svc, Chat: be, Guide: guide, Diagnose: diagnose, Quit: stop, Log: log, Appearance: scheme, Version: buildinfo.Version})
 	go func() {
 		// The main window exists once the app has started the shell.
 		time.Sleep(300 * time.Millisecond)
@@ -193,4 +201,63 @@ func demoView() chat.View {
 			{Role: chat.RoleAssistant, Text: "При экспорте оставьте формат PNG — пустая заливка сохранится как прозрачность. Внизу правой панели в блоке Export", Streaming: true},
 		},
 	}
+}
+
+// demoGuide is a GuideBackend over the prototype's walkthrough; its
+// buttons move through the steps without drawing or speaking anything.
+type demoGuide struct {
+	mu   sync.Mutex
+	st   walkthrough.State
+	subs []chan walkthrough.View
+}
+
+func newDemoGuide(status walkthrough.Status) *demoGuide {
+	steps := []walkthrough.Step{
+		{Title: "Бочка на каждую долю", Say: "В строке Kick включите шаги 1, 5, 9 и 13."},
+		{Title: "Хэт между бочками", Say: "В строке Hat включите шаги 3, 7, 11 и 15 — я отметил их пунктиром. Скажите «дальше», когда закончите."},
+		{Title: "Хлопок на вторую и четвёртую", Say: "В строке Clap включите шаги 5 и 13."},
+		{Title: "Темп 124", Say: "Нажмите на поле BPM и введите 124."},
+		{Title: "Запуск", Say: "Нажмите пробел, чтобы послушать бит."},
+	}
+	return &demoGuide{st: walkthrough.State{Plan: walkthrough.Plan{Goal: "бит в стиле house", Steps: steps}, Status: status, Index: 1}}
+}
+
+func (d *demoGuide) view() walkthrough.View {
+	st := d.st
+	v := walkthrough.View{Status: st.Status, Goal: st.Plan.Goal, Index: st.Index, Total: len(st.Plan.Steps)}
+	if st.Index < len(st.Plan.Steps) {
+		v.Title, v.Text = st.Plan.Steps[st.Index].Title, st.Plan.Steps[st.Index].Say
+	}
+	if st.Index > 0 {
+		v.Prev = st.Plan.Steps[st.Index-1].Title
+	}
+	return v
+}
+
+func (d *demoGuide) Subscribe() (<-chan walkthrough.View, func()) {
+	ch := make(chan walkthrough.View, 1)
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	ch <- d.view()
+	d.subs = append(d.subs, ch)
+	return ch, func() {}
+}
+
+func (d *demoGuide) Do(_ context.Context, cmd walkthrough.Command) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	next, _, err := d.st.Apply(cmd)
+	if err != nil {
+		return err
+	}
+	d.st = next
+	v := d.view()
+	for _, ch := range d.subs {
+		select {
+		case <-ch:
+		default:
+		}
+		ch <- v
+	}
+	return nil
 }

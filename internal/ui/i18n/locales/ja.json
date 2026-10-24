@@ -484,5 +484,16 @@
   "memory.cancel": "キャンセル",
   "memory.hint": "「忘れて」と言うと、直前に覚えたことを削除します。パスワード、支払い、健康に関する情報は覚えません。",
   "memory.loadError": "メモリを読み込めませんでした",
-  "memory.loadError.d": "しばらくしてからもう一度お試しください。"
+  "memory.loadError.d": "しばらくしてからもう一度お試しください。",
+  "guide.step": "ステップ %d / %d",
+  "guide.prevDone": "ステップ %d：%s — 完了",
+  "guide.prev": "前のステップ",
+  "guide.repeat": "もう一度",
+  "guide.pause": "一時停止",
+  "guide.resume": "再開",
+  "guide.next": "次へ",
+  "guide.finish": "完了",
+  "guide.stop": "ガイドを終了",
+  "guide.preparing": "画面を確認しています…",
+  "guide.error": "できませんでした。もう一度お試しください。"
 }

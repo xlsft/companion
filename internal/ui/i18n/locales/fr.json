@@ -484,5 +484,16 @@
   "memory.cancel": "Annuler",
   "memory.hint": "Dites « oublie ça » pour supprimer ce qui vient d'être appris. Les secrets, les données de paiement et de santé ne sont jamais mémorisés.",
   "memory.loadError": "Impossible de lire la mémoire",
-  "memory.loadError.d": "Réessayez dans un instant."
+  "memory.loadError.d": "Réessayez dans un instant.",
+  "guide.step": "Étape %d sur %d",
+  "guide.prevDone": "Étape %d : %s — fait",
+  "guide.prev": "Étape précédente",
+  "guide.repeat": "Répéter",
+  "guide.pause": "Pause",
+  "guide.resume": "Reprendre",
+  "guide.next": "Suivant",
+  "guide.finish": "Terminer",
+  "guide.stop": "Arrêter le guide",
+  "guide.preparing": "Je regarde l’écran…",
+  "guide.error": "Impossible. Réessayez."
 }
