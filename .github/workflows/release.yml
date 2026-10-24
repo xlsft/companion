@@ -1,0 +1,153 @@
+name: Release
+
+# A v* tag builds the Linux tarballs and AppImages natively per architecture,
+# then GoReleaser checksums them, signs checksums.txt with cosign (keyless,
+# this workflow's OIDC identity) and publishes the GitHub release.
+#
+# Changes to the packaging run the same build as a dry run: nothing is
+# signed or published, the result is kept as a workflow artifact.
+on:
+  push:
+    tags: ["v*"]
+    branches: ["**"]
+    paths:
+      - .github/workflows/release.yml
+      - .goreleaser.yaml
+      - Makefile
+      - install.sh
+      - packaging/**
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .goreleaser.yaml
+      - Makefile
+      - install.sh
+      - packaging/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  ci:
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/ci.yml
+
+  dist:
+    name: dist-linux (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest supported Ubuntu runner sets the glibc floor of the
+          # binaries (2.35), so they run on older distributions too.
+          - runner: ubuntu-22.04
+            arch: x86_64
+          - runner: ubuntu-22.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: System packages
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libwayland-dev libx11-dev libx11-xcb-dev libxkbcommon-x11-dev \
+            libgles2-mesa-dev libegl1-mesa-dev libffi-dev libxcursor-dev \
+            libxfixes-dev libvulkan-dev libpipewire-0.3-dev pkg-config \
+            cmake ninja-build ccache squashfs-tools
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: release-whisper-${{ matrix.arch }}
+      - name: Version
+        id: version
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*) v=${GITHUB_REF_NAME#v} ;;
+            *) v=0.0.0-dev.$(git rev-parse --short HEAD) ;;
+          esac
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - name: make whisper
+        # Portable ggml (no -march=native): the binary runs on any CPU of
+        # the architecture. CPU backend only; GPU backends are a build option.
+        run: make whisper WHISPER_NATIVE=OFF WHISPER_CMAKE_EXTRA="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+      - name: make dist-linux
+        run: make dist-linux VERSION=${{ steps.version.outputs.version }}
+      - name: Smoke test
+        run: |
+          name=companion-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}
+          test -f "dist/$name.tar.gz"
+          tar -tzf "dist/$name.tar.gz" | sort
+          tar -xzf "dist/$name.tar.gz" -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/$name/companion" -version
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ matrix.arch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.AppImage
+          if-no-files-found: error
+
+  release:
+    needs: [ci, dist]
+    # ci is skipped for dry runs; release then only checks the assets.
+    if: ${{ !cancelled() && needs.dist.result == 'success' && (needs.ci.result == 'success' || needs.ci.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write # keyless cosign signing of checksums.txt
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: dist-*
+          path: dist-release
+          merge-multiple: true
+      - uses: sigstore/cosign-installer@v4
+      - name: GoReleaser (publish)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify the published signature
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cosign verify-blob dist/checksums.txt --bundle dist/checksums.txt.sigstore.json \
+            --certificate-identity-regexp '^https://github.com/xlsft/companion/.github/workflows/release.yml@refs/tags/v.*$' \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+      - name: GoReleaser (dry run)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: release --clean --snapshot --skip=publish,sign
+      - name: Summary
+        run: |
+          {
+            echo '### Release assets'
+            echo '```'
+            cat dist/checksums.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          name: release-dry-run
+          path: |
+            dist/checksums.txt
+            dist-release/*

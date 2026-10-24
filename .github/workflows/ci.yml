@@ -50,7 +50,7 @@ jobs:
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -tags novulkan ./...
       - name: shellcheck
-        run: shellcheck packaging/install.sh packaging/dist-linux.sh
+        run: shellcheck install.sh packaging/install.sh packaging/dist-linux.sh
 
   test:
     name: Test
@@ -114,3 +114,13 @@ jobs:
         run: make whisper WHISPER_NATIVE=OFF WHISPER_CMAKE_EXTRA="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
       - name: make build-whisper
         run: make build-whisper && grep -q whisper_init_from_file bin/stt-sidecar
+
+  goreleaser:
+    name: GoReleaser config
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: check
