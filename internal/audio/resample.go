@@ -6,8 +6,10 @@ import (
 )
 
 // Resampler filter design. The stopband starts exactly at the lower Nyquist
-// frequency so nothing above 8 kHz folds back into the speech band at 16 kHz;
-// the passband keeps 87.5% of it (7 kHz), which covers whisper's useful range.
+// frequency of the pair: capturing to 16 kHz nothing above 8 kHz folds back
+// into the speech band, and playing 24 kHz TTS on a 48 kHz device no spectral
+// image above 12 kHz survives. The passband keeps 87.5% of it (7 kHz and
+// 10.5 kHz respectively), which covers whisper's and TTS voices' useful range.
 const (
 	passbandFrac = 0.875
 	stopbandDB   = 90.0
@@ -103,6 +105,13 @@ func (r *Resampler) Process(dst []float64, src []float32) []float64 {
 		r.pos -= drop
 	}
 	return dst
+}
+
+// Flush appends the output still held back by the filter delay, as if the
+// input ended in silence, and returns it. Call it once at the end of a
+// stream; a playback tail would otherwise lose its last couple of ms.
+func (r *Resampler) Flush(dst []float64) []float64 {
+	return r.Process(dst, make([]float32, r.half))
 }
 
 func sinc(x float64) float64 {
