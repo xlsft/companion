@@ -8,8 +8,8 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
-	"gioui.org/unit"
 	"gioui.org/widget"
+	"gioui.org/widget/material"
 
 	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
@@ -17,9 +17,7 @@ import (
 
 // Shared widgets live in kit so the wizard package can use them too.
 var (
-	focusRing  = kit.FocusRing
 	button     = kit.Button
-	heading    = kit.Heading
 	subheading = kit.Subheading
 	body       = kit.Body
 	muted      = kit.Muted
@@ -27,17 +25,34 @@ var (
 	card       = kit.Card
 )
 
+// pageScaffold is a main-window page: the 54px header with title and
+// actions, then rows in a scrolling list with the prototypes' padding.
+func pageScaffold(gtx layout.Context, th *theme.Theme, title string, actions layout.Widget, list *widget.List, rows []layout.Widget) layout.Dimensions {
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return kit.PageHeader(gtx, th, kit.PageTitle(th, title).Layout, actions)
+		}),
+		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+			list.Axis = layout.Vertical
+			return material.List(th.Theme, list).Layout(gtx, len(rows), func(gtx layout.Context, i int) layout.Dimensions {
+				in := layout.Inset{Left: th.Dp(28), Right: th.Dp(28)}
+				if i == 0 {
+					in.Top = th.Dp(24)
+				}
+				if i == len(rows)-1 {
+					in.Bottom = th.Dp(24)
+				}
+				return in.Layout(gtx, rows[i])
+			})
+		}),
+	)
+}
+
 // placeholderPage stands in for sections that are not implemented yet.
 type placeholderPage struct{ route Route }
 
 func (p placeholderPage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
-	return layout.UniformInset(24).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-			layout.Rigid(heading(th, T(l, p.route.labelKey())).Layout),
-			vspace(12),
-			layout.Rigid(muted(th, T(l, "placeholder.body")).Layout),
-		)
-	})
+	return pageScaffold(gtx, th, T(l, p.route.labelKey()), nil, new(widget.List), []layout.Widget{muted(th, T(l, "placeholder.body")).Layout})
 }
 
 // dialog is a modal message box; Esc or its button closes it.
@@ -46,11 +61,15 @@ type dialog struct {
 	needFocus bool
 	title     string
 	text      string
-	closeBtn  widget.Clickable
+	// note is an optional small print line under the text.
+	note     string
+	closeBtn widget.Clickable
 }
 
-func (d *dialog) show(title, text string) {
-	d.open, d.needFocus, d.title, d.text = true, true, title, text
+func (d *dialog) show(title, text string) { d.showNote(title, text, "") }
+
+func (d *dialog) showNote(title, text, note string) {
+	d.open, d.needFocus, d.title, d.text, d.note = true, true, title, text, note
 }
 
 func (d *dialog) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
@@ -91,17 +110,27 @@ func (d *dialog) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dime
 		d.needFocus = false
 	}
 	return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(unit.Dp(420*th.Scale)))
-		return card(gtx, th, func(gtx layout.Context) layout.Dimensions {
-			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				layout.Rigid(subheading(th, d.title).Layout),
-				vspace(8),
-				layout.Rigid(body(th, d.text).Layout),
-				vspace(16),
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return button(gtx, th, &d.closeBtn, T(l, "dialog.close"))
-				}),
-			)
+		gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(th.Dp(440)))
+		return kit.Box(gtx, th, th.Pal.Surface, th.Pal.Border, 6, func(gtx layout.Context) layout.Dimensions {
+			return layout.UniformInset(th.Dp(24)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+					layout.Rigid(kit.Title(th, d.title).Layout),
+					vspace(th.Dp(10)),
+					layout.Rigid(kit.Lead(th, d.text).Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						if d.note == "" {
+							return layout.Dimensions{}
+						}
+						return layout.Inset{Top: th.Dp(12)}.Layout(gtx, kit.Small(th, d.note).Layout)
+					}),
+					vspace(th.Dp(20)),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						return layout.E.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							return kit.SecondaryButton(gtx, th, &d.closeBtn, T(l, "dialog.close"))
+						})
+					}),
+				)
+			})
 		})
 	})
 }

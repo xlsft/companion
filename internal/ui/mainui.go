@@ -4,12 +4,11 @@ import (
 	"image"
 	"sync"
 
-	"gioui.org/font"
 	"gioui.org/layout"
-	"gioui.org/unit"
 	"gioui.org/widget"
-	"gioui.org/widget/material"
 
+	"github.com/xlsft/companion/internal/ui/icon"
+	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
 )
 
@@ -29,12 +28,21 @@ type mainUI struct {
 	nav   Navigator
 	pages map[Route]page
 
-	navBtns []widget.Clickable
-	about   dialog
+	chat *chatModel
+
+	newChatBtn widget.Clickable
+	aboutBtn   widget.Clickable
+	navBtns    []widget.Clickable
+	about      dialog
 }
 
 func newMainUI(sh *Shell) *mainUI {
-	return &mainUI{sh: sh, pages: map[Route]page{}, navBtns: make([]widget.Clickable, len(Routes))}
+	return &mainUI{
+		sh:      sh,
+		pages:   map[Route]page{},
+		chat:    newChatModel(sh.opts.Chat, sh.log, sh.invalidateAll),
+		navBtns: make([]widget.Clickable, len(Routes)),
+	}
 }
 
 func (m *mainUI) navigate(r Route) {
@@ -48,6 +56,14 @@ func (m *mainUI) current() Route {
 	defer m.mu.Unlock()
 	return m.nav.Current()
 }
+
+// newChat starts an empty conversation and shows it.
+func (m *mainUI) newChat() {
+	m.chat.newChat()
+	m.navigate(RouteHome)
+}
+
+func (m *mainUI) close() { m.chat.close() }
 
 // page builds a section on first visit, so unvisited sections cost nothing.
 func (m *mainUI) page(r Route) page {
@@ -77,6 +93,13 @@ func (m *mainUI) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dime
 			m.navigate(Routes[i])
 		}
 	}
+	if m.newChatBtn.Clicked(gtx) {
+		m.newChat()
+	}
+	if m.aboutBtn.Clicked(gtx) {
+		m.about.showNote(T(l, "about.title"), Tf(l, "about.body", m.sh.opts.Version), T(l, "nav.hint"))
+	}
+	m.chat.ensure()
 	cur := m.current()
 	pg := m.page(cur)
 	return layout.Stack{}.Layout(gtx,
@@ -84,10 +107,7 @@ func (m *mainUI) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dime
 			gtx.Constraints.Min = gtx.Constraints.Max
 			return layout.Flex{}.Layout(gtx,
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions { return m.sidebar(gtx, th, l, cur) }),
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					fill(gtx, th.Pal.Divider, image.Pt(gtx.Dp(1), gtx.Constraints.Max.Y))
-					return layout.Dimensions{Size: image.Pt(gtx.Dp(1), gtx.Constraints.Max.Y)}
-				}),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.VDivider(gtx, th) }),
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return pg.Layout(gtx, th, l) }),
 			)
 		}),
@@ -95,92 +115,94 @@ func (m *mainUI) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dime
 	)
 }
 
+// sidebarWidth is the prototypes' sidebar column in CSS pixels.
+const sidebarWidth = 260
+
 func (m *mainUI) sidebar(gtx layout.Context, th *theme.Theme, l Lang, cur Route) layout.Dimensions {
-	w := gtx.Dp(unit.Dp(210 * th.Scale))
+	w := gtx.Dp(th.Dp(sidebarWidth))
 	gtx.Constraints = layout.Exact(image.Pt(w, gtx.Constraints.Max.Y))
 	fill(gtx, th.Pal.Sidebar, gtx.Constraints.Max)
 	children := []layout.FlexChild{
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return m.logoRow(gtx, th, l) }),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.Divider(gtx, th) }),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Left: 16, Right: 16, Top: 20, Bottom: 16}.Layout(gtx, subheading(th, T(l, "app.name")).Layout)
+			if m.chat.be == nil {
+				gtx = gtx.Disabled()
+			}
+			return layout.Inset{Top: th.Dp(12), Bottom: th.Dp(4), Left: th.Dp(8), Right: th.Dp(8)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return newChatButton(gtx, th, &m.newChatBtn, T(l, "sidebar.newChat"))
+			})
 		}),
+		kit.VSpace(th.Dp(8)),
 	}
 	for i, r := range Routes {
 		children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return navItem(gtx, th, &m.navBtns[i], T(l, r.labelKey()), r == cur)
+			return layout.Inset{Left: th.Dp(8), Right: th.Dp(8), Bottom: th.Dp(2)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return kit.NavItem(gtx, th, &m.navBtns[i], r.icon(), T(l, r.labelKey()), r == cur)
+			})
 		}))
 	}
 	children = append(children,
 		layout.Flexed(1, layout.Spacer{}.Layout),
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return layout.UniformInset(16).Layout(gtx, muted(th, T(l, "nav.hint")).Layout)
-		}),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.Divider(gtx, th) }),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return sidebarStatus(gtx, th, l, m.chat) }),
 	)
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
 }
 
-func navItem(gtx layout.Context, th *theme.Theme, btn *widget.Clickable, label string, selected bool) layout.Dimensions {
-	return layout.Inset{Left: 8, Right: 8, Bottom: 2}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return focusRing(gtx, th, gtx.Focused(btn), func(gtx layout.Context) layout.Dimensions {
-			return material.Clickable(gtx, btn, func(gtx layout.Context) layout.Dimensions {
-				gtx.Constraints.Min.X = gtx.Constraints.Max.X
-				return layout.Background{}.Layout(gtx,
-					func(gtx layout.Context) layout.Dimensions {
-						if selected {
-							fill(gtx, th.Pal.Selected, gtx.Constraints.Min)
-						}
-						return layout.Dimensions{Size: gtx.Constraints.Min}
-					},
-					func(gtx layout.Context) layout.Dimensions {
-						prefix := "   "
-						if selected {
-							prefix = theme.SelectedMarker + " "
-						}
-						lbl := body(th, prefix+label)
-						if selected {
-							lbl.Font.Weight = font.Bold
-						}
-						return layout.Inset{Top: 8, Bottom: 8, Left: 8, Right: 8}.Layout(gtx, lbl.Layout)
-					})
-			})
-		})
+// logoRow is the 54px brand row; it lines up with the page headers.
+func (m *mainUI) logoRow(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
+	h := gtx.Dp(th.Dp(54))
+	gtx.Constraints = layout.Exact(image.Pt(gtx.Constraints.Max.X, h))
+	return layout.Inset{Left: th.Dp(20), Right: th.Dp(12)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+				d := kit.VCenter(gtx, h, func(gtx layout.Context) layout.Dimensions { return kit.Logo(gtx, th, 15) })
+				d.Size.X = gtx.Constraints.Max.X
+				return d
+			}),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return kit.VCenter(gtx, h, func(gtx layout.Context) layout.Dimensions {
+					return kit.IconButton(gtx, th, &m.aboutBtn, icon.Information, T(l, "home.about"))
+				})
+			}),
+		)
 	})
 }
 
-// homePage is the main landing section; Talk and chats attach here later.
-type homePage struct {
-	m           *mainUI
-	settingsBtn widget.Clickable
-	aboutBtn    widget.Clickable
-}
-
-func newHomePage(m *mainUI) *homePage { return &homePage{m: m} }
-
-func (p *homePage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
-	if p.settingsBtn.Clicked(gtx) {
-		p.m.navigate(RouteSettings)
+// newChatButton is the sidebar's full-width "New chat" with its shortcut.
+func newChatButton(gtx layout.Context, th *theme.Theme, c *widget.Clickable, label string) layout.Dimensions {
+	fg, bg := th.Pal.Fg, th.Pal.Raised
+	switch {
+	case !gtx.Enabled():
+		fg = th.Pal.Subtle
+	case c.Hovered():
+		bg = th.Pal.Hover
 	}
-	if p.aboutBtn.Clicked(gtx) {
-		p.m.about.show(T(l, "about.title"), Tf(l, "about.body", p.m.sh.opts.Version))
-	}
-	return layout.UniformInset(24).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-			layout.Rigid(heading(th, T(l, "home.heading")).Layout),
-			vspace(8),
-			layout.Rigid(th.StatusLabel(theme.StatusOK, T(l, "home.status")).Layout),
-			vspace(12),
-			layout.Rigid(body(th, T(l, "home.body")).Layout),
-			vspace(20),
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{}.Layout(gtx,
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						return button(gtx, th, &p.settingsBtn, T(l, "home.settings"))
-					}),
-					layout.Rigid(layout.Spacer{Width: 12}.Layout),
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						return button(gtx, th, &p.aboutBtn, T(l, "home.about"))
-					}),
-				)
-			}),
-		)
+	return kit.FocusRing(gtx, th, gtx.Focused(c), func(gtx layout.Context) layout.Dimensions {
+		return c.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			h := gtx.Dp(th.Dp(36))
+			gtx.Constraints = layout.Exact(image.Pt(gtx.Constraints.Max.X, h))
+			return kit.Box(gtx, th, bg, th.Pal.Border, 4, func(gtx layout.Context) layout.Dimensions {
+				return layout.Inset{Left: th.Dp(12), Right: th.Dp(12)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							return kit.VCenter(gtx, h, func(gtx layout.Context) layout.Dimensions { return kit.Icon(gtx, th, icon.Add, 16, fg) })
+						}),
+						kit.HSpace(th.Dp(8)),
+						layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+							t := kit.Text(th, 14, label, fg)
+							t.MaxLines = 1
+							return kit.VCenter(gtx, h, t.Layout)
+						}),
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							t := kit.Text(th, 11, "Ctrl+N", th.Pal.Subtle)
+							t.Font.Typeface = theme.Mono
+							return kit.VCenter(gtx, h, t.Layout)
+						}),
+					)
+				})
+			})
+		})
 	})
 }

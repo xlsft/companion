@@ -89,14 +89,16 @@ func TestLayoutAllScreens(t *testing.T) {
 }
 
 type recTarget struct {
-	quit  chan struct{}
-	scale []int
-	nav   []int
+	quit    chan struct{}
+	scale   []int
+	nav     []int
+	newChat int
 }
 
 func (r *recTarget) Quit()             { r.quit <- struct{}{} }
 func (r *recTarget) stepScale(n int)   { r.scale = append(r.scale, n) }
 func (r *recTarget) navShortcut(d int) { r.nav = append(r.nav, d) }
+func (r *recTarget) newChatShortcut()  { r.newChat++ }
 func (r *recTarget) Layout(gtx layout.Context, _ *theme.Theme, _ Lang) layout.Dimensions {
 	handleShortcuts(gtx, r)
 	return layout.Dimensions{Size: gtx.Constraints.Max}
@@ -117,6 +119,7 @@ func TestShortcuts(t *testing.T) {
 		key.Event{Name: "0", Modifiers: key.ModShortcut, State: key.Press},
 		key.Event{Name: "3", Modifiers: key.ModShortcut, State: key.Press},
 		key.Event{Name: "3", State: key.Press}, // without Ctrl: ignored
+		key.Event{Name: "N", Modifiers: key.ModShortcut, State: key.Press},
 		key.Event{Name: "Q", Modifiers: key.ModShortcut, State: key.Press},
 	)
 	run()
@@ -125,23 +128,34 @@ func TestShortcuts(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("Ctrl+Q did not quit")
 	}
-	if fmt.Sprint(rt.scale) != "[1 -1 0]" || fmt.Sprint(rt.nav) != "[3]" {
-		t.Errorf("scale=%v nav=%v", rt.scale, rt.nav)
+	if fmt.Sprint(rt.scale) != "[1 -1 0]" || fmt.Sprint(rt.nav) != "[3]" || rt.newChat != 1 {
+		t.Errorf("scale=%v nav=%v newChat=%d", rt.scale, rt.nav, rt.newChat)
 	}
 }
 
-// Tab must walk the sidebar in display order (FR-UI-007).
+// Tab must walk the sidebar in display order (FR-UI-007): About in the
+// logo row, New chat, then the sections.
 func TestTabOrderStartsWithNavigation(t *testing.T) {
 	h := newHarness(t, ModeMain, nil)
 	m, _ := h.mainBuilt()
 	th := theme.New(false, 1)
 	r := new(input.Router)
 	frame(r, h.sh, th, m)
+	r.MoveFocus(key.FocusForward)
+	frame(r, h.sh, th, m)
+	if !r.Source().Focused(&m.aboutBtn) {
+		t.Fatal("Tab 1: About not focused")
+	}
+	r.MoveFocus(key.FocusForward)
+	frame(r, h.sh, th, m)
+	if !r.Source().Focused(&m.newChatBtn) {
+		t.Fatal("Tab 2: New chat not focused")
+	}
 	for i := range Routes {
 		r.MoveFocus(key.FocusForward)
 		frame(r, h.sh, th, m)
 		if !r.Source().Focused(&m.navBtns[i]) {
-			t.Fatalf("Tab %d: nav item %d not focused", i+1, i)
+			t.Fatalf("Tab %d: nav item %d not focused", i+3, i)
 		}
 	}
 	// Enter activates the focused item like a click.

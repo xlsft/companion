@@ -10,6 +10,7 @@ import (
 	"gioui.org/widget/material"
 
 	"github.com/xlsft/companion/internal/settings"
+	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
 )
 
@@ -174,13 +175,13 @@ func (p *settingsPage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layou
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						return button(gtx, th, &p.slower, T(l, "tts.slower"))
+						return kit.SecondaryButton(gtx, th, &p.slower, T(l, "tts.slower"))
 					}),
 					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 						return layout.Inset{Left: 12, Right: 12}.Layout(gtx, material.Slider(th.Theme, &p.speed).Layout)
 					}),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						return button(gtx, th, &p.faster, T(l, "tts.faster"))
+						return kit.SecondaryButton(gtx, th, &p.faster, T(l, "tts.faster"))
 					}),
 				)
 			}),
@@ -207,19 +208,15 @@ func (p *settingsPage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layou
 		}},
 	}
 
-	var head []layout.Widget
-	head = append(head, heading(th, T(l, "settings.heading")).Layout)
+	var rows []layout.Widget
 	if p.saveErr {
-		head = append(head, th.StatusLabel(theme.StatusError, T(l, "settings.saveError")).Layout)
+		rows = append(rows, func(gtx layout.Context) layout.Dimensions {
+			return layout.Inset{Bottom: 12}.Layout(gtx, th.StatusLabel(theme.StatusError, T(l, "settings.saveError")).Layout)
+		})
 	}
-	n := len(head) + len(groups)
-	return layout.UniformInset(24).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return material.List(th.Theme, &p.list).Layout(gtx, n, func(gtx layout.Context, i int) layout.Dimensions {
-			if i < len(head) {
-				return layout.Inset{Bottom: 12}.Layout(gtx, head[i])
-			}
-			g := groups[i-len(head)]
-			return layout.Inset{Bottom: 12, Right: 12}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+	for _, g := range groups {
+		rows = append(rows, func(gtx layout.Context) layout.Dimensions {
+			return layout.Inset{Bottom: 12}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				gtx.Constraints.Min.X = gtx.Constraints.Max.X
 				return card(gtx, th, func(gtx layout.Context) layout.Dimensions {
 					rows := append([]layout.FlexChild{layout.Rigid(subheading(th, T(l, g.key)).Layout), vspace(8)}, g.rows...)
@@ -227,7 +224,8 @@ func (p *settingsPage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layou
 				})
 			})
 		})
-	})
+	}
+	return pageScaffold(gtx, th, T(l, "settings.heading"), nil, &p.list, rows)
 }
 
 func (p *settingsPage) modelRows(th *theme.Theme, l Lang, m settings.Models) []layout.FlexChild {

@@ -90,6 +90,11 @@ type Snapshot struct {
 	// the full reply if the model did not stream. Empty for pure state
 	// changes. It must never be logged.
 	Text string
+	// Request is the user's complete request (the final transcript of a
+	// voice request, the typed text of a text one). It is set on exactly
+	// one snapshot per generation, the first after the input became final,
+	// so a chat view can append the user's turn. It must never be logged.
+	Request string
 	// Since is when State was entered; text-only updates keep it.
 	Since time.Time
 }

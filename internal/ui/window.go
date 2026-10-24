@@ -92,6 +92,7 @@ type shortcutTarget interface {
 	Quit()
 	stepScale(n int)
 	navShortcut(digit int)
+	newChatShortcut()
 }
 
 var shortcutFilters = func() []event.Filter {
@@ -101,6 +102,7 @@ var shortcutFilters = func() []event.Filter {
 		key.Filter{Name: "=", Required: key.ModShortcut, Optional: key.ModShift},
 		key.Filter{Name: "-", Required: key.ModShortcut},
 		key.Filter{Name: "0", Required: key.ModShortcut},
+		key.Filter{Name: "N", Required: key.ModShortcut},
 	}
 	for i := range Routes {
 		fs = append(fs, key.Filter{Name: key.Name(rune('1' + i)), Required: key.ModShortcut})
@@ -130,6 +132,8 @@ func handleShortcuts(gtx layout.Context, t shortcutTarget) {
 			t.stepScale(-1)
 		case "0":
 			t.stepScale(0)
+		case "N":
+			t.newChatShortcut()
 		default:
 			if len(e.Name) == 1 && e.Name[0] >= '1' && e.Name[0] <= '9' {
 				t.navShortcut(int(e.Name[0] - '0'))

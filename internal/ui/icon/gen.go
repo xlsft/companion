@@ -25,6 +25,7 @@ var names = []string{
 	"more-2-line", "pause-fill", "pin-line", "play-fill", "refresh-2-line", "right-line",
 	"robot-line", "search-line", "settings-3-line", "sparkles-line", "stop-fill", "time-line",
 	"translate-line", "up-line", "volume-line", "warning-line",
+	"mic-off-line", "stop-line", "unlink-line", "voice-line",
 }
 
 var pathRe = regexp.MustCompile(`<path fill="currentColor"[^>]*\sd="([^"]*)"|<path d="([^"]*)" fill="currentColor"`)

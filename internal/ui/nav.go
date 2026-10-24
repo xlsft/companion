@@ -1,5 +1,7 @@
 package ui
 
+import "github.com/xlsft/companion/internal/ui/icon"
+
 // Route is a section of the main window.
 type Route int
 
@@ -31,6 +33,22 @@ func (r Route) labelKey() string {
 		return "nav.diagnostics"
 	}
 	return "nav.home"
+}
+
+func (r Route) icon() icon.Name {
+	switch r {
+	case RouteHistory:
+		return icon.History
+	case RouteAgents:
+		return icon.Robot
+	case RouteSkills:
+		return icon.Sparkles
+	case RouteSettings:
+		return icon.Settings3
+	case RouteDiagnostics:
+		return icon.Heartbeat
+	}
+	return icon.Chat1
 }
 
 func (r Route) valid() bool { return r >= RouteHome && r <= RouteDiagnostics }

@@ -722,3 +722,62 @@ func TestStreamedSpeechFailureDegradesToText(t *testing.T) {
 	// The manager must not try to speak the reply again after a failure.
 	h.expectNone()
 }
+
+// The user's turn is published once, on the first state after the input
+// became final, whatever the capture order.
+func TestRequestPublishedOnce(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     Config
+		acts    []act
+		states  []State
+		request int // index of the snapshot carrying Request
+		want    string
+	}{
+		{
+			name:    "text, capture",
+			cfg:     Config{Settings: Settings{Capture: CaptureAtEnd}},
+			acts:    []act{in(SubmitText{Text: "typed"}), res(CaptureDone{}), res(LLMDelta{Text: "a"})},
+			states:  []State{StateCapturing, StateReasoning, StateResponding},
+			request: 0, want: "typed",
+		},
+		{
+			name:    "text, no capture",
+			cfg:     Config{Settings: Settings{Capture: CaptureNever}},
+			acts:    []act{in(SubmitText{Text: "typed"}), res(LLMDelta{Text: "a"})},
+			states:  []State{StateReasoning, StateResponding},
+			request: 0, want: "typed",
+		},
+		{
+			name: "voice, capture at end",
+			cfg:  Config{Settings: Settings{VoiceMode: ModeToggle, Capture: CaptureAtEnd}},
+			acts: []act{in(ToggleTalk{}), res(TranscriptPartial{Text: "spo"}), in(ToggleTalk{}),
+				res(TranscriptFinal{Text: " spoken "}), res(CaptureDone{})},
+			states:  []State{StateListening, StateListening, StateTranscribing, StateCapturing, StateReasoning},
+			request: 3, want: "spoken",
+		},
+		{
+			name: "voice, capture at start",
+			cfg:  Config{Settings: Settings{VoiceMode: ModeToggle, Capture: CaptureAtStart}},
+			acts: []act{in(ToggleTalk{}), res(CaptureDone{}), in(ToggleTalk{}),
+				res(TranscriptFinal{Text: "spoken"}), res(LLMDelta{Text: "a"})},
+			states:  []State{StateCapturing, StateListening, StateTranscribing, StateReasoning, StateResponding},
+			request: 3, want: "spoken",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t, tt.cfg)
+			h.play(tt.acts...)
+			for i, s := range h.expect(tt.states...) {
+				want := ""
+				if i == tt.request {
+					want = tt.want
+				}
+				if s.Request != want {
+					t.Errorf("snapshot %d (%v): Request %q, want %q", i, s.State, s.Request, want)
+				}
+			}
+		})
+	}
+}
