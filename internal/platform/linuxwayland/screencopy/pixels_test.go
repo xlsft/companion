@@ -43,7 +43,7 @@ func TestConvert(t *testing.T) {
 			name:   "XRGB2101010 keeps the top 8 bits",
 			format: FormatXRGB2101010, stride: 8,
 			// R=0x3ff G=0x200 B=0x004 -> 0xff 0x80 0x01; then black, white, red.
-			src: le32(0x3ff<<20|0x200<<10|0x004, 0, 0x3fffffff, 0x3ff<<20),
+			src:  le32(0x3ff<<20|0x200<<10|0x004, 0, 0x3fffffff, 0x3ff<<20),
 			want: []byte{0xff, 0x80, 0x01, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 255},
 		},
 		{
