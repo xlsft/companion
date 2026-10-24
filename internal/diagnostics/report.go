@@ -108,7 +108,7 @@ func (c *Collector) Collect(ctx context.Context) (Report, error) {
 	r := Report{
 		GeneratedAt:  now().UTC(),
 		AppVersion:   buildinfo.Version,
-		Commit:       buildinfo.Commit,
+		Commit:       shortCommit(buildinfo.Commit),
 		Providers:    []ProviderSummary{},
 		RecentErrors: []logging.ErrorEvent{},
 	}
@@ -196,4 +196,13 @@ func redactCapabilities(in contracts.CapabilityReport) contracts.CapabilityRepor
 		}
 	}
 	return out
+}
+
+// shortCommit keeps a full 40-char sha from looking like a hex secret to the
+// export safety pass.
+func shortCommit(c string) string {
+	if len(c) > 12 {
+		return c[:12]
+	}
+	return c
 }
