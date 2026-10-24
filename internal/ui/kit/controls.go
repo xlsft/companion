@@ -285,25 +285,46 @@ func (d *Dropdown) close(gtx layout.Context) {
 // Layout draws the box; labels[sel] is the current value, or placeholder
 // when sel is out of range. A disabled context closes the list.
 func (d *Dropdown) Layout(gtx layout.Context, th *theme.Theme, labels []string, sel int, placeholder string) layout.Dimensions {
-	if !gtx.Enabled() || len(labels) == 0 {
-		gtx = gtx.Disabled()
-		d.open = false
-	}
-	if len(d.options) < len(labels) {
-		d.options = append(d.options, make([]widget.Clickable, len(labels)-len(d.options))...)
-	}
 	cur := placeholder
 	if sel >= 0 && sel < len(labels) {
 		cur = labels[sel]
 	}
-	fg := th.Pal.Fg
-	if !gtx.Enabled() {
-		fg = th.Pal.Subtle
+	gtx, fg := d.prepare(gtx, th, len(labels))
+	dims := d.box(gtx, th, cur, 36, func(gtx layout.Context) layout.Dimensions {
+		l := label(th, 14, cur, fg)
+		l.MaxLines = 1
+		return l.Layout(gtx)
+	})
+	if d.open {
+		d.popup(gtx, th, len(labels), sel, dims.Size, false, func(gtx layout.Context, i int) layout.Dimensions {
+			return d.option(gtx, th, i, labels[i], i == sel)
+		})
 	}
+	return dims
+}
+
+// prepare closes the list of a disabled or empty select and sizes the
+// option clickables; fg is the box's text colour.
+func (d *Dropdown) prepare(gtx layout.Context, th *theme.Theme, n int) (layout.Context, color.NRGBA) {
+	if !gtx.Enabled() || n == 0 {
+		gtx = gtx.Disabled()
+		d.open = false
+	}
+	if len(d.options) < n {
+		d.options = append(d.options, make([]widget.Clickable, n-len(d.options))...)
+	}
+	if !gtx.Enabled() {
+		return gtx, th.Pal.Subtle
+	}
+	return gtx, th.Pal.Fg
+}
+
+// box is the closed select: content on the left, the arrow on the right.
+func (d *Dropdown) box(gtx layout.Context, th *theme.Theme, desc string, h float32, content layout.Widget) layout.Dimensions {
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
-	dims := FocusRing(gtx, th, gtx.Focused(&d.toggle), func(gtx layout.Context) layout.Dimensions {
+	return FocusRing(gtx, th, gtx.Focused(&d.toggle), func(gtx layout.Context) layout.Dimensions {
 		return d.toggle.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			semantic.DescriptionOp(cur).Add(gtx.Ops)
+			semantic.DescriptionOp(desc).Add(gtx.Ops)
 			border, bg := th.Pal.Divider, th.Pal.Raised
 			if d.open {
 				border = th.Pal.AccentLine
@@ -312,48 +333,46 @@ func (d *Dropdown) Layout(gtx layout.Context, th *theme.Theme, labels []string, 
 				bg = th.Pal.Hover
 			}
 			return Box(gtx, th, bg, border, 4, func(gtx layout.Context) layout.Dimensions {
-				return layout.Inset{Left: th.Dp(12), Right: th.Dp(10)}.Layout(gtx, FixedH(th, 36, func(gtx layout.Context) layout.Dimensions {
+				return layout.Inset{Left: th.Dp(12), Right: th.Dp(10)}.Layout(gtx, FixedH(th, h, func(gtx layout.Context) layout.Dimensions {
 					arrow := icon.Down
 					if d.open != d.Up {
 						arrow = icon.Up
 					}
-					return Spread(func(gtx layout.Context) layout.Dimensions {
-						l := label(th, 14, cur, fg)
-						l.MaxLines = 1
-						return l.Layout(gtx)
-					}, IconW(th, arrow, 14, th.Pal.Muted))(gtx)
+					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+						layout.Flexed(1, content),
+						HSpace(th.Dp(10)),
+						layout.Rigid(IconW(th, arrow, 14, th.Pal.Muted)),
+					)
 				}))
 			})
 		})
 	})
-	if d.open {
-		d.popup(gtx, th, labels, sel, dims.Size)
-	}
-	return dims
 }
 
-// popup draws the option list over everything else in the window.
-func (d *Dropdown) popup(gtx layout.Context, th *theme.Theme, labels []string, sel int, head image.Point) {
+// popup draws the option list over everything else in the window. Plain
+// rows sit inside a 4px inset; rich rows run edge to edge with dividers.
+func (d *Dropdown) popup(gtx layout.Context, th *theme.Theme, n, sel int, head image.Point, rich bool, row func(gtx layout.Context, i int) layout.Dimensions) {
 	if d.focusOpts {
 		d.focusOpts = false
 		gtx.Execute(key.FocusCmd{Tag: &d.options[max(0, sel)]})
 	}
-	rowH := gtx.Dp(th.Dp(34))
-	h := min(len(labels), 10)*rowH + gtx.Dp(th.Dp(8)) + 2
+	rowH, inset, rows := gtx.Dp(th.Dp(34)), th.Dp(4), 10
+	if rich {
+		rowH, inset, rows = gtx.Dp(th.Dp(richRowH)), 0, 6
+	}
+	h := min(n, rows)*rowH + 2*gtx.Dp(inset) + 2
 	gtx.Constraints = layout.Exact(image.Pt(head.X, h))
 
 	list := op.Record(gtx.Ops)
 	Panel(gtx, th, func(gtx layout.Context) layout.Dimensions {
 		gtx.Constraints = layout.Exact(image.Pt(head.X, h))
-		return layout.UniformInset(th.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return layout.UniformInset(inset).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			d.list.Axis = layout.Vertical
 			// The scrollbar floats over the rows so a long list keeps the
 			// same padding as a short one.
 			ls := material.List(th.Theme, &d.list)
 			ls.AnchorStrategy = material.Overlay
-			return ls.Layout(gtx, len(labels), func(gtx layout.Context, i int) layout.Dimensions {
-				return d.option(gtx, th, i, labels[i], i == sel)
-			})
+			return ls.Layout(gtx, n, row)
 		})
 	})
 	call := list.Stop()

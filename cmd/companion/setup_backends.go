@@ -55,6 +55,17 @@ func (s setupSTT) Install(ctx context.Context, m models.Manifest, progress func(
 	return nil
 }
 
+var _ wizard.ActiveModeler = setupSTT{}
+
+// ActiveModel is the model recognition runs on, for Settings → Voice.
+func (s setupSTT) ActiveModel() string {
+	m, err := s.c.activator.Active()
+	if err != nil {
+		return ""
+	}
+	return m.ID
+}
+
 func (s setupSTT) Devices(ctx context.Context) ([]audio.Device, error) { return s.c.mic.Devices(ctx) }
 func (s setupSTT) Open(ctx context.Context, id string) (audio.Stream, error) {
 	return s.c.mic.Open(ctx, id)
