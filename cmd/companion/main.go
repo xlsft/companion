@@ -20,6 +20,7 @@ import (
 
 	"github.com/xlsft/companion/internal/app"
 	"github.com/xlsft/companion/internal/buildinfo"
+	"github.com/xlsft/companion/internal/platform/appearance"
 	"github.com/xlsft/companion/internal/platform/control"
 	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/platform/tray"
@@ -39,7 +40,6 @@ func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
 	diagnose := flag.Bool("diagnose", false, "print the platform capability report as JSON and exit")
 	dataDir := flag.String("data", "", "data directory (default: user config dir/openclick)")
-	dark := flag.Bool("dark", false, "use the dark theme")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(buildinfo.String())
@@ -91,18 +91,23 @@ func main() {
 	if svc.Get().Platform.TrayIcon {
 		tr = tray.New()
 	}
+	// The theme follows the desktop; there is deliberately no flag for it.
+	scheme := appearance.New()
+	if err := scheme.Start(ctx); err != nil {
+		log.Warn("system colour scheme unavailable, using light", "err", err)
+	}
 	shell := ui.New(ui.Options{
-		Mode:     mode,
-		Settings: svc,
-		Gate:     gate,
-		Setup:    c.setupBackends(),
-		Chat:     c.chat,
-		Tray:     tr,
-		Diagnose: detect.New().Detect,
-		Quit:     stop,
-		Log:      log,
-		Dark:     *dark,
-		Version:  buildinfo.Version,
+		Mode:       mode,
+		Settings:   svc,
+		Gate:       gate,
+		Setup:      c.setupBackends(),
+		Chat:       c.chat,
+		Tray:       tr,
+		Diagnose:   detect.New().Detect,
+		Quit:       stop,
+		Log:        log,
+		Appearance: scheme,
+		Version:    buildinfo.Version,
 	})
 
 	// Gio must own the main goroutine (macOS requires the main thread), so

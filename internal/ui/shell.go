@@ -93,10 +93,12 @@ type Options struct {
 	// Diagnose produces the capability report for Diagnostics.
 	Diagnose func(ctx context.Context) (contracts.CapabilityReport, error)
 	// Quit asks the process to shut down; the app lifecycle then calls Stop.
-	Quit    func()
-	Log     *slog.Logger
-	Dark    bool
-	Version string
+	Quit func()
+	Log  *slog.Logger
+	// Appearance supplies the system colour scheme and its changes; nil
+	// means light. The caller starts it.
+	Appearance contracts.AppearanceSource
+	Version    string
 }
 
 // Shell implements app.Component.
@@ -106,6 +108,8 @@ type Shell struct {
 	newWindow windowFactory
 	diag      *diagModel
 	quitOnce  sync.Once
+	stopOnce  sync.Once
+	done      chan struct{} // closed by Stop
 
 	mu       sync.Mutex
 	mode     Mode
@@ -140,9 +144,12 @@ func newShell(opts Options, f windowFactory) *Shell {
 		log:       opts.Log,
 		newWindow: f,
 		mode:      opts.Mode,
-		dark:      opts.Dark,
 		scale:     1,
 		closing:   map[window]bool{},
+		done:      make(chan struct{}),
+	}
+	if opts.Appearance != nil {
+		s.dark = opts.Appearance.Dark()
 	}
 	s.diag = newDiagModel(opts.Diagnose, s.invalidateAll)
 	return s
@@ -166,6 +173,9 @@ func (s *Shell) Start(ctx context.Context) error {
 	mode := s.mode
 	s.mu.Unlock()
 	go s.watchSettings(ch)
+	if s.opts.Appearance != nil {
+		go s.watchAppearance(s.opts.Appearance)
+	}
 
 	if s.opts.Tray != nil {
 		err := s.opts.Tray.Start(ctx, T(lang, "tray.tooltip"), TrayItems(mode, lang), s.onTray)
@@ -197,6 +207,7 @@ func (s *Shell) Stop(ctx context.Context) error {
 	unsub := s.unsub
 	trayOK := s.trayOK
 	s.mu.Unlock()
+	s.stopOnce.Do(func() { close(s.done) })
 	for _, w := range wins {
 		if w != nil {
 			w.Close()
@@ -390,6 +401,22 @@ func (s *Shell) windowClosed(w window) {
 	}
 	if quit {
 		s.Quit()
+	}
+}
+
+// watchAppearance re-applies the theme when the system scheme flips; the
+// windows read it on every frame, so repainting is all that is needed.
+func (s *Shell) watchAppearance(src contracts.AppearanceSource) {
+	for {
+		select {
+		case <-src.Changes():
+			s.mu.Lock()
+			s.dark = src.Dark()
+			s.mu.Unlock()
+			s.invalidateAll()
+		case <-s.done:
+			return
+		}
 	}
 }
 

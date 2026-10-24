@@ -14,8 +14,10 @@ import (
 	"log/slog"
 	"slices"
 	"sync"
+	"time"
 
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/widget"
 
 	"github.com/xlsft/companion/internal/readiness"
@@ -98,6 +100,7 @@ type Wizard struct {
 	list      widget.List
 	asideList widget.List
 	frame     frameRecord
+	auto      map[readiness.Step]autoRecord
 
 	perm permState
 	byok byokState
@@ -125,7 +128,7 @@ func New(cfg Config) *Wizard {
 		cfg.SpeechLanguage = func() string { return "auto" }
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	w := &Wizard{cfg: cfg, ctx: ctx, cancel: cancel, btns: map[Action]*widget.Clickable{}}
+	w := &Wizard{cfg: cfg, ctx: ctx, cancel: cancel, btns: map[Action]*widget.Clickable{}, auto: map[readiness.Step]autoRecord{}}
 	w.list.Axis = layout.Vertical
 	w.langDD.Up = true // it sits at the bottom of the aside
 	w.prog = cfg.Gate.Progress()
@@ -291,4 +294,61 @@ func (w *Wizard) selectStep(s snapshot, st readiness.Step) {
 		}
 		w.cfg.Invalidate()
 	}()
+}
+
+// autoRecord remembers the last automatic run of a step in this session.
+type autoRecord struct {
+	sig string
+	at  time.Time
+}
+
+// autoRetry is how often a failing permissions check is repeated, so a fix
+// made in the system settings turns the row green without a click. The
+// check only reads state, so it is cheap.
+const autoRetry = 3 * time.Second
+
+// autoCheck starts the shown step's check without a click (the owner wants
+// "does it work" answered on arrival). Only checks that need nothing from
+// the user run on their own: permissions, platform, a saved provider and,
+// right after Save, the speech output. STT records the user's voice and the
+// end-to-end test records and plays sound, so those keep one explicit Start.
+func (w *Wizard) autoCheck(gtx layout.Context, s snapshot) {
+	st := s.view()
+	if s.running || !s.unlocked(st) {
+		return
+	}
+	var sig string
+	switch st {
+	case readiness.StepPermissions, readiness.StepPlatform:
+	case readiness.StepBYOK:
+		var ok bool
+		if sig, ok = w.byok.autoSig(w); !ok {
+			return
+		}
+	case readiness.StepTTS:
+		var ok bool
+		if sig, ok = w.tts.autoSig(w); !ok {
+			return
+		}
+	default:
+		return
+	}
+	prev, ran := w.auto[st]
+	now := gtx.Now
+	if !ran || prev.sig != sig {
+		w.auto[st] = autoRecord{sig: sig, at: now}
+		w.runCheck(st, nil, nil)
+		return
+	}
+	if st != readiness.StepPermissions {
+		return
+	}
+	if r, ok := s.result(st); ok && r.Status != readiness.Passed {
+		if due := prev.at.Add(autoRetry); now.Before(due) {
+			gtx.Execute(op.InvalidateCmd{At: due})
+		} else {
+			w.auto[st] = autoRecord{sig: sig, at: now}
+			w.runCheck(st, nil, nil)
+		}
+	}
 }
