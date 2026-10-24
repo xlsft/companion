@@ -19,6 +19,7 @@ import (
 
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/internal/update"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -54,7 +55,9 @@ func reportWithCaps() contracts.CapabilityReport {
 // TestLayoutAllScreens builds every window's widget tree in both
 // languages, themes and the text scale extremes without a display.
 func TestLayoutAllScreens(t *testing.T) {
-	h := newHarness(t, ModeMain, nil)
+	fake := &fakeUpdates{}
+	h := newHarnessWith(t, ModeMain, nil, func(o *Options) { o.Updates = fake })
+	banners := bannerStates(t)
 	h.sh.diag = newDiagModel(func(context.Context) (contracts.CapabilityReport, error) { return reportWithCaps(), nil }, func() {})
 	m, _ := h.mainBuilt()
 	wiz := newWizardUI(h.sh)
@@ -79,6 +82,12 @@ func TestLayoutAllScreens(t *testing.T) {
 				m.about.show("t", "b")
 				frame(r, h.sh, th, m)
 				m.about.open = false
+				for _, st := range banners {
+					fake.set(st)
+					frame(r, h.sh, th, m)
+					frame(r, h.sh, th, wiz)
+				}
+				fake.set(update.State{})
 				frame(r, h.sh, th, wiz)
 				wiz.showDiagnostics(true)
 				frame(r, h.sh, th, wiz)
@@ -198,9 +207,11 @@ func TestHeadlessRender(t *testing.T) {
 	}
 	defer w.Release()
 
-	h := newHarness(t, ModeMain, nil)
+	fake := &fakeUpdates{}
+	h := newHarnessWith(t, ModeMain, nil, func(o *Options) { o.Updates = fake })
 	h.sh.diag = newDiagModel(func(context.Context) (contracts.CapabilityReport, error) { return reportWithCaps(), nil }, func() {})
 	h.sh.diag.Refresh()
+	banners := bannerStates(t)
 	for _, running := true, true; running; {
 		running = h.sh.diag.snapshot().running
 		time.Sleep(time.Millisecond)
@@ -215,14 +226,21 @@ func TestHeadlessRender(t *testing.T) {
 		section settingsSection
 		open    bool // the language select is open
 		diag    bool // the setup window shows Diagnostics
+		upd     string
 	}{
-		{"wizard", wiz, 0, 0, false, false},
-		{"wizard-diagnostics", wiz, 0, 0, false, true},
-		{"home", m, RouteHome, 0, false, false},
-		{"settings", m, RouteSettings, secGeneral, false, false},
-		{"settings-language", m, RouteSettings, secGeneral, true, false},
-		{"settings-voice", m, RouteSettings, secVoice, false, false},
-		{"diagnostics", m, RouteSettings, secDiagnostics, false, false},
+		{"wizard", wiz, 0, 0, false, false, ""},
+		{"wizard-diagnostics", wiz, 0, 0, false, true, ""},
+		{"home", m, RouteHome, 0, false, false, ""},
+		{"settings", m, RouteSettings, secGeneral, false, false, ""},
+		{"settings-language", m, RouteSettings, secGeneral, true, false, ""},
+		{"settings-voice", m, RouteSettings, secVoice, false, false, ""},
+		{"diagnostics", m, RouteSettings, secDiagnostics, false, false, ""},
+		{"update-home", m, RouteHome, 0, false, false, "available"},
+		{"update-settings", m, RouteSettings, secGeneral, false, false, "downloading"},
+		{"update-wizard", wiz, 0, 0, false, false, "available"},
+		{"update-failed", m, RouteHome, 0, false, false, "failed"},
+		{"update-managed", wiz, 0, 0, false, false, "managed"},
+		{"update-restart", m, RouteSettings, secDiagnostics, false, false, "restart"},
 	}
 	dir := os.Getenv("OC_UI_SNAPSHOT_DIR")
 	variants := []struct {
@@ -241,6 +259,7 @@ func TestHeadlessRender(t *testing.T) {
 				m.showSettings(s.section)
 			}
 			wiz.showDiagnostics(s.diag)
+			fake.set(banners[s.upd])
 			r := new(input.Router)
 			frame(r, h.sh, th, s.content)
 			if sp, ok := m.pages[RouteSettings].(*settingsPage); ok {
@@ -282,4 +301,23 @@ func uniform(img *image.RGBA) bool {
 		}
 	}
 	return true
+}
+
+// bannerStates are the update banner's looks, by name; "" is no banner.
+func bannerStates(t *testing.T) map[string]update.State {
+	avail := availableState(t)
+	with := func(fn func(*update.State)) update.State {
+		st := avail
+		fn(&st)
+		return st
+	}
+	return map[string]update.State{
+		"":            {Current: avail.Current, LastCheck: avail.LastCheck},
+		"available":   avail,
+		"managed":     with(func(s *update.State) { s.Managed = "package_managed" }),
+		"downloading": with(func(s *update.State) { s.Phase, s.Done, s.Total = update.PhaseDownloading, 12<<20, 40<<20 }),
+		"verifying":   with(func(s *update.State) { s.Phase = update.PhaseVerifying }),
+		"failed":      with(func(s *update.State) { s.Phase, s.Err = update.PhaseFailed, "bad_signature" }),
+		"restart":     with(func(s *update.State) { s.Phase = update.PhaseRestartNeeded }),
+	}
 }

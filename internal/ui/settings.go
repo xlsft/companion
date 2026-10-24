@@ -116,6 +116,12 @@ type settingsPage struct {
 
 	keepShots, memory, saveText, shareDiag, login, tray widget.Bool
 
+	// updates is the updater behind the General section's update rows;
+	// nil leaves "Check now" out.
+	updates         UpdateBackend
+	autoUpd, preUpd widget.Bool
+	checkNow        widget.Clickable
+
 	saveErr bool
 
 	// hotkeys edits the Talk and Cancel shortcuts; nil without a backend.
@@ -174,11 +180,16 @@ func (p *settingsPage) update(gtx layout.Context) {
 		{&p.shareDiag, func(s *settings.Settings, v bool) { s.Privacy.ShareDiagnostics = v }},
 		{&p.login, func(s *settings.Settings, v bool) { s.Platform.LaunchAtLogin = v }},
 		{&p.tray, func(s *settings.Settings, v bool) { s.Platform.TrayIcon = v }},
+		{&p.autoUpd, func(s *settings.Settings, v bool) { s.Updates.AutoCheck = v }},
+		{&p.preUpd, func(s *settings.Settings, v bool) { s.Updates.Prereleases = v }},
 	} {
 		if b.w.Update(gtx) {
 			v, set := b.w.Value, b.set
 			p.apply(func(s *settings.Settings) { set(s, v) })
 		}
+	}
+	if p.checkNow.Clicked(gtx) && p.updates != nil {
+		p.updates.CheckNow()
 	}
 	moved, steps := p.speed.Update(gtx)
 	if moved {
@@ -205,6 +216,8 @@ func (p *settingsPage) sync(s settings.Settings) {
 	p.shareDiag.Value = s.Privacy.ShareDiagnostics
 	p.login.Value = s.Platform.LaunchAtLogin
 	p.tray.Value = s.Platform.TrayIcon
+	p.autoUpd.Value = s.Updates.AutoCheck
+	p.preUpd.Value = s.Updates.Prereleases
 	if !p.speed.Float.Dragging() && !p.speedPending {
 		p.speed.Float.Value = sliderFromSpeed(s.Voice.TTSSpeed)
 	}
@@ -401,5 +414,29 @@ func (p *settingsPage) sectionRows(th *theme.Theme, l Lang, cur settings.Setting
 		}),
 		setting(th, l, "platform.tray", "platform.tray.d", true, toggle(&p.tray, "platform.tray")),
 		setting(th, l, "platform.login", "platform.login.d", false, toggle(&p.login, "platform.login")),
-	)}
+	), p.updateRows(th, l, toggle)}
+}
+
+// updateRows is the General section's update panel: the two preferences
+// and, with an updater, the running version, last check and "Check now".
+func (p *settingsPage) updateRows(th *theme.Theme, l Lang, toggle func(*widget.Bool, string) layout.Widget) layout.Widget {
+	rows := []layout.Widget{
+		setting(th, l, "updates.auto", "updates.auto.d", true, toggle(&p.autoUpd, "updates.auto")),
+		setting(th, l, "updates.pre", "updates.pre.d", true, toggle(&p.preUpd, "updates.pre")),
+	}
+	if p.updates != nil {
+		st := p.updates.State()
+		r := kit.SettingRow{
+			Title: Tf(l, "updates.version", st.Current.String()),
+			Desc:  updateStatus(l, st, time.Now()),
+			Control: func(gtx layout.Context) layout.Dimensions {
+				if st.Checking || st.Busy() {
+					gtx = gtx.Disabled()
+				}
+				return kit.ButtonStyle{Kind: kit.Secondary, Small: true, Label: T(l, "updates.checkNow")}.Layout(gtx, th, &p.checkNow)
+			},
+		}
+		rows = append(rows, func(gtx layout.Context) layout.Dimensions { return r.Layout(gtx, th) })
+	}
+	return panelOf(th, rows...)
 }

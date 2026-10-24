@@ -89,6 +89,14 @@ type Platform struct {
 	TrayIcon      bool `json:"tray_icon"`
 }
 
+// Updates controls the in-app updater (OC-75).
+type Updates struct {
+	// AutoCheck asks the release feed at start and every few hours.
+	AutoCheck bool `json:"auto_check"`
+	// Prereleases offers pre-release versions too.
+	Prereleases bool `json:"prereleases"`
+}
+
 type UI struct {
 	Language string `json:"language"` // one of UILanguages
 }
@@ -109,6 +117,7 @@ type Settings struct {
 	Privacy  Privacy  `json:"privacy"`
 	Platform Platform `json:"platform"`
 	UI       UI       `json:"ui"`
+	Updates  Updates  `json:"updates"`
 }
 
 // Defaults favour privacy: nothing is kept unless the user opts in.
@@ -121,6 +130,7 @@ func Defaults() Settings {
 		Memory:   Memory{Enabled: true},
 		Platform: Platform{TrayIcon: true},
 		UI:       UI{Language: "en"},
+		Updates:  Updates{AutoCheck: true},
 	}
 }
 

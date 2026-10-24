@@ -32,7 +32,8 @@ type mainUI struct {
 	// section is a Settings section to show on the next frame, or -1.
 	section settingsSection
 
-	chat *chatModel
+	chat   *chatModel
+	update *updateBanner
 
 	newChatBtn widget.Clickable
 	aboutBtn   widget.Clickable
@@ -45,6 +46,7 @@ func newMainUI(sh *Shell) *mainUI {
 		sh:      sh,
 		pages:   map[Route]page{},
 		chat:    newChatModel(sh.opts.Chat, sh.log, sh.invalidateAll),
+		update:  newUpdateBanner(sh.opts.Updates),
 		navBtns: map[Route]*widget.Clickable{},
 		section: -1,
 	}
@@ -103,6 +105,7 @@ func (m *mainUI) page(r Route) page {
 	switch r {
 	case RouteSettings:
 		sp := newSettingsPage(m.sh.opts.Settings)
+		sp.updates = m.sh.opts.Updates
 		sp.diag = newDiagView(m.sh.diag, m.sh.opts.Version)
 		sp.jump = m.takeSection
 		if be := m.sh.opts.Setup.Permissions; be != nil {
@@ -134,12 +137,14 @@ func (m *mainUI) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dime
 	pg := m.page(cur)
 	return layout.Stack{}.Layout(gtx,
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-			gtx.Constraints.Min = gtx.Constraints.Max
-			return layout.Flex{}.Layout(gtx,
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions { return m.sidebar(gtx, th, l, cur) }),
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.VDivider(gtx, th) }),
-				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return pg.Layout(gtx, th, l) }),
-			)
+			// The update notice spans the window above every section.
+			return m.update.wrap(gtx, th, l, func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{}.Layout(gtx,
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions { return m.sidebar(gtx, th, l, cur) }),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.VDivider(gtx, th) }),
+					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return pg.Layout(gtx, th, l) }),
+				)
+			})
 		}),
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions { return m.about.Layout(gtx, th, l) }),
 	)

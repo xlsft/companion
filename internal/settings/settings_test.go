@@ -33,7 +33,8 @@ func TestDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	if d.Version != CurrentVersion || d.Screen.KeepScreenshots || d.Screen.Target != ScreenActive ||
-		d.Voice.Language != "auto" || d.Voice.TTSSpeed != 1.0 || d.UI.Language != "en" {
+		d.Voice.Language != "auto" || d.Voice.TTSSpeed != 1.0 || d.UI.Language != "en" ||
+		!d.Updates.AutoCheck || d.Updates.Prereleases {
 		t.Errorf("defaults: %+v", d)
 	}
 	s, _ := newSvc(t)
