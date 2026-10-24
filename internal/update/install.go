@@ -111,7 +111,7 @@ func (in *Installer) Install(ctx context.Context, tarball string) (err error) {
 		if err := in.swap(n, staged[n]); err != nil {
 			// Put back what was already replaced: the pair must match.
 			for _, d := range done {
-				in.restore(d)
+				err = errors.Join(err, in.restore(d))
 			}
 			return err
 		}
@@ -163,8 +163,7 @@ func (in *Installer) swap(n, staged string) error {
 		return err
 	}
 	if err := os.Rename(staged, cur); err != nil {
-		os.Rename(old, cur)
-		return err
+		return errors.Join(err, os.Rename(old, cur))
 	}
 	return nil
 }

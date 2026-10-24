@@ -317,6 +317,11 @@ func (b *Backend) Capture(ctx context.Context, display string, region *image.Rec
 	if err := b.c.Err(); err != nil {
 		return nil, err
 	}
+	// A request cancelled before it started must not capture: a fast
+	// compositor could otherwise win the race against ctx.Done below.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	fs := &frameState{
 		bufferInfo:     make(chan struct{}),
 		done:           make(chan struct{}),

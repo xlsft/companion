@@ -152,7 +152,14 @@ func (t *sttState) install(w *Wizard) {
 			w.cfg.Log.Warn("setup model install failed", "model", m.ID, "code", t.installErr)
 			return
 		}
-		t.installed[m.ID] = true
+		// Copy on write: views take the map under the lock and read it
+		// after releasing it.
+		next := make(map[string]bool, len(t.installed)+1)
+		for id := range t.installed {
+			next[id] = true
+		}
+		next[m.ID] = true
+		t.installed = next
 	})
 }
 
