@@ -67,6 +67,9 @@ func gatherLinux(ctx context.Context) linuxFacts {
 		go func() {
 			defer wg.Done()
 			p := probePortal(busCtx, conn, iface)
+			if iface == portalRemoteDesktop && p.Present {
+				p.Devices, p.DevicesKnown = probeDevices(busCtx, conn)
+			}
 			mu.Lock()
 			f.Portals[iface] = p
 			mu.Unlock()
@@ -93,6 +96,18 @@ func probePortal(ctx context.Context, conn *dbus.Conn, iface string) portalProbe
 		return portalProbe{Err: "unexpected version type"}
 	}
 	return portalProbe{Present: true, Version: n}
+}
+
+// probeDevices reads RemoteDesktop's AvailableDeviceTypes, also a plain
+// property read.
+func probeDevices(ctx context.Context, conn *dbus.Conn) (uint32, bool) {
+	obj := conn.Object("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop")
+	var v dbus.Variant
+	if err := obj.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, portalRemoteDesktop, "AvailableDeviceTypes").Store(&v); err != nil {
+		return 0, false
+	}
+	n, ok := v.Value().(uint32)
+	return n, ok
 }
 
 func probeName(ctx context.Context, conn *dbus.Conn, name string) busName {
