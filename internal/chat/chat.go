@@ -7,7 +7,10 @@
 package chat
 
 import (
+	"image"
 	"time"
+
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // Role is who said a message.
@@ -43,7 +46,21 @@ type Message struct {
 	// step that failed.
 	Failed bool
 	Code   string
+	// Screens are the screenshots the request carried (user turns). An
+	// entry exists whether or not the picture was kept; see Screenshot.
+	Screens []Screenshot
 }
+
+// Screenshot says a request had a screen attached. Thumb is nil unless the
+// user opted in to keeping screenshots: without it only the fact is shown,
+// never pixels (FR-SCREEN-006).
+type Screenshot struct {
+	Meta  contracts.CaptureMetadata
+	Thumb *image.RGBA
+}
+
+// Kept reports whether the picture itself was stored with the message.
+func (s Screenshot) Kept() bool { return s.Thumb != nil }
 
 // Phase is the session state as the chat presents it.
 type Phase int
