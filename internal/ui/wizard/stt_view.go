@@ -12,7 +12,6 @@ import (
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 
-	"github.com/xlsft/companion/internal/models"
 	"github.com/xlsft/companion/internal/models/hw"
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/ui/i18n"
@@ -28,13 +27,6 @@ func size(l i18n.Lang, n int64) string {
 		return i18n.Tf(l, "wiz.stt.gb", float64(n)/(1<<30))
 	}
 	return i18n.Tf(l, "wiz.stt.mb", float64(n)/(1<<20))
-}
-
-func langsOf(l i18n.Lang, m models.Manifest) string {
-	if m.Multilingual() {
-		return i18n.T(l, "wiz.stt.multilingual")
-	}
-	return strings.ToUpper(strings.Join(m.Languages, ", "))
 }
 
 // hardwareChip is the accelerator and memory the recommendation is for.
@@ -99,26 +91,15 @@ func (t *sttState) modelCard(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot
 	if shown.ID != "" {
 		name := kit.Text(th, 20, shown.Name, th.Pal.Fg)
 		name.Font = font.Font{Typeface: th.Display(), Weight: font.SemiBold}
-		title = kit.VStack(th, 4, w.text(name), w.text(kit.Text(th, 13, size(l, shown.Size)+" · "+langsOf(l, shown), th.Pal.Muted)))
+		title = kit.VStack(th, 4, w.text(name),
+			w.text(kit.Text(th, 13, size(l, shown.Size)+" · "+langsOf(l, shown), th.Pal.Muted)),
+			w.text(kit.Text(th, 13, modelDesc(l, shown), th.Pal.Fg2)))
 	}
 
-	labels := make([]string, len(cat))
-	sel := -1
-	for i, m := range cat {
-		labels[i] = m.Name + " — " + size(l, m.Size)
-		if m.ID == rec.ID {
-			labels[i] += " · " + i18n.T(l, "wiz.stt.rec")
-		}
-		if inst[m.ID] {
-			labels[i] += " · " + i18n.T(l, "wiz.stt.installed")
-		}
-		if m.ID == selected {
-			sel = i
-		}
-	}
+	opts, sel := ModelOptions(l, cat, rec.ID, selected, inst)
 	w.frame.texts = append(w.frame.texts, i18n.T(l, "wiz.stt.other"))
 	pick := kit.Labeled(th, i18n.T(l, "wiz.stt.other"), func(gtx layout.Context) layout.Dimensions {
-		return w.dropdown(gtx, th, &t.modelDD, labels, sel, i18n.T(l, "wiz.stt.pickModel"), !installing && !s.running)
+		return w.richDropdown(gtx, th, &t.modelDD, opts, sel, i18n.T(l, "wiz.stt.pickModel"), !installing && !s.running)
 	})
 
 	var action, progress layout.Widget
@@ -130,6 +111,9 @@ func (t *sttState) modelCard(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot
 		}
 		left := w.text(kit.Muted(th, i18n.Tf(l, "wiz.stt.progress", size(l, prog.Done), size(l, prog.Total))))
 		right := w.text(kit.Muted(th, i18n.Tf(l, "wiz.stt.rate", prog.Rate/(1<<20), fmtETA(prog.ETA))))
+		if prog.Unpacking {
+			left, right = w.text(kit.Muted(th, i18n.Tf(l, "stt.unpacking", size(l, prog.Done), size(l, prog.Total)))), nil
+		}
 		progress = kit.VStack(th, 6, kit.Spread(left, right),
 			func(gtx layout.Context) layout.Dimensions { return kit.ProgressBar(gtx, th, 6, frac) },
 			kit.Spread(w.text(kit.Muted(th, i18n.T(l, "wiz.stt.checksum"))), func(gtx layout.Context) layout.Dimensions {

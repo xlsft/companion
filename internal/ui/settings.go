@@ -135,6 +135,8 @@ type settingsPage struct {
 
 	// hotkeys edits the Talk and Cancel shortcuts; nil without a backend.
 	hotkeys *wizard.HotkeyEditor
+	// models picks the speech model; nil without an STT backend.
+	models *wizard.ModelPicker
 }
 
 func newSettingsPage(store SettingsStore) *settingsPage {
@@ -358,11 +360,17 @@ func (p *settingsPage) sectionRows(gtx layout.Context, th *theme.Theme, l Lang, 
 			speed = speedFromSlider(p.speed.Float.Value)
 		}
 		var shortcuts []layout.Widget
+		if p.models != nil {
+			shortcuts = append(shortcuts, panelOf(th,
+				setting(th, l, "stt.model", "stt.model.d", true, nil),
+				kit.Pad(th, 16, 20, p.models.Layout(th, l, nil)),
+			))
+		}
 		if p.hotkeys != nil {
-			shortcuts = []layout.Widget{panelOf(th,
+			shortcuts = append(shortcuts, panelOf(th,
 				setting(th, l, "voice.shortcuts", "voice.shortcuts.d", true, nil),
 				kit.Pad(th, 16, 20, p.hotkeys.Layout(th, l, nil)),
-			)}
+			))
 		}
 		return append(shortcuts, panelOf(th,
 			setting(th, l, "voice.hotkeyMode", "voice.hotkeyMode.d", false, func(gtx layout.Context) layout.Dimensions {

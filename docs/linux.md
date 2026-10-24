@@ -1,6 +1,6 @@
 # Linux
 
-Companion on Linux is two binaries that must sit in the same directory: `companion` (Gio UI, core) and `stt-sidecar` (whisper.cpp speech recognition). The core looks for the sidecar next to its own executable (symlinks are resolved). Speech models are never bundled; they are downloaded on first run into `~/.config/openclick/models` (or the `-data` directory).
+Companion on Linux is two binaries that must sit in the same directory: `companion` (Gio UI, core) and `stt-sidecar` (speech recognition: sherpa-onnx, with whisper.cpp as the fallback engine). The core looks for the sidecar next to its own executable (symlinks are resolved). The sidecar loads `libsherpa-onnx-c-api.so` and `libonnxruntime.so` (prebuilt, CPU, from the sherpa-onnx Go module) from its own directory through an `$ORIGIN` runpath, so they ship beside it in the tarball, the AppImage (`usr/bin`) and the Arch package (`/usr/lib/companion`). Speech models are never bundled; they are downloaded on first run into `~/.config/openclick/models` (or the `-data` directory).
 
 Build and packaging commands are at the end of this page.
 
@@ -15,7 +15,7 @@ cd companion-<version>-linux-x86_64
 ./install.sh                # or install under ~/.local (PREFIX=/usr as root for system-wide)
 ```
 
-`install.sh` puts both binaries into `$PREFIX/lib/companion`, symlinks `companion` into `$PREFIX/bin` and installs the desktop entry, icon and AppStream metainfo.
+`install.sh` puts both binaries and the two sherpa-onnx libraries into `$PREFIX/lib/companion`, symlinks `companion` into `$PREFIX/bin` and installs the desktop entry, icon and AppStream metainfo.
 
 ### AppImage
 
@@ -37,7 +37,7 @@ The AppImage is deliberately thin: it does not bundle the graphics stack, becaus
 | libEGL, Wayland client libs | Gio window (Wayland) | `libglvnd wayland` | `libglvnd-egl libwayland-client libwayland-egl libwayland-cursor` | `libegl1 libwayland-client0 libwayland-egl1 libwayland-cursor0` |
 | X11 + xkbcommon | Gio window (X11, XWayland), X11 backends | `libx11 libxcursor libxfixes libxkbcommon libxkbcommon-x11 libxcb` | `libX11 libXcursor libXfixes libxkbcommon libxkbcommon-x11 libxcb` | `libx11-6 libxcursor1 libxfixes3 libxkbcommon0 libxkbcommon-x11-0 libx11-xcb1 libxcb1` |
 | Mesa/GL driver | rendering | `mesa` | `mesa-dri-drivers` | `libgl1-mesa-dri` |
-| libstdc++, libgomp | `stt-sidecar` (whisper.cpp) | `gcc-libs` | `libstdc++ libgomp` | `libstdc++6 libgomp1` |
+| libstdc++, libgomp | `stt-sidecar` (whisper.cpp, sherpa-onnx, onnxruntime) | `gcc-libs` | `libstdc++ libgomp` | `libstdc++6 libgomp1` |
 | PipeWire (with pipewire-pulse) or PulseAudio | microphone and speaker via miniaudio | `pipewire pipewire-pulse` | `pipewire pipewire-pulseaudio` | `pipewire pipewire-pulse` |
 | xdg-desktop-portal and a backend | screenshot, global shortcuts, remote desktop (below) | `xdg-desktop-portal` + backend | `xdg-desktop-portal` + backend | `xdg-desktop-portal` + backend |
 | Secret Service provider | API keys (never written to disk) | `gnome-keyring` or `kwallet` or `keepassxc` | same | same |
@@ -119,6 +119,6 @@ make dist-linux         # dist/companion-<VERSION>-linux-<arch>.tar.gz and an Ap
 make dist-linux APPIMAGE=skip VERSION=0.1.0   # tarball only
 ```
 
-`make dist-linux` builds the UI binary and the whisper build of the sidecar itself and refuses to pack a sidecar without the whisper engine. The AppImage step needs `mksquashfs` (`squashfs-tools`) and `appimagetool`; if `appimagetool` is not on `PATH`, version 1.9.1 is downloaded into `dist/.tools` and used only after its SHA-256 matches the pinned value in `packaging/dist-linux.sh`. If either is missing the target fails with a message (and the tarball has already been written). For a redistributable binary build whisper.cpp with `make whisper WHISPER_NATIVE=OFF` so ggml is not tuned to the build host's CPU.
+`make dist-linux` builds the UI binary and the release sidecar (`make build-stt`: `-tags "whisper sherpa"`, `-engine auto`) itself, copies the sherpa-onnx libraries next to it, and refuses to pack a sidecar that lacks either engine or the libraries. With `patchelf` installed the sidecar's runpath is reduced to `$ORIGIN` (otherwise the build host's Go module cache stays as a harmless second entry). The AppImage step needs `mksquashfs` (`squashfs-tools`) and `appimagetool`; if `appimagetool` is not on `PATH`, version 1.9.1 is downloaded into `dist/.tools` and used only after its SHA-256 matches the pinned value in `packaging/dist-linux.sh`. If either is missing the target fails with a message (and the tarball has already been written). For a redistributable binary build whisper.cpp with `make whisper WHISPER_NATIVE=OFF` so ggml is not tuned to the build host's CPU.
 
 The icon (`packaging/companion.svg`) is the Unbounded "↖" glyph in `#8b5cf6`, rendered to paths by `go run packaging/genicon.go > packaging/companion.svg`; the 256 px PNG is `rsvg-convert -w 256 -h 256` of that file. The window class and Wayland app id are both `companion` (Gio defaults to the executable name), which is why the desktop file is `companion.desktop` with `StartupWMClass=companion`: renaming the binary requires changing both.

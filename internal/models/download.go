@@ -42,6 +42,9 @@ type Progress struct {
 	Rate float64
 	// ETA is zero while the rate is unknown.
 	ETA time.Duration
+	// Unpacking is set once an archive is downloaded and verified; Done
+	// and Total then count unpacked bytes and Rate/ETA are zero.
+	Unpacking bool
 }
 
 // Downloader fetches models into a directory with resume and verification.
@@ -80,6 +83,9 @@ func (d *Downloader) Download(ctx context.Context, m Manifest, destDir string, p
 	}
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return "", err
+	}
+	if m.Archive() {
+		return d.downloadArchive(ctx, m, destDir, progress)
 	}
 	final := filepath.Join(destDir, m.File)
 	part := final + partSuffix

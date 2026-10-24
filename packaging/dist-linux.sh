@@ -1,5 +1,6 @@
 #!/bin/sh
-# Packs bin/companion and bin/stt-sidecar (built by `make dist-linux`) into
+# Packs bin/companion, bin/stt-sidecar and the sherpa-onnx libraries next to
+# it (built by `make dist-linux`) into
 # dist/companion-VERSION-linux-ARCH.tar.gz and, when appimagetool is usable,
 # dist/Companion-VERSION-ARCH.AppImage.
 #
@@ -28,9 +29,28 @@ for f in bin/companion bin/stt-sidecar; do
 	[ -x "$f" ] || die "$f missing; run make dist-linux, not this script directly"
 done
 # The fake-engine sidecar from plain `make build` would ship without speech
-# recognition; the whisper build links these symbols.
+# recognition; the release build links both engines (make build-stt).
 grep -q whisper_init_from_file "$root/bin/stt-sidecar" ||
-	die "bin/stt-sidecar is not the whisper build (run: make whisper build-whisper)"
+	die "bin/stt-sidecar lacks the whisper engine (run: make whisper build-stt)"
+grep -q SherpaOnnxCreateOfflineRecognizer "$root/bin/stt-sidecar" ||
+	die "bin/stt-sidecar lacks the sherpa-onnx engine (run: make build-stt)"
+# sherpa-onnx's prebuilt libraries are loaded from next to the sidecar
+# ($ORIGIN runpath), see docs/stt-protocol.md#sherpa-onnx-build.
+sherpa_libs="bin/libsherpa-onnx-c-api.so bin/libonnxruntime.so"
+for f in $sherpa_libs; do
+	[ -f "$f" ] || die "$f missing (run: make build-stt)"
+done
+
+# sidecar DIR: installs the sidecar and its libraries into DIR. The build
+# host's module-cache runpath is dropped when patchelf is available; left
+# in, it is only a dead search path after $ORIGIN.
+sidecar() {
+	install -m 755 bin/stt-sidecar "$1/"
+	install -m 644 $sherpa_libs "$1/"
+	if command -v patchelf >/dev/null; then
+		patchelf --set-rpath '$ORIGIN' "$1/stt-sidecar"
+	fi
+}
 
 # --- directory tree shared by tarball and AppDir --------------------------
 stage() { # stage DIR: fills DIR with the files common to both formats
@@ -45,6 +65,7 @@ stage() { # stage DIR: fills DIR with the files common to both formats
 	install -m 644 packaging/NOTICE "$d/NOTICE"
 	install -m 644 internal/assets/fonts/OFL.txt "$d/licenses/OFL.txt"
 	install -m 644 internal/ui/icon/LICENSE.mingcute "$d/licenses/LICENSE.mingcute"
+	install -m 644 packaging/licenses/LICENSE.sherpa-onnx packaging/licenses/LICENSE.onnxruntime "$d/licenses/"
 }
 
 rm -rf "${dist:?}/$name" "$dist/AppDir"
@@ -53,7 +74,8 @@ mkdir -p "$dist"
 # --- tarball -----------------------------------------------------------------
 t="$dist/$name"
 install -d "$t"
-install -m 755 bin/companion bin/stt-sidecar "$t/"
+install -m 755 bin/companion "$t/"
+sidecar "$t"
 install -m 755 packaging/install.sh "$t/"
 install -m 644 packaging/README.txt "$t/"
 stage "$t"
@@ -88,7 +110,8 @@ fi
 
 a="$dist/AppDir"
 install -d "$a/usr/bin"
-install -m 755 bin/companion bin/stt-sidecar "$a/usr/bin/"
+install -m 755 bin/companion "$a/usr/bin/"
+sidecar "$a/usr/bin"
 stage "$a/usr"
 # AppImage wants the desktop entry and icon at the AppDir root too. AppRun is
 # a symlink so /proc/self/exe resolves into usr/bin, where the sidecar is.

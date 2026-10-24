@@ -30,7 +30,7 @@ build() {
   cd "$_root"
   # Redistributable ggml: not tuned to the build machine.
   make whisper WHISPER_NATIVE=OFF
-  make build build-whisper VERSION="$pkgver"
+  make build build-stt VERSION="$pkgver"
 }
 
 check() {
@@ -42,6 +42,9 @@ package() {
   cd "$_root"
   install -Dm755 bin/companion "$pkgdir/usr/lib/companion/companion"
   install -Dm755 bin/stt-sidecar "$pkgdir/usr/lib/companion/stt-sidecar"
+  # Prebuilt sherpa-onnx/onnxruntime from the Go module, loaded via $ORIGIN.
+  install -Dm644 bin/libsherpa-onnx-c-api.so bin/libonnxruntime.so -t "$pkgdir/usr/lib/companion"
+  install -Dm644 packaging/licenses/LICENSE.sherpa-onnx packaging/licenses/LICENSE.onnxruntime -t "$pkgdir/usr/share/licenses/$pkgname"
   install -d "$pkgdir/usr/bin"
   ln -s /usr/lib/companion/companion "$pkgdir/usr/bin/companion"
   install -Dm644 packaging/companion.desktop -t "$pkgdir/usr/share/applications"

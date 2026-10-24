@@ -7,6 +7,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/widget"
 
+	"github.com/xlsft/companion/internal/models/hw"
 	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
@@ -118,6 +119,12 @@ func (m *mainUI) page(r Route) page {
 		}
 		if be := m.sh.opts.Setup.Permissions; be != nil {
 			sp.hotkeys = &wizard.HotkeyEditor{Backend: be, Invalidate: m.sh.invalidateAll}
+		}
+		if be := m.sh.opts.Setup.STT; be != nil {
+			sp.models = &wizard.ModelPicker{Backend: be, Invalidate: m.sh.invalidateAll, Language: func() string {
+				s := m.sh.opts.Settings.Get()
+				return hw.SpeechLanguage(s.Voice.Language, s.UI.Language)
+			}}
 		}
 		p = sp
 	default:

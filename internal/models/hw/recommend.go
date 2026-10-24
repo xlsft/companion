@@ -31,19 +31,106 @@ func isQuantized(m ModelEntry) bool {
 	return strings.HasPrefix(m.Quantization, "q")
 }
 
-// Recommend picks the largest model that fits the machine. lang is "auto" or
-// an ISO code; "auto" and anything but English need a multilingual model.
-func Recommend(p Profile, catalog models.Catalog, lang string) (ModelEntry, string) {
-	ceiling, why := ceilingFor(p)
+// SpeechLanguage is the language to recommend a model for: the configured
+// speech language, or the interface language while that is "auto" (a
+// Russian UI almost always means Russian speech).
+func SpeechLanguage(voice, ui string) string {
+	if voice != "" && voice != "auto" {
+		return voice
+	}
+	if ui != "" {
+		return ui
+	}
+	return "auto"
+}
 
-	// Budget RAM against what is free now when known, else a share of total.
-	budgetMB := 0
+// budgetMB is the RAM a model may take: a share of what is free now when
+// known, else of the total; 0 means unknown.
+func budgetMB(p Profile) int {
 	switch {
 	case p.Memory.AvailableBytes > 0:
-		budgetMB = int(p.Memory.AvailableBytes >> 20 * 8 / 10)
+		return int(p.Memory.AvailableBytes >> 20 * 8 / 10)
 	case p.Memory.TotalBytes > 0:
-		budgetMB = int(p.Memory.TotalBytes >> 20 * 6 / 10)
+		return int(p.Memory.TotalBytes >> 20 * 6 / 10)
 	}
+	return 0
+}
+
+// Recommend picks the model for lang ("auto" or an ISO code) and this
+// machine. Primary (sherpa-onnx) models come first: Parakeet for European
+// languages, SenseVoice for Chinese, Japanese, Korean and Cantonese.
+// whisper.cpp is recommended only for a language no primary model covers,
+// or when none fits in memory.
+func Recommend(p Profile, catalog models.Catalog, lang string) (ModelEntry, string) {
+	if m, why, ok := recommendPrimary(p, catalog, lang); ok {
+		return m, why
+	}
+	m, why := recommendWhisper(p, catalog, lang)
+	return m, "fallback for " + lang + ": " + why
+}
+
+// recommendPrimary ranks the listed sherpa models that recognise lang.
+// Offline models beat streaming ones (they see the whole utterance, and
+// partials come from the rolling window anyway), and among those the
+// larger one that fits wins (for streaming ones the monolingual one);
+// ties keep catalogue order, which puts
+// Parakeet v3 before v2 (same 0.6B encoder, so v2 is not faster). For
+// "auto" the model with the most languages wins. Without AVX2/NEON or a
+// GPU the smallest fitting model wins instead: a 0.6B encoder is too slow
+// there.
+func recommendPrimary(p Profile, catalog models.Catalog, lang string) (ModelEntry, string, bool) {
+	budget := budgetMB(p)
+	slow := !p.CPU.FastSIMD && !p.GPU.Usable() && p.CPU.Cores > 0
+	auto := lang == "" || lang == "auto"
+	var best ModelEntry
+	found := false
+	better := func(m ModelEntry) bool {
+		switch {
+		case !found:
+			return true
+		case slow:
+			return m.RAMRequiredMB < best.RAMRequiredMB
+		case auto && len(m.Languages) != len(best.Languages):
+			return len(m.Languages) > len(best.Languages)
+		case m.Streaming() != best.Streaming():
+			return !m.Streaming()
+		case m.Streaming() && len(m.Languages) != len(best.Languages):
+			// A small bilingual transducer splits its capacity; the
+			// monolingual one is the better pick for its language.
+			return len(m.Languages) < len(best.Languages)
+		}
+		return m.RAMRequiredMB > best.RAMRequiredMB
+	}
+	for _, m := range catalog {
+		if m.Family != models.FamilySherpa || m.Fallback || m.Hidden {
+			continue
+		}
+		if !auto && !m.Supports(lang) {
+			continue
+		}
+		if budget > 0 && m.RAMRequiredMB > budget {
+			continue
+		}
+		if better(m) {
+			best, found = m, true
+		}
+	}
+	if !found {
+		return ModelEntry{}, "", false
+	}
+	why := fmt.Sprintf("%s covers %s within ~%d MB RAM budget", best.ID, lang, budget)
+	if slow {
+		why += "; no AVX2/NEON: smallest model"
+	}
+	return best, why, true
+}
+
+// recommendWhisper picks the largest whisper model that fits the machine.
+// lang is "auto" or an ISO code; anything but English needs a
+// multilingual model.
+func recommendWhisper(p Profile, catalog models.Catalog, lang string) (ModelEntry, string) {
+	ceiling, why := ceilingFor(p)
+	budgetMB := budgetMB(p)
 
 	englishOnly := lang == "en"
 	var best ModelEntry

@@ -8,6 +8,7 @@ require (
 	github.com/gen2brain/malgo v0.11.26
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/jezek/xgb v1.3.1
+	github.com/k2-fsa/sherpa-onnx-go v1.13.8
 	github.com/sigstore/protobuf-specs v0.5.1
 	github.com/sigstore/sigstore-go v1.3.0
 	github.com/theupdateframework/go-tuf/v2 v2.4.2
@@ -65,6 +66,9 @@ require (
 	github.com/in-toto/in-toto-golang v0.11.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jedisct1/go-minisign v0.0.0-20211028175153-1c139d1cc84b // indirect
+	github.com/k2-fsa/sherpa-onnx-go-linux v1.13.8 // indirect
+	github.com/k2-fsa/sherpa-onnx-go-macos v1.13.8 // indirect
+	github.com/k2-fsa/sherpa-onnx-go-windows v1.13.8 // indirect
 	github.com/letsencrypt/boulder v0.20260309.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect

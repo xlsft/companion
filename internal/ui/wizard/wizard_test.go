@@ -345,7 +345,7 @@ func TestSTTFlow(t *testing.T) {
 	h.pass(readiness.StepPermissions)
 	h.pass(readiness.StepBYOK)
 	h.eventually("stt loaded", func() bool { return h.view() == readiness.StepSTT && h.has(ActDownload) })
-	if !h.shows("ГБ ОЗУ") || !h.shows("Рекомендуем") || !h.shows("whisper") {
+	if !h.shows("ГБ ОЗУ") || !h.shows("Рекомендуем") || !h.shows("Parakeet") {
 		t.Errorf("hardware/recommendation missing: %q", h.w.frame.texts)
 	}
 	if !h.shows("«Привет, это проверка микрофона»") {

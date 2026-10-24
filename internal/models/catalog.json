@@ -1,5 +1,249 @@
 [
   {
+    "id": "parakeet-tdt-0.6b-v3-int8",
+    "name": "Parakeet TDT v3",
+    "version": "1",
+    "family": "sherpa",
+    "file": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+    "size": 487170055,
+    "sha256": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf",
+    "languages": [
+      "bg",
+      "hr",
+      "cs",
+      "da",
+      "nl",
+      "en",
+      "et",
+      "fi",
+      "fr",
+      "de",
+      "el",
+      "hu",
+      "it",
+      "lv",
+      "lt",
+      "mt",
+      "pl",
+      "pt",
+      "ro",
+      "sk",
+      "sl",
+      "es",
+      "sv",
+      "ru",
+      "uk"
+    ],
+    "quantization": "int8",
+    "ram_required_mb": 1300,
+    "backends": [
+      "cpu"
+    ],
+    "min_runtime_version": "1.13.8",
+    "format": "tar.bz2",
+    "files": [
+      {
+        "role": "encoder",
+        "path": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/encoder.int8.onnx",
+        "size": 652184281
+      },
+      {
+        "role": "decoder",
+        "path": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/decoder.int8.onnx",
+        "size": 11845275
+      },
+      {
+        "role": "joiner",
+        "path": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/joiner.int8.onnx",
+        "size": 6355277
+      },
+      {
+        "role": "tokens",
+        "path": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/tokens.txt",
+        "size": 93939
+      }
+    ],
+    "kind": "offline",
+    "model_type": "nemo_transducer",
+    "license": "CC-BY-4.0"
+  },
+  {
+    "id": "parakeet-tdt-0.6b-v2-int8",
+    "name": "Parakeet TDT v2",
+    "version": "1",
+    "family": "sherpa",
+    "file": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+    "size": 482468385,
+    "sha256": "157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad",
+    "languages": [
+      "en"
+    ],
+    "quantization": "int8",
+    "ram_required_mb": 1300,
+    "backends": [
+      "cpu"
+    ],
+    "min_runtime_version": "1.13.8",
+    "format": "tar.bz2",
+    "files": [
+      {
+        "role": "encoder",
+        "path": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/encoder.int8.onnx",
+        "size": 652184296
+      },
+      {
+        "role": "decoder",
+        "path": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/decoder.int8.onnx",
+        "size": 7257753
+      },
+      {
+        "role": "joiner",
+        "path": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/joiner.int8.onnx",
+        "size": 1739080
+      },
+      {
+        "role": "tokens",
+        "path": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/tokens.txt",
+        "size": 9384
+      }
+    ],
+    "kind": "offline",
+    "model_type": "nemo_transducer",
+    "license": "CC-BY-4.0"
+  },
+  {
+    "id": "sense-voice-small-int8",
+    "name": "SenseVoice Small",
+    "version": "1",
+    "family": "sherpa",
+    "file": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
+    "size": 163002883,
+    "sha256": "7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e",
+    "languages": [
+      "zh",
+      "en",
+      "ja",
+      "ko",
+      "yue"
+    ],
+    "quantization": "int8",
+    "ram_required_mb": 700,
+    "backends": [
+      "cpu"
+    ],
+    "min_runtime_version": "1.13.8",
+    "format": "tar.bz2",
+    "files": [
+      {
+        "role": "model",
+        "path": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/model.int8.onnx",
+        "size": 239233841
+      },
+      {
+        "role": "tokens",
+        "path": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/tokens.txt",
+        "size": 315894
+      }
+    ],
+    "kind": "offline",
+    "model_type": "sense_voice",
+    "license": "FunASR-Model-License-1.1"
+  },
+  {
+    "id": "zipformer-streaming-en-int8",
+    "name": "Zipformer Streaming EN",
+    "version": "1",
+    "family": "sherpa",
+    "file": "sherpa-onnx-streaming-zipformer-en-2023-06-26.tar.bz2",
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-06-26.tar.bz2",
+    "size": 310414022,
+    "sha256": "639e25b578e9e997131402199419c13a941f8e4e198e2da1ce57dbf5cf401282",
+    "languages": [
+      "en"
+    ],
+    "quantization": "int8",
+    "ram_required_mb": 350,
+    "backends": [
+      "cpu"
+    ],
+    "min_runtime_version": "1.13.8",
+    "format": "tar.bz2",
+    "files": [
+      {
+        "role": "encoder",
+        "path": "sherpa-onnx-streaming-zipformer-en-2023-06-26/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx",
+        "size": 70108816
+      },
+      {
+        "role": "decoder",
+        "path": "sherpa-onnx-streaming-zipformer-en-2023-06-26/decoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx",
+        "size": 540688
+      },
+      {
+        "role": "joiner",
+        "path": "sherpa-onnx-streaming-zipformer-en-2023-06-26/joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx",
+        "size": 259416
+      },
+      {
+        "role": "tokens",
+        "path": "sherpa-onnx-streaming-zipformer-en-2023-06-26/tokens.txt",
+        "size": 5048
+      }
+    ],
+    "kind": "streaming",
+    "model_type": "zipformer_transducer",
+    "license": "Apache-2.0"
+  },
+  {
+    "id": "zipformer-streaming-zh-en-int8",
+    "name": "Zipformer Streaming ZH/EN",
+    "version": "1",
+    "family": "sherpa",
+    "file": "sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2",
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2",
+    "size": 511274346,
+    "sha256": "27ffbd9ee24ad186d99acc2f6354d7992b27bcab490812510665fa8f9389c5f8",
+    "languages": [
+      "zh",
+      "en"
+    ],
+    "quantization": "int8",
+    "ram_required_mb": 600,
+    "backends": [
+      "cpu"
+    ],
+    "min_runtime_version": "1.13.8",
+    "format": "tar.bz2",
+    "files": [
+      {
+        "role": "encoder",
+        "path": "sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/encoder-epoch-99-avg-1.int8.onnx",
+        "size": 181895032
+      },
+      {
+        "role": "decoder",
+        "path": "sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/decoder-epoch-99-avg-1.int8.onnx",
+        "size": 13091040
+      },
+      {
+        "role": "joiner",
+        "path": "sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/joiner-epoch-99-avg-1.int8.onnx",
+        "size": 3228404
+      },
+      {
+        "role": "tokens",
+        "path": "sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/tokens.txt",
+        "size": 56317
+      }
+    ],
+    "kind": "streaming",
+    "model_type": "zipformer_transducer",
+    "license": "Apache-2.0"
+  },
+  {
     "id": "whisper-tiny",
     "name": "Whisper Tiny",
     "version": "1",
@@ -19,7 +263,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-tiny-q5_1",
@@ -41,7 +289,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-tiny-q8_0",
@@ -63,7 +315,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-tiny.en",
@@ -85,7 +341,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-tiny.en-q5_1",
@@ -107,7 +367,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-tiny.en-q8_0",
@@ -129,7 +393,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-base",
@@ -151,7 +419,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-base-q5_1",
@@ -173,7 +445,10 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT"
   },
   {
     "id": "whisper-base-q8_0",
@@ -195,7 +470,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-base.en",
@@ -217,7 +496,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-base.en-q5_1",
@@ -239,7 +522,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-base.en-q8_0",
@@ -261,7 +548,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-small",
@@ -283,7 +574,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-small-q5_1",
@@ -305,7 +600,10 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT"
   },
   {
     "id": "whisper-small-q8_0",
@@ -327,7 +625,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-small.en",
@@ -349,7 +651,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-small.en-q5_1",
@@ -371,7 +677,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-small.en-q8_0",
@@ -393,7 +703,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-medium",
@@ -415,7 +729,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-medium-q5_0",
@@ -437,7 +755,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-medium-q8_0",
@@ -459,7 +781,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-medium.en",
@@ -481,7 +807,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-medium.en-q5_0",
@@ -503,7 +833,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-medium.en-q8_0",
@@ -525,7 +859,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.5.0"
+    "min_runtime_version": "1.5.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-large-v3-turbo",
@@ -547,7 +885,11 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.7.0"
+    "min_runtime_version": "1.7.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   },
   {
     "id": "whisper-large-v3-turbo-q5_0",
@@ -569,7 +911,10 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.7.0"
+    "min_runtime_version": "1.7.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT"
   },
   {
     "id": "whisper-large-v3-turbo-q8_0",
@@ -591,6 +936,10 @@
       "vulkan",
       "metal"
     ],
-    "min_runtime_version": "1.7.0"
+    "min_runtime_version": "1.7.0",
+    "kind": "offline",
+    "fallback": true,
+    "license": "MIT",
+    "hidden": true
   }
 ]

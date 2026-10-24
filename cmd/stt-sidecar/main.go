@@ -21,14 +21,21 @@ import (
 )
 
 func main() {
+	names := engine.Names()
+	hasSherpa, hasWhisper := slices.Contains(names, "sherpa"), slices.Contains(names, "whisper")
 	defaultEngine := "fake"
-	if slices.Contains(engine.Names(), "whisper") {
+	switch {
+	case hasSherpa && hasWhisper:
+		defaultEngine = "auto"
+	case hasSherpa:
+		defaultEngine = "sherpa"
+	case hasWhisper:
 		defaultEngine = "whisper"
 	}
 	vcfg := vad.DefaultConfig()
 	var (
 		showVersion     = flag.Bool("version", false, "print version and exit")
-		engineName      = flag.String("engine", defaultEngine, "speech engine: fake or a compiled-in engine "+fmt.Sprint(engine.Names()))
+		engineName      = flag.String("engine", defaultEngine, "speech engine: fake, auto (sherpa for a model directory, whisper for a file) or a compiled-in engine "+fmt.Sprint(names))
 		partialInterval = flag.Duration("partial-interval", 700*time.Millisecond, "new audio between rolling partial decodes")
 		partialWindow   = flag.Duration("partial-window", 10*time.Second, "trailing audio decoded for each partial")
 		maxUtterance    = flag.Duration("max-utterance", 5*time.Minute, "per-session audio limit")
@@ -37,6 +44,7 @@ func main() {
 		vadHangover     = flag.Duration("vad-hangover", vcfg.Hangover, "silence that ends a speech run")
 		fakeDelay       = flag.Duration("fake-delay", 0, "fake engine: delay per decode")
 		fakeExit        = flag.Bool("fake-exit-on-final", false, "fake engine: exit during the final decode (crash simulation)")
+		fakeStreaming   = flag.Bool("fake-streaming", false, "fake engine: behave as a streaming model")
 		logLevel        = flag.String("log-level", "info", "stderr log level")
 	)
 	flag.Parse()
@@ -53,9 +61,12 @@ func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: lvl}))
 
 	var factory engine.Factory
-	if *engineName == "fake" {
-		factory = fake.Factory(fake.Options{Delay: *fakeDelay, ExitOnFinal: *fakeExit})
-	} else {
+	switch *engineName {
+	case "fake":
+		factory = fake.Factory(fake.Options{Delay: *fakeDelay, ExitOnFinal: *fakeExit, Streaming: *fakeStreaming})
+	case "auto":
+		factory = engine.Auto("sherpa", "whisper")
+	default:
 		f, err := engine.Lookup(*engineName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "stt-sidecar:", err)

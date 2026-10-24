@@ -20,6 +20,9 @@ type Options struct {
 	// ExitOnFinal terminates the process during the first final decode,
 	// simulating a native crash in the runtime.
 	ExitOnFinal bool
+	// Streaming makes the engine a streaming one (engine.Streamer): the
+	// hypothesis is Text(true, samples so far), the final Text(false, all).
+	Streaming bool
 }
 
 const RuntimeVersion = "fake-1"
@@ -82,3 +85,30 @@ func (e *Engine) Transcribe(ctx context.Context, pcm []float32, opts engine.Opti
 }
 
 func (e *Engine) Close() error { return nil }
+
+func (e *Engine) NewStream(opts engine.Options) (engine.Stream, error) {
+	if !e.opts.Streaming {
+		return nil, engine.ErrNotStreaming
+	}
+	return &stream{e: e, lang: opts.Language}, nil
+}
+
+type stream struct {
+	e    *Engine
+	lang string
+	n    int
+}
+
+func (s *stream) Accept(ctx context.Context, pcm []float32) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	s.n += len(pcm)
+	return Text(true, s.n), nil
+}
+
+func (s *stream) Finish(ctx context.Context) (engine.Result, error) {
+	return s.e.Transcribe(ctx, make([]float32, s.n), engine.Options{Language: s.lang})
+}
+
+func (s *stream) Close() error { return nil }

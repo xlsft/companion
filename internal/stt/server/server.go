@@ -98,6 +98,11 @@ type session struct {
 	partialDone   chan struct{}
 	partialSeq    uint64
 	lastPartial   string
+
+	// stream is set for a streaming model: every chunk is decoded
+	// incrementally by the feed goroutine and the rolling window is unused.
+	stream engine.Stream
+	feed   *feeder
 }
 
 func New(cfg Config) *Server {
@@ -246,9 +251,13 @@ func (s *Server) initialize(m *protocol.Message) {
 			s.logCode("warn", "backend_fallback_cpu", "")
 		}
 		s.mu.Unlock()
+		name := s.cfg.EngineName
+		if info.Engine != "" {
+			name = info.Engine
+		}
 		s.respond(m.ID, protocol.InitializeResult{
 			ProtocolVersion: protocol.Version,
-			Engine:          s.cfg.EngineName,
+			Engine:          name,
 			RuntimeVersion:  info.RuntimeVersion,
 			BackendInUse:    info.BackendInUse,
 			FallbackReason:  info.FallbackReason,
@@ -259,10 +268,13 @@ func (s *Server) initialize(m *protocol.Message) {
 
 func (s *Server) load(p protocol.InitializeParams) (engine.Engine, engine.Info, *protocol.Error) {
 	if p.ModelPath != "" {
-		if _, err := os.Stat(p.ModelPath); err != nil {
+		st, err := os.Stat(p.ModelPath)
+		if err != nil {
 			return nil, engine.Info{}, protocol.ErrModelNotFound.WithDetail("stat")
 		}
-		if p.ModelSHA256 != "" {
+		// A model directory has no single hash; the core verified its
+		// files against the install record before activating it.
+		if p.ModelSHA256 != "" && !st.IsDir() {
 			sum, err := fileSHA256(p.ModelPath)
 			if err != nil {
 				return nil, engine.Info{}, protocol.ErrModelNotFound.WithDetail("read")
@@ -351,6 +363,18 @@ func (s *Server) start(m *protocol.Message) {
 	}
 	ctx, cancel := context.WithCancel(s.ctx)
 	sess := &session{id: p.SessionID, language: lang, partials: p.Partials, ctx: ctx, cancel: cancel}
+	if st, ok := s.eng.(engine.Streamer); ok {
+		stream, err := st.NewStream(engine.Options{Language: lang})
+		switch {
+		case err == nil:
+			sess.stream, sess.feed = stream, newFeeder()
+			s.wg.Add(1)
+			go s.runFeed(sess)
+		case !errors.Is(err, engine.ErrNotStreaming):
+			// The rolling window still gives partials and a final.
+			s.logCode("warn", "stream_failed", sess.id)
+		}
+	}
 	switch {
 	case p.VAD != nil:
 		sess.ep = s.newEndpointer(*p.VAD)
@@ -417,6 +441,10 @@ func (s *Server) audio(m *protocol.Message) {
 		})
 	}
 
+	if sess.feed != nil {
+		sess.feed.push(protocol.Float32(pcm))
+		return
+	}
 	// While a partial decode runs, sinceDecode keeps growing, so the next
 	// one starts with the first chunk after it finishes.
 	if sess.partials && sess.sawSpeech && sess.partialDone == nil && sess.sinceDecode >= samples(s.cfg.PartialInterval) {
@@ -482,16 +510,111 @@ func (s *Server) startPartial(sess *session) {
 			s.logCode("warn", "partial_failed", sess.id)
 			return
 		}
-		text := strings.TrimSpace(res.Text)
-		if text == "" || text == sess.lastPartial {
-			return
-		}
-		sess.lastPartial = text
-		sess.partialSeq++
-		s.notify(protocol.MethodSessionPartial, protocol.PartialParams{
-			SessionID: sess.id, Seq: sess.partialSeq, Text: text,
-		})
+		s.emitPartial(sess, res.Text)
 	}()
+}
+
+// emitPartial sends a changed, non-empty hypothesis; s.mu must be held.
+func (s *Server) emitPartial(sess *session, text string) {
+	text = strings.TrimSpace(text)
+	if text == "" || text == sess.lastPartial {
+		return
+	}
+	sess.lastPartial = text
+	sess.partialSeq++
+	s.notify(protocol.MethodSessionPartial, protocol.PartialParams{
+		SessionID: sess.id, Seq: sess.partialSeq, Text: text,
+	})
+}
+
+// feeder hands audio from the protocol loop to a session's stream
+// goroutine. Pending audio is taken in one piece, so a slow decoder sees
+// bigger chunks rather than a growing queue of small ones.
+type feeder struct {
+	mu      sync.Mutex
+	pending []float32
+	closed  bool
+	wake    chan struct{}
+	done    chan struct{}
+}
+
+func newFeeder() *feeder {
+	return &feeder{wake: make(chan struct{}, 1), done: make(chan struct{})}
+}
+
+func (f *feeder) signal() {
+	select {
+	case f.wake <- struct{}{}:
+	default:
+	}
+}
+
+func (f *feeder) push(pcm []float32) {
+	f.mu.Lock()
+	f.pending = append(f.pending, pcm...)
+	f.mu.Unlock()
+	f.signal()
+}
+
+// close ends the input; the goroutine drains what is pending and exits.
+func (f *feeder) close() {
+	f.mu.Lock()
+	f.closed = true
+	f.mu.Unlock()
+	f.signal()
+}
+
+func (f *feeder) take() ([]float32, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	p := f.pending
+	f.pending = nil
+	return p, f.closed
+}
+
+// runFeed decodes a streaming session as audio arrives and reports the
+// hypothesis as a partial once speech was heard. A session that is
+// cancelled rather than finished closes its stream here; otherwise finish
+// owns it.
+func (s *Server) runFeed(sess *session) {
+	defer s.wg.Done()
+	defer close(sess.feed.done)
+	defer func() {
+		s.mu.Lock()
+		finishing := sess.finishing
+		s.mu.Unlock()
+		if !finishing {
+			_ = sess.stream.Close()
+		}
+	}()
+	for {
+		select {
+		case <-sess.ctx.Done():
+			return
+		case <-sess.feed.wake:
+		}
+		for {
+			pcm, closed := sess.feed.take()
+			if len(pcm) == 0 {
+				if closed {
+					return
+				}
+				break
+			}
+			text, err := sess.stream.Accept(sess.ctx, pcm)
+			if sess.ctx.Err() != nil {
+				return
+			}
+			s.mu.Lock()
+			switch {
+			case err != nil:
+				s.logCode("warn", "partial_failed", sess.id)
+			case sess.partials && sess.sawSpeech && !sess.finishing && s.sessions[sess.id] == sess:
+				s.emitPartial(sess, text)
+			}
+			s.mu.Unlock()
+		}
+	}
 }
 
 func (s *Server) finish(m *protocol.Message) {
@@ -516,6 +639,9 @@ func (s *Server) finish(m *protocol.Message) {
 	if sess.partialCancel != nil {
 		sess.partialCancel()
 	}
+	if sess.feed != nil {
+		sess.feed.close()
+	}
 	partialDone, eng := sess.partialDone, s.eng
 	s.mu.Unlock()
 
@@ -524,6 +650,10 @@ func (s *Server) finish(m *protocol.Message) {
 		defer s.wg.Done()
 		if partialDone != nil {
 			<-partialDone // engines may serialise decodes; don't queue behind it
+		}
+		if sess.feed != nil {
+			<-sess.feed.done // all audio is in the stream
+			defer sess.stream.Close()
 		}
 		res := protocol.FinalResult{
 			SessionID:  sess.id,
@@ -536,7 +666,11 @@ func (s *Server) finish(m *protocol.Message) {
 		if sess.sawSpeech {
 			t0 := time.Now()
 			var out engine.Result
-			out, err = eng.Transcribe(sess.ctx, protocol.Float32(sess.pcm), engine.Options{Language: sess.language})
+			if sess.stream != nil {
+				out, err = sess.stream.Finish(sess.ctx)
+			} else {
+				out, err = eng.Transcribe(sess.ctx, protocol.Float32(sess.pcm), engine.Options{Language: sess.language})
+			}
 			res.DecodeMS = time.Since(t0).Milliseconds()
 			res.Text = strings.TrimSpace(out.Text)
 			if out.Language != "" {

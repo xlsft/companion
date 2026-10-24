@@ -13,9 +13,32 @@ Icons (internal/ui/icon, embedded in the companion binary)
   Full text: licenses/LICENSE.mingcute
 
 Speech recognition (stt-sidecar)
+  sherpa-onnx, Copyright Xiaomi Corporation and the k2-fsa authors: Apache
+  License 2.0. libsherpa-onnx-c-api is shipped next to stt-sidecar as a shared
+  library, unmodified, as built by the k2-fsa/sherpa-onnx-go module.
+  Full text: licenses/LICENSE.sherpa-onnx
+  ONNX Runtime, Copyright Microsoft Corporation: MIT License. libonnxruntime
+  is shipped next to stt-sidecar, unmodified, from the same module.
+  Full text: licenses/LICENSE.onnxruntime; its own third-party notices:
+  https://github.com/microsoft/onnxruntime/blob/main/ThirdPartyNotices.txt
   whisper.cpp and ggml, Copyright the ggml authors: MIT License,
-  statically linked into stt-sidecar. Speech models are not bundled; they are
-  downloaded at runtime and carry their own licences.
+  statically linked into stt-sidecar.
+
+Speech models (not bundled)
+  No model ships with Companion. The user picks one in setup and it is
+  downloaded from its publisher's release (k2-fsa/sherpa-onnx "asr-models",
+  ggerganov/whisper.cpp on Hugging Face) under that model's licence:
+  - Parakeet TDT 0.6B v3 and v2 (NVIDIA, converted to ONNX by k2-fsa):
+    Creative Commons Attribution 4.0 (CC-BY-4.0).
+    https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+    https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2
+  - SenseVoice Small (Alibaba Group, FunAudioLLM, converted by k2-fsa):
+    FunASR Model Open Source License 1.1, which permits use, copying,
+    modification and sharing provided the source, authors and model name are
+    retained. https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE
+  - Streaming zipformer EN (2023-06-26) and bilingual ZH/EN (2023-02-20)
+    (k2-fsa icefall): Apache License 2.0.
+  - Whisper (OpenAI, ggml conversion by ggerganov): MIT License.
 
 Go module dependencies are linked statically into both binaries; their
 licences are those of the respective modules (see go.mod).

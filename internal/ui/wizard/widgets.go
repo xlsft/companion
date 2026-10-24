@@ -48,6 +48,25 @@ func (w *Wizard) dropdown(gtx layout.Context, th *theme.Theme, d *kit.Dropdown, 
 	return d.Layout(gtx, th, labels, sel, placeholder)
 }
 
+// richDropdown lays out a rich kit.Dropdown as a choice of the step.
+func (w *Wizard) richDropdown(gtx layout.Context, th *theme.Theme, d *kit.Dropdown, opts []kit.RichOption, sel int, placeholder string, enabled bool) layout.Dimensions {
+	w.frame.actions = append(w.frame.actions, ActChoose)
+	if sel >= 0 && sel < len(opts) {
+		w.frame.texts = append(w.frame.texts, opts[sel].Texts()...)
+	} else {
+		w.frame.texts = append(w.frame.texts, placeholder)
+	}
+	if d.Opened() {
+		for _, o := range opts {
+			w.frame.texts = append(w.frame.texts, o.Texts()...)
+		}
+	}
+	if !enabled {
+		gtx = gtx.Disabled()
+	}
+	return d.LayoutRich(gtx, th, opts, sel, placeholder)
+}
+
 // alert is an inline kit.Alert; detail may be empty.
 func alert(w *Wizard, th *theme.Theme, s theme.Status, title, detail string) layout.Widget {
 	w.frame.texts = append(w.frame.texts, title)

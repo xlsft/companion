@@ -10,7 +10,7 @@
 Companion (repo `openclick`) is a local desktop assistant for Windows, macOS and Linux. Hard constraints from the PRD:
 
 - one codebase, as much Go as possible, UI on Gio, no WebView/Electron/TS UI;
-- speech recognition is local (whisper.cpp), LLM is BYOK (OpenAI/Anthropic-compatible), TTS is an external provider;
+- speech recognition is local (whisper.cpp; sherpa-onnx since amendment 2), LLM is BYOK (OpenAI/Anthropic-compatible), TTS is an external provider;
 - no backend, no accounts, all data on device;
 - OS-specific functionality (hotkeys, capture, overlay, input, accessibility, secrets) differs per platform and, on Linux, per compositor.
 
@@ -84,3 +84,13 @@ Gio's Linux (Wayland/X11/EGL) and macOS backends are cgo, so rule 6 cannot hold 
 - The tray (`internal/platform/tray`, `fyne.io/systray`) is pure Go on Linux and Windows and cgo on macOS; a `CGO_ENABLED=0` darwin build gets a stub that returns `Unsupported(CapTray)`.
 - Gio's event loop must own the main goroutine (`app.Main()`); `cmd/companion` runs the `internal/app` lifecycle in a goroutine and exits the process when it returns.
 - Gio is built with `-tags novulkan` (set via `GOFLAGS` in the Makefile): its Vulkan backend needs vulkan-headers at build time, while the GL/EGL backend (Linux), Metal (macOS) and D3D11 (Windows) cover every target. Bare `go build/test` outside make needs the same tag unless vulkan-headers are installed.
+
+## Amendment 2 (2026-10-25, OC-29): sherpa-onnx is the primary STT engine
+
+whisper.cpp alone no longer meets the product bar: NVIDIA Parakeet TDT (25 European languages, punctuation and casing) and SenseVoice (zh/en/ja/ko/yue) are newer, more accurate models that run in real time on a desktop CPU with int8 weights, and streaming zipformer transducers give true incremental partials. They run on sherpa-onnx (k2-fsa, Apache-2.0) through its official Go bindings `github.com/k2-fsa/sherpa-onnx-go`.
+
+- Amended rule 6: cgo is also allowed in the build-tagged `internal/stt/engine/sherpa` (tag `sherpa && cgo`), imported only by `cmd/stt-sidecar`. Its pure-Go helpers (descriptor detection, text normalisation) build without the tag, so `make test` and `make cross` cover them.
+- The bindings link prebuilt shared libraries (`libsherpa-onnx-c-api`, `libonnxruntime`) shipped inside the Go module per OS and arch. They are not vendored or rebuilt: the sidecar gets an `$ORIGIN` runpath and the libraries are copied next to it (`make build-sherpa`, `make build-stt`, `packaging/dist-linux.sh`). The core never links them, so a native crash still costs one request (rule above).
+- The release sidecar is built with `-tags "whisper sherpa"` and runs `-engine auto`: a model directory (multi-file sherpa model with `model.json`) goes to sherpa, a single ggml file to whisper. whisper.cpp stays as the fallback engine for languages no sherpa model covers (e.g. Turkish, Arabic, Hindi); the recommender picks it only then.
+- Endpointing stays with the sidecar's energy VAD (`internal/stt/vad`) for every engine: the protocol's endpoint semantics must not depend on the engine, and sherpa's Silero VAD would add a model download and an onnx session per sidecar for no measured gain on the existing fixtures.
+- Speech models are still never bundled; the catalogue downloads them from the k2-fsa/sherpa-onnx `asr-models` release (tar.bz2, SHA-256 pinned) and the installer unpacks only the files the engine needs.

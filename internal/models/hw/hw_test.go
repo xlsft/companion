@@ -24,7 +24,7 @@ func profile(ramGB int, simd bool, gpu ...string) Profile {
 	}
 }
 
-func TestRecommend(t *testing.T) {
+func TestRecommendWhisper(t *testing.T) {
 	cat := mustCatalog(t)
 	tests := []struct {
 		name  string
@@ -46,7 +46,7 @@ func TestRecommend(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, reason := Recommend(tt.p, cat, tt.lang)
+			m, reason := recommendWhisper(tt.p, cat, tt.lang)
 			if classes[classRank(m)] != tt.class {
 				t.Fatalf("got %s (%s), want class %s", m.ID, reason, tt.class)
 			}
@@ -62,10 +62,10 @@ func TestRecommend(t *testing.T) {
 
 func TestRecommendQuantization(t *testing.T) {
 	cat := mustCatalog(t)
-	if m, _ := Recommend(profile(8, true), cat, "auto"); !isQuantized(m) {
+	if m, _ := recommendWhisper(profile(8, true), cat, "auto"); !isQuantized(m) {
 		t.Fatalf("cpu should prefer quantized, got %s", m.ID)
 	}
-	if m, _ := Recommend(profile(8, true, BackendMetal), cat, "auto"); isQuantized(m) {
+	if m, _ := recommendWhisper(profile(8, true, BackendMetal), cat, "auto"); isQuantized(m) {
 		t.Fatalf("gpu should prefer full precision, got %s", m.ID)
 	}
 }
