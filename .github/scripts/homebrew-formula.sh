@@ -42,8 +42,10 @@ class Companion < Formula
   end
 
   def install
-    # Must stay side by side: the core starts stt-sidecar from its own directory.
-    libexec.install "companion", "stt-sidecar"
+    # Must stay side by side: the core starts stt-sidecar from its own
+    # directory, and the sidecar loads the sherpa-onnx libraries from its
+    # own directory.
+    libexec.install "companion", "stt-sidecar", "libsherpa-onnx-c-api.so", "libonnxruntime.so"
     bin.install_symlink libexec/"companion"
     share.install Dir["share/*"]
     prefix.install "LICENSE.md", "NOTICE", "licenses"
