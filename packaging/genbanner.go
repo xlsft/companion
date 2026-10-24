@@ -28,14 +28,14 @@ import (
 
 const (
 	accent   = "#8b5cf6"
-	headline = "A voice helper that sees your screen."
-	sub      = "Ask how to do something in any app — it explains out loud and shows you where to click."
+	headline = "The friend who knows everything."
+	sub      = "Ask how to do anything. Companion watches your screen with you and guides you step by step."
 )
 
 var (
 	// subLines is sub broken where the banner has room.
-	subLines = []string{"Ask how to do something in any app — it explains", "out loud and shows you where to click."}
-	chips    = []string{"Works in any app", "Your voice stays on your computer", "No account"}
+	subLines = []string{"Ask how to do anything. Companion watches your screen", "with you and guides you step by step."}
+	chips    = []string{"Works everywhere", "Your voice stays on your computer", "No account"}
 )
 
 // hsl formats an HSL colour (degrees, percent, percent) as #rrggbb, so the
