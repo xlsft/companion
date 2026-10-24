@@ -43,11 +43,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The oldest supported Ubuntu runner sets the glibc floor of the
-          # binaries (2.35), so they run on older distributions too.
-          - runner: ubuntu-22.04
+          # The runner sets the glibc floor of the binaries (2.39). 22.04
+          # would give 2.35, but its PipeWire (0.3.48) lacks the SPA headers
+          # the screen-capture grabber needs.
+          - runner: ubuntu-24.04
             arch: x86_64
-          - runner: ubuntu-22.04-arm
+          - runner: ubuntu-24.04-arm
             arch: aarch64
     runs-on: ${{ matrix.runner }}
     steps:
