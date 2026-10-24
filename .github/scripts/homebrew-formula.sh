@@ -48,6 +48,8 @@ class Companion < Formula
     libexec.install "companion", "stt-sidecar", "libsherpa-onnx-c-api.so", "libonnxruntime.so"
     bin.install_symlink libexec/"companion"
     share.install Dir["share/*"]
+    # Launchers do not search brew's bin; point the entry at it directly.
+    inreplace share/"applications/companion.desktop", /^Exec=companion$/, "Exec=#{opt_bin}/companion"
     prefix.install "LICENSE.md", "NOTICE", "licenses"
   end
 

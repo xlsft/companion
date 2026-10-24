@@ -15,7 +15,11 @@ install -m 755 "$here/companion" "$here/stt-sidecar" "$lib/"
 # sherpa-onnx's libraries are found next to the sidecar ($ORIGIN).
 install -m 644 "$here/libsherpa-onnx-c-api.so" "$here/libonnxruntime.so" "$lib/"
 ln -sf "$lib/companion" "$prefix/bin/companion"
-install -m 644 "$here/share/applications/companion.desktop" "$prefix/share/applications/"
+# Launchers start desktop entries with the session's PATH, which often
+# lacks ~/.local/bin, so the entry names the binary by its full path.
+sed "s|^Exec=companion\$|Exec=\"$prefix/bin/companion\"|" "$here/share/applications/companion.desktop" \
+	>"$prefix/share/applications/companion.desktop"
+chmod 644 "$prefix/share/applications/companion.desktop"
 install -m 644 "$here/share/metainfo/companion.metainfo.xml" "$prefix/share/metainfo/"
 install -m 644 "$here/share/icons/hicolor/scalable/apps/companion.svg" "$prefix/share/icons/hicolor/scalable/apps/"
 install -m 644 "$here/share/icons/hicolor/256x256/apps/companion.png" "$prefix/share/icons/hicolor/256x256/apps/"
