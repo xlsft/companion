@@ -77,19 +77,39 @@ func arcGlint(p *painter, c contracts.Point, r, w float64, an anim, col color.NR
 	}
 }
 
-// pathGlint draws the glint travelling along a polyline (closed paths wrap
-// around, open ones run start to end).
+// pathGlint draws the glint travelling along a polyline. On a closed path
+// it loops around; on an open one it slides out past the end while fading
+// and fades back in at the start, instead of jumping back.
 func pathGlint(p *painter, pts []contracts.Point, closed bool, w float64, an anim, col color.NRGBA) {
 	if !an.live || len(pts) < 2 {
 		return
 	}
+	pos, env := an.phase, 1.0
+	if !closed {
+		pos, env = openGlint(an.phase)
+	}
 	for _, l := range glintLayers {
-		from, to := an.phase-l.span/2, an.phase+l.span/2
-		p.color(alpha(mix(col, white, l.light), l.alpha*an.appear))
+		from, to := pos-l.span/2, pos+l.span/2
+		p.color(alpha(mix(col, white, l.light), l.alpha*an.appear*env))
 		for _, sub := range subpaths(pts, closed, from, to) {
 			polyline(p, sub, w)
 		}
 	}
+}
+
+// glintMargin is how far past either end of an open path the glint
+// travels, so it leaves and enters gradually.
+const glintMargin = 0.12
+
+// openGlint maps the repeating phase to a position on an open path, from
+// before its start to past its end, and an opacity envelope that is 0 at
+// both extremes.
+func openGlint(phase float64) (pos, env float64) {
+	pos = -glintMargin + phase*(1+2*glintMargin)
+	edge := min(pos+glintMargin, 1+glintMargin-pos) / (2 * glintMargin)
+	env = min(1, max(0, edge))
+	env = env * env * (3 - 2*env) // smoothstep
+	return pos, env
 }
 
 // subpaths returns the part of the path between fractions from and to of

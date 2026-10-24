@@ -277,7 +277,7 @@ func TestArrowGlintLightsHead(t *testing.T) {
 		renderInto(f, s, born.Add(glintPeriod*3+time.Duration(phase*float64(glintPeriod))), true, image.Rectangle{})
 		return f.RGBAAt(337, 155) // inside the head, off the shaft line
 	}
-	away, over := arrowAt(0.3), arrowAt(0.97)
+	away, over := arrowAt(0.3), arrowAt(0.86) // 0.86 puts the glint at ~95% of the length
 	if over.G <= away.G+40 {
 		t.Errorf("head not lit by the glint: away %v, over %v", away, over)
 	}

@@ -669,13 +669,14 @@ func headGlint(p *painter, from, base, to contracts.Point, w float64, an anim, c
 		return
 	}
 	start := dist(from, base) / total
+	pos, env := openGlint(an.phase)
 	for _, l := range glintLayers {
-		lo, hi := max(an.phase-l.span/2, start), min(an.phase+l.span/2, 1)
+		lo, hi := max(pos-l.span/2, start), min(pos+l.span/2, 1)
 		if hi <= lo {
 			continue
 		}
 		cover := min(1, (hi-lo)/max(1-start, 1e-9)*2)
-		p.color(alpha(mix(c, white, l.light), l.alpha*an.appear*cover))
+		p.color(alpha(mix(c, white, l.light), l.alpha*an.appear*cover*env))
 		p.polygon(arrowHead(base, to, w))
 		p.fill()
 	}
