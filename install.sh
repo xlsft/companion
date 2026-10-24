@@ -67,8 +67,11 @@ refresh_caches() {
 	if command -v update-desktop-database >/dev/null 2>&1; then
 		update-desktop-database -q "$PREFIX/share/applications" 2>/dev/null || true
 	fi
-	if command -v gtk-update-icon-cache >/dev/null 2>&1 && [ -f "$PREFIX/share/icons/hicolor/index.theme" ]; then
-		gtk-update-icon-cache -q -t "$PREFIX/share/icons/hicolor" 2>/dev/null || true
+	# A per-user hicolor rarely has an index.theme, but may still hold a
+	# cache from another app; -t rebuilds it without one, so the icon is
+	# not hidden behind a stale cache.
+	if command -v gtk-update-icon-cache >/dev/null 2>&1 && [ -f "$PREFIX/share/icons/hicolor/icon-theme.cache" ]; then
+		gtk-update-icon-cache -q -f -t "$PREFIX/share/icons/hicolor" 2>/dev/null || true
 	fi
 }
 
