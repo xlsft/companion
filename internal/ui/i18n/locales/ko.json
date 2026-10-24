@@ -382,5 +382,8 @@
   "wiz.tts.speed": "속도",
   "wiz.tts.voice": "음성",
   "wizard.back": "설정으로 돌아가기",
-  "wizard.title": "Companion 설정 마법사"
+  "wizard.title": "Companion 설정 마법사",
+  "chat.shot.attached": "스크린샷 첨부됨",
+  "chat.shot.kept": "스크린샷이 이 메시지와 함께 저장됨",
+  "screen.keepShots.needsSave": "스크린샷은 ‘개인정보’에서 ‘대화 저장’이 켜져 있을 때만 보관됩니다."
 }

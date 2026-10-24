@@ -382,5 +382,8 @@
   "wiz.tts.speed": "速度",
   "wiz.tts.voice": "音声",
   "wizard.back": "セットアップに戻る",
-  "wizard.title": "Companion のセットアップ"
+  "wizard.title": "Companion のセットアップ",
+  "chat.shot.attached": "スクリーンショット添付",
+  "chat.shot.kept": "スクリーンショットをこのメッセージと一緒に保存しました",
+  "screen.keepShots.needsSave": "スクリーンショットは「プライバシー」で「会話を保存」がオンのときだけ保存されます。"
 }

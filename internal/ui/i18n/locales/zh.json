@@ -382,5 +382,8 @@
   "wiz.tts.speed": "速度",
   "wiz.tts.voice": "声音",
   "wizard.back": "返回设置向导",
-  "wizard.title": "Companion 设置向导"
+  "wizard.title": "Companion 设置向导",
+  "chat.shot.attached": "已附截图",
+  "chat.shot.kept": "截图已随此消息保存",
+  "screen.keepShots.needsSave": "仅当“隐私”中开启“保存对话”时才会保留截图。"
 }
