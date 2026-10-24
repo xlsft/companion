@@ -167,7 +167,7 @@ func (w *Wizard) asideFoot(gtx layout.Context, th *theme.Theme, l i18n.Lang) lay
 	var meta layout.Widget
 	if w.cfg.SetLanguage != nil {
 		meta = func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Top: th.Dp(8), Left: th.Dp(6)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			return layout.Inset{Top: th.Dp(8)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				return w.langPicker(gtx, th, l)
 			})
 		}
@@ -191,7 +191,8 @@ func (w *Wizard) langPicker(gtx layout.Context, th *theme.Theme, l i18n.Lang) la
 	if w.langDD.Opened() {
 		w.frame.texts = append(w.frame.texts, names...)
 	}
-	gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(th.Dp(156)))
+	// Full aside width, like the Diagnostics item above it.
+	gtx.Constraints.Min.X = gtx.Constraints.Max.X
 	return w.langDD.Layout(gtx, th, names, sel, names[sel])
 }
 

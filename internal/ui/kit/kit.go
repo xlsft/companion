@@ -132,10 +132,22 @@ func LogoVersion(gtx layout.Context, th *theme.Theme, size float32, version stri
 	if version == "" {
 		return Logo(gtx, th, size)
 	}
+	mark := label(th, size*1.2, "↖", th.Pal.AccentLine)
+	mark.Font = font.Font{Typeface: th.Display(), Weight: font.SemiBold}
+	word := label(th, size, "companion", th.Pal.Fg)
+	word.Font = font.Font{Typeface: th.Display(), Weight: font.SemiBold}
+	// The version sits on the wordmark's baseline; centring the two label
+	// boxes put it visibly low, as Unbounded's box is much taller.
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return Logo(gtx, th, size) }),
-		HSpace(th.Dp(8)),
-		layout.Rigid(Small(th, "v"+version).Layout),
+		layout.Rigid(mark.Layout),
+		HSpace(th.Dp(size*0.6)),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return layout.Flex{Alignment: layout.Baseline}.Layout(gtx,
+				layout.Rigid(word.Layout),
+				HSpace(th.Dp(8)),
+				layout.Rigid(Small(th, "v"+version).Layout),
+			)
+		}),
 	)
 }
 
