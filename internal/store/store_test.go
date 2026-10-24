@@ -56,8 +56,8 @@ func TestReopenIsIdempotent(t *testing.T) {
 		}
 		var n int
 		db.QueryRowContext(ctx, `SELECT count(*) FROM schema_migrations`).Scan(&n)
-		if n != 1 {
-			t.Errorf("open #%d: %d migration rows", i, n)
+		if want := len(mustLoadBuiltin(t)); n != want {
+			t.Errorf("open #%d: %d migration rows, want %d", i, n, want)
 		}
 		db.Close()
 	}

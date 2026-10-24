@@ -1,23 +1,89 @@
 // Command stt-sidecar hosts the local speech recognition runtime and speaks
-// JSON-RPC over stdin/stdout with the core (see docs/adr/0001).
+// JSON-RPC over stdin/stdout with the core (docs/stt-protocol.md).
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
+	"os/signal"
+	"slices"
+	"syscall"
+	"time"
 
 	"github.com/xlsft/openclick/internal/buildinfo"
+	"github.com/xlsft/openclick/internal/stt/engine"
+	"github.com/xlsft/openclick/internal/stt/engine/fake"
+	"github.com/xlsft/openclick/internal/stt/server"
+	"github.com/xlsft/openclick/internal/stt/vad"
 )
 
 func main() {
-	showVersion := flag.Bool("version", false, "print version and exit")
+	defaultEngine := "fake"
+	if slices.Contains(engine.Names(), "whisper") {
+		defaultEngine = "whisper"
+	}
+	vcfg := vad.DefaultConfig()
+	var (
+		showVersion     = flag.Bool("version", false, "print version and exit")
+		engineName      = flag.String("engine", defaultEngine, "speech engine: fake or a compiled-in engine "+fmt.Sprint(engine.Names()))
+		partialInterval = flag.Duration("partial-interval", 700*time.Millisecond, "new audio between rolling partial decodes")
+		partialWindow   = flag.Duration("partial-window", 10*time.Second, "trailing audio decoded for each partial")
+		maxUtterance    = flag.Duration("max-utterance", 5*time.Minute, "per-session audio limit")
+		vadOn           = flag.Bool("vad", true, "detect speech; false treats all audio as speech")
+		vadThreshold    = flag.Float64("vad-threshold-db", vcfg.ThresholdDB, "frame RMS in dBFS counted as speech")
+		vadHangover     = flag.Duration("vad-hangover", vcfg.Hangover, "silence that ends a speech run")
+		fakeDelay       = flag.Duration("fake-delay", 0, "fake engine: delay per decode")
+		fakeExit        = flag.Bool("fake-exit-on-final", false, "fake engine: exit during the final decode (crash simulation)")
+		logLevel        = flag.String("log-level", "info", "stderr log level")
+	)
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(buildinfo.String())
 		return
 	}
-	// The JSON-RPC server is implemented in OC-28.
-	fmt.Fprintln(os.Stderr, "stt-sidecar: protocol not implemented yet")
-	os.Exit(2)
+
+	var lvl slog.Level
+	if err := lvl.UnmarshalText([]byte(*logLevel)); err != nil {
+		fmt.Fprintln(os.Stderr, "stt-sidecar: bad -log-level")
+		os.Exit(2)
+	}
+	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: lvl}))
+
+	var factory engine.Factory
+	if *engineName == "fake" {
+		factory = fake.Factory(fake.Options{Delay: *fakeDelay, ExitOnFinal: *fakeExit})
+	} else {
+		f, err := engine.Lookup(*engineName)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "stt-sidecar:", err)
+			os.Exit(2)
+		}
+		factory = f
+	}
+
+	vcfg.ThresholdDB, vcfg.Hangover = *vadThreshold, *vadHangover
+	newVAD := func() vad.VAD { return vad.NewEnergy(vcfg) }
+	if !*vadOn {
+		newVAD = func() vad.VAD { return &vad.Always{} }
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	srv := server.New(server.Config{
+		EngineName:      *engineName,
+		Factory:         factory,
+		PartialInterval: *partialInterval,
+		PartialWindow:   *partialWindow,
+		MaxUtterance:    *maxUtterance,
+		NewVAD:          newVAD,
+		Log:             log,
+	})
+	log.Info("sidecar started", "version", buildinfo.Version, "engine", *engineName)
+	if err := srv.Serve(ctx, os.Stdin, os.Stdout); err != nil {
+		log.Error("sidecar stopped", "err", err)
+		os.Exit(1)
+	}
 }

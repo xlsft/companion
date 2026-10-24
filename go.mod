@@ -5,7 +5,9 @@ go 1.27.3
 require (
 	fyne.io/systray v1.12.2
 	gioui.org v0.10.3
+	github.com/gen2brain/malgo v0.11.26
 	github.com/godbus/dbus/v5 v5.2.4
+	github.com/jezek/xgb v1.3.1
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/image v0.47.0
 	golang.org/x/sys v0.49.0

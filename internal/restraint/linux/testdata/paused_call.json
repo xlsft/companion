@@ -1,0 +1,69 @@
+[
+ {
+  "id": 50,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "running",
+   "props": {
+    "media.class": "Audio/Sink",
+    "node.name": "alsa_output"
+   }
+  }
+ },
+ {
+  "id": 57,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "running",
+   "props": {
+    "media.class": "Audio/Source",
+    "node.name": "alsa_input.usb"
+   }
+  }
+ },
+ {
+  "id": 89,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "running",
+   "props": {
+    "media.class": "Stream/Input/Audio",
+    "node.name": "cava",
+    "media.role": "Music",
+    "stream.capture.sink": true,
+    "application.process.id": 4000
+   }
+  }
+ },
+ {
+  "id": 1,
+  "type": "PipeWire:Interface:Link",
+  "info": {
+   "output-node-id": 50,
+   "input-node-id": 89,
+   "state": "active"
+  }
+ },
+ {
+  "id": 93,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "idle",
+   "props": {
+    "media.class": "Stream/Input/Audio",
+    "node.name": "Discord",
+    "application.name": "Discord",
+    "application.process.id": 5300
+   }
+  }
+ },
+ {
+  "id": 5,
+  "type": "PipeWire:Interface:Link",
+  "info": {
+   "output-node-id": 57,
+   "input-node-id": 93,
+   "state": "active"
+  }
+ }
+]

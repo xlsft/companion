@@ -49,7 +49,7 @@ Rules:
 3. Platform selection happens in `internal/platform` via build tags (`linux`, `windows`, `darwin`) and runtime detection (X11 vs Wayland, compositor, portals).
 4. Every platform operation that may be missing returns `contracts.ErrUnsupported` wrapped with the capability name; callers consult the capability report first and present a fallback (PRD §4.2).
 5. All long operations take `context.Context` and honour cancellation.
-6. cgo is allowed only inside `internal/platform/*` and `cmd/stt-sidecar`. The rest of the core stays pure Go so it cross-compiles.
+6. cgo is allowed only inside `internal/platform/*`, `cmd/stt-sidecar` and the build-tagged `internal/stt/engine/whisper` (imported only by the sidecar). The rest of the core stays pure Go so it cross-compiles.
 
 ### Platform boundaries
 
@@ -77,7 +77,7 @@ SQLite (pure Go driver `modernc.org/sqlite`, no cgo) for metadata, files in the 
 
 ## Amendment 1 (2026-10-24, OC-12): Gio UI needs cgo
 
-Gio's Linux (Wayland/X11/EGL) and macOS backends are cgo, so rule 6 cannot hold for the UI. Amended rule 6: cgo is allowed in `internal/platform/*`, `cmd/stt-sidecar`, `internal/ui/...` (Gio) and therefore `cmd/companion`, which links the UI. Everything else stays pure Go.
+Gio's Linux (Wayland/X11/EGL) and macOS backends are cgo, so rule 6 cannot hold for the UI. Amended rule 6: cgo is allowed in `internal/platform/*`, `cmd/stt-sidecar`, the build-tagged `internal/stt/engine/whisper`, `internal/ui/...` (Gio) and therefore `cmd/companion`, which links the UI. Everything else stays pure Go.
 
 - `make cross` builds every package except `./cmd/companion` and `./internal/ui/...` with `CGO_ENABLED=0` for windows/darwin/linux; `make build` builds the whole tree natively with cgo. Release binaries of the core are built per OS on that OS (or with a cross C toolchain).
 - Business logic stays out of `internal/ui`, so it remains covered by the pure-Go cross build; the UI reads and writes through domain services such as `internal/settings.Service`.
