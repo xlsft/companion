@@ -19,7 +19,16 @@ func portals(gs, sc, rd bool) map[string]portalProbe {
 }
 
 func TestMapLinux(t *testing.T) {
-	layer := []Global{{Name: 1, Interface: globLayerShell, Version: 4}}
+	layer := []Global{{Name: 1, Interface: globLayerShell, Version: 4}, {Name: 2, Interface: globScreencopy, Version: 3}}
+	shot := portals(false, true, false)
+	shot[portalScreenshot] = portalProbe{Present: true, Version: 2}
+	captureBackend := func(want string) func(t *testing.T, r contracts.CapabilityReport) {
+		return func(t *testing.T, r contracts.CapabilityReport) {
+			if got := r.State(contracts.CapScreenCapture).Backend; got != want {
+				t.Errorf("screen_capture backend = %q, want %q", got, want)
+			}
+		}
+	}
 	tests := []struct {
 		name  string
 		facts linuxFacts
@@ -57,9 +66,11 @@ func TestMapLinux(t *testing.T) {
 				if r.Compositor != "niri" || r.Session != contracts.SessionWayland {
 					t.Errorf("compositor/session = %q/%v", r.Compositor, r.Session)
 				}
-				if r.Facts["portal.GlobalShortcuts.version"] != "1" || r.Facts["wayland.layer_shell"] != "true" {
+				if r.Facts["portal.GlobalShortcuts.version"] != "1" || r.Facts["wayland.layer_shell"] != "true" ||
+					r.Facts["wayland.screencopy"] != "true" {
 					t.Errorf("facts = %v", r.Facts)
 				}
+				captureBackend("wlr-screencopy")(t, r)
 				// The portal exists on niri but cannot bind (OC-6).
 				if gh := r.State(contracts.CapGlobalHotkey); gh.Backend != BackendIPC {
 					t.Errorf("global_hotkey = %+v", gh)
@@ -122,6 +133,19 @@ func TestMapLinux(t *testing.T) {
 				contracts.CapScreenCapture: contracts.StatusUnavailable, contracts.CapOverlayClickThrough: contracts.StatusUnknown,
 				contracts.CapInputInjection: contracts.StatusUnavailable,
 			},
+		},
+		{
+			name: "wayland screenshot portal without screencopy",
+			facts: linuxFacts{SessionType: "wayland", WaylandDisplay: "wayland-0", Desktop: "GNOME", Portals: shot,
+				PipeWire: true, WaylandChecked: true, Globals: []Global{{Interface: "wl_compositor", Version: 6}}},
+			want:  map[contracts.Capability]contracts.Status{contracts.CapScreenCapture: contracts.StatusAvailable},
+			extra: captureBackend("xdg-portal:Screenshot"),
+		},
+		{
+			name: "wayland screencast only is not a backend yet",
+			facts: linuxFacts{SessionType: "wayland", WaylandDisplay: "wayland-0", Portals: portals(false, true, false),
+				PipeWire: true, WaylandChecked: true},
+			want: map[contracts.Capability]contracts.Status{contracts.CapScreenCapture: contracts.StatusUnavailable},
 		},
 		{
 			name:  "session from WAYLAND_DISPLAY when type unset; bus down",

@@ -314,19 +314,48 @@ func (o *Orchestrator) startSpeech(ctx context.Context, emit session.Emitter) *s
 		close(sp.done)
 		return sp
 	}
+	pf, _ := o.Speaker.(Prefetcher)
 	go func() {
 		defer close(sp.done)
 		started := false
-		for text := range sp.queue {
-			if sp.err != nil || ctx.Err() != nil {
-				continue // drain
-			}
-			err := o.Speaker.Say(ctx, text, func() {
+		say := func(text string) error {
+			return o.Speaker.Say(ctx, text, func() {
 				if !started {
 					started = true
 					emit(session.SpeechStarted{})
 				}
 			})
+		}
+		var next string
+		haveNext, open := false, true
+		for open || haveNext {
+			var text string
+			if haveNext {
+				text, haveNext = next, false
+			} else if text, open = <-sp.queue; !open {
+				break
+			}
+			if sp.err != nil || ctx.Err() != nil {
+				continue // drain
+			}
+			var err error
+			if pf == nil || !open {
+				err = say(text)
+			} else {
+				// While this segment plays, take the next one off the queue
+				// and start synthesising it, so it is ready on hand-off.
+				res := make(chan error, 1)
+				go func() { res <- say(text) }()
+				select {
+				case err = <-res:
+				case next, open = <-sp.queue:
+					if open {
+						haveNext = true
+						pf.Prefetch(ctx, next)
+					}
+					err = <-res
+				}
+			}
 			if err != nil && ctx.Err() == nil {
 				sp.err = err
 			}

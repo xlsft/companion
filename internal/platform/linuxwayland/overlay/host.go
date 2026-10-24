@@ -80,11 +80,13 @@ type output struct {
 	gone          bool
 }
 
+// displayID matches the IDs of the displays backend (the wl_output name,
+// e.g. "DP-2"), so overlay surfaces and captures address the same display.
 func (o *output) displayID() contracts.DisplayID {
 	if o.name != "" {
-		return contracts.DisplayID("wl:" + o.name)
+		return contracts.DisplayID(o.name)
 	}
-	return contracts.DisplayID("wl:output-" + strconv.FormatUint(uint64(o.gname), 10))
+	return contracts.DisplayID("output-" + strconv.FormatUint(uint64(o.gname), 10))
 }
 
 // New connects to the compositor. It returns contracts.Unsupported when the

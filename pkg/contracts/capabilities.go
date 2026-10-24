@@ -16,6 +16,7 @@ const (
 	CapTextInsertion        Capability = "text_insertion"
 	CapSecretStore          Capability = "secret_store"
 	CapMicrophone           Capability = "microphone"
+	CapAudioOutput          Capability = "audio_output" // speech playback
 	CapTray                 Capability = "tray"
 
 	// FallbackToggleTalk is the UX used instead of CapHotkeyRelease: one
