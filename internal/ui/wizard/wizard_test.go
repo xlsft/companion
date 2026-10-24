@@ -506,3 +506,56 @@ func TestFailureStaysWhileRechecking(t *testing.T) {
 		h.w.mu.Unlock()
 	}
 }
+
+// Picking a provider preset fills the endpoint fields; a model the user
+// typed survives switching presets, another preset's default does not.
+func TestProviderPresetFillsForm(t *testing.T) {
+	h := newHarness(t)
+	h.eventually("permissions step", func() bool { return h.view() == readiness.StepPermissions })
+	h.pass(readiness.StepPermissions)
+	h.eventually("BYOK step", func() bool { return h.view() == readiness.StepBYOK && h.idle() })
+	idx := func(id string) int {
+		for i, p := range providers.Presets {
+			if p.ID == id {
+				return i
+			}
+		}
+		t.Fatalf("no preset %s", id)
+		return -1
+	}
+	b := &h.w.byok
+	pick := func(i int) {
+		b.preset.SetOpen(true)
+		h.frame()
+		b.preset.Pick(i)
+		h.frame()
+		h.frame()
+	}
+	tests := []struct {
+		name           string
+		pick           int
+		typedModel     string
+		kind, url, mdl string
+	}{
+		{"anthropic", idx("anthropic"), "", string(llm.KindAnthropic), "https://api.anthropic.com", "claude-sonnet-5-5"},
+		{"switch replaces a preset default", idx("openai"), "", string(llm.KindOpenAI), "https://api.openai.com/v1", "gpt-5"},
+		{"typed model kept", idx("openrouter"), "my-model", string(llm.KindOpenAI), "https://openrouter.ai/api/v1", "my-model"},
+		{"other endpoint clears the address", len(providers.Presets), "", string(llm.KindOpenAI), "", "my-model"},
+	}
+	for _, tt := range tests {
+		if tt.typedModel != "" {
+			b.model.SetText(tt.typedModel)
+			h.frame()
+		}
+		pick(tt.pick)
+		if b.kind.Value != tt.kind || b.baseURL.Text() != tt.url || b.model.Text() != tt.mdl {
+			t.Errorf("%s: kind=%q url=%q model=%q", tt.name, b.kind.Value, b.baseURL.Text(), b.model.Text())
+		}
+		if !b.dirty {
+			t.Errorf("%s: form not marked edited", tt.name)
+		}
+		if got := b.presetIndex(); got != tt.pick {
+			t.Errorf("%s: selection = %d, want %d", tt.name, got, tt.pick)
+		}
+	}
+}

@@ -15,12 +15,15 @@ import (
 	"github.com/xlsft/companion/internal/llm"
 	"github.com/xlsft/companion/internal/providers"
 	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/ui/kit"
 )
 
 // byokState is the provider form. Widgets are UI-goroutine only; the
 // fields under "async" are guarded by Wizard.mu.
 type byokState struct {
 	kind                     widget.Enum
+	preset                   kit.Dropdown
+	custom                   bool // "Other endpoint" picked: no preset matches on purpose
 	baseURL, model, key, hdr widget.Editor
 	dirty                    bool // edited since the last save
 	replacing                bool // the key editor is shown over a stored key
@@ -113,6 +116,9 @@ func (b *byokState) update(w *Wizard, gtx layout.Context, s snapshot) {
 		b.dirty = false
 		b.showHeaders = b.showHeaders || len(info.Input.Headers) > 0
 	}
+	if i := b.preset.Update(gtx, len(providers.Presets)+1); i >= 0 {
+		b.pickPreset(gtx, i)
+	}
 	if b.kind.Update(gtx) {
 		b.dirty = true
 	}
@@ -133,6 +139,48 @@ func (b *byokState) update(w *Wizard, gtx layout.Context, s snapshot) {
 	}
 	if w.clicked(gtx, ActTest) {
 		w.runCheck(readiness.StepBYOK, nil, nil)
+	}
+}
+
+// presetIndex is the dropdown's selection: the preset the endpoint matches,
+// the "Other endpoint" row (len(Presets)) for anything else typed, or -1
+// for an empty form.
+func (b *byokState) presetIndex() int {
+	if p, ok := providers.PresetFor(llm.Kind(b.kind.Value), b.baseURL.Text()); ok {
+		return slices.IndexFunc(providers.Presets, func(x providers.Preset) bool { return x.ID == p.ID })
+	}
+	if b.custom || strings.TrimSpace(b.baseURL.Text()) != "" {
+		return len(providers.Presets)
+	}
+	return -1
+}
+
+// pickPreset fills the form from preset i; len(Presets) is "Other
+// endpoint", which empties a preset's address for the user's own. A model
+// the user typed is kept, only an empty one or another preset's default is
+// replaced.
+func (b *byokState) pickPreset(gtx layout.Context, i int) {
+	b.dirty = true
+	if i >= len(providers.Presets) {
+		if _, ok := providers.PresetFor(llm.Kind(b.kind.Value), b.baseURL.Text()); ok {
+			b.baseURL.SetText("")
+			changed(gtx, &b.baseURL)
+		}
+		b.custom = true
+		gtx.Execute(key.FocusCmd{Tag: &b.baseURL})
+		return
+	}
+	p := providers.Presets[i]
+	b.custom = false
+	b.kind.Value = string(p.Kind)
+	b.baseURL.SetText(p.BaseURL)
+	changed(gtx, &b.baseURL)
+	if m := strings.TrimSpace(b.model.Text()); m == "" || slices.ContainsFunc(providers.Presets, func(x providers.Preset) bool { return x.Model == m }) {
+		b.model.SetText(p.Model)
+		changed(gtx, &b.model)
+	}
+	if !p.Local {
+		gtx.Execute(key.FocusCmd{Tag: &b.key})
 	}
 }
 

@@ -37,7 +37,11 @@ func (b *byokState) form(w *Wizard, th *theme.Theme, l i18n.Lang, info *provider
 			return kit.RadioCard(gtx, th, &b.kind, string(k), title, sub)
 		}
 	}
-	keyField := field(w, th, i18n.T(l, "wiz.byok.key"), i18n.T(l, "wiz.byok.key.hint"), &b.key, enabled)
+	keyHint := i18n.T(l, "wiz.byok.key.hint")
+	if p, ok := providers.PresetFor(llm.Kind(b.kind.Value), b.baseURL.Text()); ok && p.Local {
+		keyHint = i18n.T(l, "wiz.byok.key.local")
+	}
+	keyField := field(w, th, i18n.T(l, "wiz.byok.key"), keyHint, &b.key, enabled)
 	if info != nil && info.HasKey && !b.replacing {
 		keyField = storedKey(w, th, l, i18n.T(l, "wiz.byok.key"), enabled)
 	}
@@ -57,6 +61,7 @@ func (b *byokState) form(w *Wizard, th *theme.Theme, l i18n.Lang, info *provider
 		status = w.text(kit.Muted(th, i18n.T(l, "wiz.loading")))
 	}
 	return kit.VStack(th, 22,
+		b.presetPicker(w, th, l, enabled),
 		kit.Flow(th, 220, 8, kind(llm.KindAnthropic), kind(llm.KindOpenAI)),
 		kit.VStack(th, 14,
 			field(w, th, i18n.T(l, "wiz.byok.baseURL"), "https://api.example.com/v1", &b.baseURL, enabled),
@@ -72,6 +77,43 @@ func (b *byokState) form(w *Wizard, th *theme.Theme, l i18n.Lang, info *provider
 		}),
 		status,
 	)
+}
+
+// presetOptions are the dropdown rows: every preset with its address, then
+// "Other endpoint" for any compatible API.
+func presetOptions(l i18n.Lang) []kit.RichOption {
+	opts := make([]kit.RichOption, 0, len(providers.Presets)+1)
+	for _, p := range providers.Presets {
+		o := kit.RichOption{Title: p.Name, Desc: hostOf(p.BaseURL)}
+		if p.Local {
+			o.Tags = []kit.RichTag{{Text: i18n.T(l, "wiz.byok.provider.local"), Kind: kit.TagNeutral}}
+		}
+		opts = append(opts, o)
+	}
+	return append(opts, kit.RichOption{Title: i18n.T(l, "wiz.byok.provider.custom"), Desc: i18n.T(l, "wiz.byok.provider.custom.d")})
+}
+
+// presetPicker is the provider dropdown; picking one fills the fields
+// under it (byokState.pickPreset).
+func (b *byokState) presetPicker(w *Wizard, th *theme.Theme, l i18n.Lang, enabled bool) layout.Widget {
+	label := i18n.T(l, "wiz.byok.provider")
+	opts, sel := presetOptions(l), b.presetIndex()
+	w.frame.actions = append(w.frame.actions, ActChoose)
+	w.frame.texts = append(w.frame.texts, label)
+	if sel >= 0 {
+		w.frame.texts = append(w.frame.texts, opts[sel].Texts()...)
+	}
+	if b.preset.Opened() {
+		for _, o := range opts {
+			w.frame.texts = append(w.frame.texts, o.Texts()...)
+		}
+	}
+	return kit.Labeled(th, label, func(gtx layout.Context) layout.Dimensions {
+		if !enabled {
+			gtx = gtx.Disabled()
+		}
+		return b.preset.LayoutRich(gtx, th, opts, sel, i18n.T(l, "wiz.byok.provider.pick"))
+	})
 }
 
 // providerSteps are the provider test steps shown as rows; the
