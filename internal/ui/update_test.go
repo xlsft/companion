@@ -17,7 +17,6 @@ type fakeUpdates struct {
 	mu                         sync.Mutex
 	st                         update.State
 	installs, checks, notes    int
-	dismissed                  []update.Version
 	watchers, cancelledWatches int
 }
 
@@ -30,12 +29,6 @@ func (f *fakeUpdates) set(st update.State) { f.mu.Lock(); f.st = st; f.mu.Unlock
 func (f *fakeUpdates) CheckNow()           { f.mu.Lock(); f.checks++; f.mu.Unlock() }
 func (f *fakeUpdates) Install()            { f.mu.Lock(); f.installs++; f.mu.Unlock() }
 func (f *fakeUpdates) OpenNotes()          { f.mu.Lock(); f.notes++; f.mu.Unlock() }
-func (f *fakeUpdates) Dismiss(v update.Version) {
-	f.mu.Lock()
-	f.dismissed = append(f.dismissed, v)
-	f.st.Dismissed = true
-	f.mu.Unlock()
-}
 func (f *fakeUpdates) Watch(func()) func() {
 	f.mu.Lock()
 	f.watchers++
@@ -77,11 +70,10 @@ func TestUpdateBannerStates(t *testing.T) {
 	}{
 		{"nothing new", update.State{Current: base.Current}, false, "", "", 0, false},
 		{"available", base, true, "Companion v0.2.0 is available", "", theme.StatusUnknown, false},
-		{"dismissed", with(func(s *update.State) { s.Dismissed = true }), false, "", "", 0, false},
 		{"package manager", with(func(s *update.State) { s.Managed = "package_managed" }), true, "Companion v0.2.0 is available", "package manager", theme.StatusUnknown, false},
 		{"downloading", with(func(s *update.State) { s.Phase, s.Done, s.Total = update.PhaseDownloading, 1<<20, 4<<20 }), true, "Updating to v0.2.0…", "1.0 of 4.0 MB", theme.StatusUnknown, true},
 		{"verifying", with(func(s *update.State) { s.Phase = update.PhaseVerifying }), true, "Updating to v0.2.0…", "signature", theme.StatusUnknown, false},
-		{"installing, even if dismissed", with(func(s *update.State) { s.Phase, s.Dismissed = update.PhaseInstalling, true }), true, "Updating to v0.2.0…", "Installing", theme.StatusUnknown, false},
+		{"installing", with(func(s *update.State) { s.Phase = update.PhaseInstalling }), true, "Updating to v0.2.0…", "Installing", theme.StatusUnknown, false},
 		{"restart needed", with(func(s *update.State) { s.Phase = update.PhaseRestartNeeded }), true, "Companion v0.2.0 is installed", "open Companion again", theme.StatusOK, false},
 		{"bad signature", with(func(s *update.State) { s.Phase, s.Err = update.PhaseFailed, "bad_signature" }), true, "Couldn't update to v0.2.0", "signature is not valid", theme.StatusError, false},
 		{"unknown failure", with(func(s *update.State) { s.Phase, s.Err = update.PhaseFailed, "weird" }), true, "Couldn't update to v0.2.0", "Something went wrong", theme.StatusError, false},
@@ -133,12 +125,6 @@ func TestUpdateBannerInBothWindows(t *testing.T) {
 		}
 	}
 	r := new(input.Router)
-	frame(r, h.sh, th, m)
-	m.update.closeBtn.Click()
-	frame(r, h.sh, th, m)
-	if len(fake.dismissed) != 1 || fake.dismissed[0].String() != "0.2.0" {
-		t.Errorf("dismissed = %v", fake.dismissed)
-	}
 	// A package-managed install offers no Update button.
 	fake.set(func() update.State { st := availableState(t); st.Managed = "package_managed"; return st }())
 	before := fake.installs

@@ -38,8 +38,6 @@ type State struct {
 	Current Version
 	// Latest is the newer release when one is available.
 	Latest *Release
-	// Dismissed: the user closed the banner for Latest.
-	Dismissed bool
 	// Managed is set when this install cannot update itself: "package_managed",
 	// "not_writable" or "unsupported" (Code values); "" when it can.
 	Managed string
@@ -189,9 +187,6 @@ func (s *Service) loop(ctx context.Context, prefs <-chan settings.Settings) {
 				// Turned on, or the set of candidate releases changed.
 				timer = time.After(0)
 			}
-			if n.Dismissed != p.Dismissed {
-				s.update(func(st *State) { st.Dismissed = st.Latest != nil && st.Latest.Version.String() == n.Dismissed })
-			}
 			p = n
 		}
 	}
@@ -243,7 +238,6 @@ func (s *Service) check(ctx context.Context) time.Duration {
 		}
 		if !newer {
 			st.Latest = nil
-			st.Dismissed = false
 			return
 		}
 		if st.Latest == nil || st.Latest.Version != r.Version {
@@ -251,23 +245,8 @@ func (s *Service) check(ctx context.Context) time.Duration {
 		}
 		rel := r
 		st.Latest = &rel
-		st.Dismissed = prefs.Dismissed == r.Version.String()
 	})
 	return wait
-}
-
-// Dismiss hides the banner until a newer release than v appears.
-func (s *Service) Dismiss(v Version) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if err := s.cfg.Prefs.Update(ctx, func(p *settings.Settings) { p.Updates.Dismissed = v.String() }); err != nil {
-		s.cfg.Log.Warn("update dismiss not saved", "err", err)
-	}
-	s.update(func(st *State) {
-		if st.Latest != nil && st.Latest.Version == v {
-			st.Dismissed = true
-		}
-	})
 }
 
 // OpenNotes shows the available release's page in the browser.

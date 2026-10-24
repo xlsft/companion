@@ -390,7 +390,6 @@
   "update.install": "Güncelle",
   "update.retry": "Tekrar dene",
   "update.notes": "Sürüm notları",
-  "update.dismiss": "Sonraki sürüme kadar gizle",
   "update.progress": "v%s sürümüne güncelleniyor…",
   "update.verifying": "İmza ve sağlama toplamı denetleniyor…",
   "update.downloading": "İndiriliyor…",

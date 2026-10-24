@@ -390,7 +390,6 @@
   "update.install": "Aktualizuj",
   "update.retry": "Spróbuj ponownie",
   "update.notes": "Informacje o wydaniu",
-  "update.dismiss": "Ukryj do następnej wersji",
   "update.progress": "Aktualizacja do v%s…",
   "update.verifying": "Sprawdzanie podpisu i sumy kontrolnej…",
   "update.downloading": "Pobieranie…",

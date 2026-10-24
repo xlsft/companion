@@ -171,7 +171,7 @@ func TestServiceInstall(t *testing.T) {
 			}
 			defer s.Stop(context.Background())
 			st := waitFor(t, s, "release", func(st State) bool { return st.Latest != nil })
-			if st.Latest.Version.String() != "0.2.0" || st.Dismissed || st.Managed != "" || st.CheckErr != "" || st.LastCheck.IsZero() {
+			if st.Latest.Version.String() != "0.2.0" || st.Managed != "" || st.CheckErr != "" || st.LastCheck.IsZero() {
 				t.Fatalf("state = %+v", st)
 			}
 			s.Install()
@@ -200,31 +200,26 @@ func TestServiceInstall(t *testing.T) {
 	}
 }
 
-func TestServiceChecksAndDismiss(t *testing.T) {
+func TestServiceRecheck(t *testing.T) {
 	rel := newFakeRelease(t, "0.2.0", []byte("x"))
-	prefs := newPrefs()
 	s := NewService(Config{
 		Checker: &Checker{Client: rel.srv.Client(), Feed: rel.srv.URL},
-		Prefs:   prefs, Current: "0.0.1", GOOS: "linux", GOARCH: "amd64",
+		Prefs:   newPrefs(), Current: "0.0.1", GOOS: "linux", GOARCH: "amd64",
 	})
 	changes := make(chan struct{}, 100)
 	s.Watch(func() { changes <- struct{}{} })
 	s.Start(context.Background())
 	defer s.Stop(context.Background())
 	st := waitFor(t, s, "release", func(st State) bool { return st.Latest != nil })
-	s.Dismiss(st.Latest.Version)
-	if !s.State().Dismissed || prefs.Get().Updates.Dismissed != "0.2.0" {
-		t.Fatalf("dismiss: %+v %+v", s.State(), prefs.Get().Updates)
-	}
 	if len(changes) == 0 {
 		t.Error("watchers not notified")
 	}
-	// A dismissed version stays dismissed across checks.
-	before := s.State().LastCheck
+	// Check now asks again and keeps the release.
+	before := st.LastCheck
 	s.CheckNow()
 	st = waitFor(t, s, "second check", func(st State) bool { return st.LastCheck.After(before) && !st.Checking })
-	if !st.Dismissed {
-		t.Error("dismissal lost on recheck")
+	if st.Latest == nil || st.CheckErr != "" {
+		t.Errorf("after recheck: %+v", st)
 	}
 }
 

@@ -390,7 +390,6 @@
   "update.install": "Оновити",
   "update.retry": "Повторити",
   "update.notes": "Що нового",
-  "update.dismiss": "Сховати до наступної версії",
   "update.progress": "Оновлення до v%s…",
   "update.verifying": "Перевіряємо підпис і контрольну суму…",
   "update.downloading": "Завантаження…",

@@ -140,6 +140,9 @@ func PublicGoodRoot(ctx context.Context, cacheDir string, client *http.Client) (
 }
 
 func fetchTUFRoot(ctx context.Context, cacheDir string, client *http.Client) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // nothing starts that would outlive ctx
+	}
 	if client == nil {
 		client = http.DefaultClient
 	}

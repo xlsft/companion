@@ -19,7 +19,6 @@ type UpdateBackend interface {
 	State() update.State
 	CheckNow()
 	Install()
-	Dismiss(v update.Version)
 	OpenNotes()
 	// Watch calls fn after every state change until cancelled.
 	Watch(fn func()) (cancel func())
@@ -28,8 +27,8 @@ type UpdateBackend interface {
 // updateBanner is the update notice at the top of a window. Each window
 // content owns one, so their buttons are independent widgets.
 type updateBanner struct {
-	be                       UpdateBackend
-	install, notes, closeBtn widget.Clickable
+	be             UpdateBackend
+	install, notes widget.Clickable
 }
 
 func newUpdateBanner(be UpdateBackend) *updateBanner { return &updateBanner{be: be} }
@@ -58,10 +57,6 @@ func (b *updateBanner) Layout(gtx layout.Context, th *theme.Theme, l Lang) layou
 	if b.notes.Clicked(gtx) {
 		b.be.OpenNotes()
 	}
-	if b.closeBtn.Clicked(gtx) && st.Latest != nil {
-		b.be.Dismiss(st.Latest.Version)
-		st = b.be.State()
-	}
 	bn, ok := bannerFor(l, st)
 	if !ok {
 		return layout.Dimensions{}
@@ -80,13 +75,11 @@ func (b *updateBanner) Layout(gtx layout.Context, th *theme.Theme, l Lang) layou
 			bn.Actions = append(bn.Actions, upd(T(l, "update.retry")))
 		}
 		bn.Actions = append(bn.Actions, notes)
-		bn.Close, bn.CloseLabel = &b.closeBtn, T(l, "update.dismiss")
 	case st.Phase == update.PhaseIdle:
 		if st.Managed == "" {
 			bn.Actions = append(bn.Actions, upd(T(l, "update.install")))
 		}
 		bn.Actions = append(bn.Actions, notes)
-		bn.Close, bn.CloseLabel = &b.closeBtn, T(l, "update.dismiss")
 	case st.Phase == update.PhaseRestartNeeded:
 		bn.Actions = append(bn.Actions, notes)
 	}
@@ -103,9 +96,6 @@ func bannerFor(l Lang, st update.State) (kit.Banner, bool) {
 	b := kit.Banner{Icon: icon.Sparkles, Progress: -1}
 	switch st.Phase {
 	case update.PhaseIdle:
-		if st.Dismissed {
-			return kit.Banner{}, false
-		}
 		b.Title = Tf(l, "update.available", v)
 		if st.Managed != "" {
 			b.Detail = T(l, "update.managed."+st.Managed)

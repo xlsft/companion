@@ -390,7 +390,6 @@
   "update.install": "Atualizar",
   "update.retry": "Tentar novamente",
   "update.notes": "Notas da versão",
-  "update.dismiss": "Ocultar até a próxima versão",
   "update.progress": "Atualizando para v%s…",
   "update.verifying": "Verificando a assinatura e a soma de verificação…",
   "update.downloading": "Baixando…",

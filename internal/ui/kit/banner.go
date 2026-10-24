@@ -4,16 +4,16 @@ import (
 	"image"
 
 	"gioui.org/layout"
-	"gioui.org/widget"
 
 	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 // Banner is the full-width notice bar across the top of a window, above
-// every page: an icon, a title and a detail, an optional progress track,
-// the actions and an optional close button. The update notice of the main
-// and the setup window is one Banner, so it looks the same in both.
+// every page: an icon, a title and a detail, an optional progress track
+// and the actions. It has no close button: the notice stays until it no
+// longer applies. The update notice of the main and the setup window is
+// one Banner, so it looks the same in both.
 type Banner struct {
 	// Status picks the tint and icon colour; StatusUnknown is the
 	// informational accent tint.
@@ -26,9 +26,6 @@ type Banner struct {
 	// Actions are laid out at the end of the bar, or under the text when
 	// the window is narrow.
 	Actions []layout.Widget
-	// Close, when set, is the dismiss button; CloseLabel names it.
-	Close      *widget.Clickable
-	CloseLabel string
 }
 
 func (b Banner) Layout(gtx layout.Context, th *theme.Theme) layout.Dimensions {
@@ -60,15 +57,7 @@ func (b Banner) Layout(gtx layout.Context, th *theme.Theme) layout.Dimensions {
 			layout.Flexed(1, VStack(th, 2, Medium(label(th, 13, b.Title, th.Pal.Fg)).Layout, detail, progress)),
 		)
 	}
-	actions := func(gtx layout.Context) layout.Dimensions {
-		ws := append([]layout.Widget(nil), b.Actions...)
-		if b.Close != nil {
-			ws = append(ws, func(gtx layout.Context) layout.Dimensions {
-				return IconButton(gtx, th, b.Close, icon.Close, b.CloseLabel)
-			})
-		}
-		return HStack(th, 8, ws...)(gtx)
-	}
+	actions := HStack(th, 8, b.Actions...)
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return layout.Background{}.Layout(gtx,

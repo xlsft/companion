@@ -390,7 +390,6 @@
   "update.install": "Aggiorna",
   "update.retry": "Riprova",
   "update.notes": "Note di rilascio",
-  "update.dismiss": "Nascondi fino alla prossima versione",
   "update.progress": "Aggiornamento a v%s…",
   "update.verifying": "Verifica della firma e del checksum…",
   "update.downloading": "Download in corso…",

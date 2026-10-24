@@ -90,9 +90,6 @@ type Updates struct {
 	AutoCheck bool `json:"auto_check"`
 	// Prereleases offers pre-release versions too.
 	Prereleases bool `json:"prereleases"`
-	// Dismissed is the version whose banner the user closed; a newer
-	// release shows it again.
-	Dismissed string `json:"dismissed,omitempty"`
 }
 
 type UI struct {

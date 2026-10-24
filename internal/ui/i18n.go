@@ -127,7 +127,6 @@ var catalog = map[string][2]string{
 	"update.install":                 {"Update", "Обновить"},
 	"update.retry":                   {"Try again", "Повторить"},
 	"update.notes":                   {"Release notes", "Что нового"},
-	"update.dismiss":                 {"Hide until the next version", "Скрыть до следующей версии"},
 	"update.progress":                {"Updating to v%s…", "Обновление до v%s…"},
 	"update.verifying":               {"Checking the signature and checksum…", "Проверяем подпись и контрольную сумму…"},
 	"update.downloading":             {"Downloading…", "Загрузка…"},
