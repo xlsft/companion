@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Companion
+GenericName=Voice and screen assistant
+Comment=Talk to your desktop: local speech recognition, your own LLM key
+Exec=companion
+Icon=companion
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=voice;assistant;speech;screen;
+# Gio sets the Wayland app_id and the X11 WM_CLASS to the executable name
+# (app.ID defaults to filepath.Base(os.Args[0])), so this must stay "companion".
+StartupWMClass=companion
+StartupNotify=false

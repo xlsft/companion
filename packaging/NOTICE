@@ -1,0 +1,18 @@
+Companion third-party notices
+=============================
+
+Fonts (internal/assets/fonts, embedded in the companion binary)
+  Google Sans, Google Sans Code, Unbounded: SIL Open Font License 1.1.
+  Full text and copyright lines: licenses/OFL.txt
+
+Icons (internal/ui/icon, embedded in the companion binary)
+  MingCute Icon, Copyright MingCute Design: Apache License 2.0.
+  Full text: licenses/LICENSE.mingcute
+
+Speech recognition (stt-sidecar)
+  whisper.cpp and ggml, Copyright the ggml authors: MIT License,
+  statically linked into stt-sidecar. Speech models are not bundled; they are
+  downloaded at runtime and carry their own licences.
+
+Go module dependencies are linked statically into both binaries; their
+licences are those of the respective modules (see go.mod).
