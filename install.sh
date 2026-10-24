@@ -185,7 +185,8 @@ fi
 
 previous=
 if [ -x "$PREFIX/lib/companion/companion" ]; then
-	previous=$("$PREFIX/lib/companion/companion" -version 2>/dev/null | head -n 1 || true)
+	# "-version" prints "openclick <version> (<commit>) <os>/<arch>".
+	previous=$("$PREFIX/lib/companion/companion" -version 2>/dev/null | awk 'NR == 1 { print "v" $2 }' || true)
 fi
 
 tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
@@ -194,7 +195,9 @@ dir="$TMP/companion-$VER-linux-$ARCH"
 PREFIX=$PREFIX sh "$dir/install.sh" >/dev/null
 refresh_caches
 
-if [ -n "$previous" ]; then
+if [ "$previous" = "$TAG" ]; then
+	ok "Reinstalled Companion $TAG in ${BOLD}$PREFIX${RESET}"
+elif [ -n "$previous" ]; then
 	ok "Upgraded Companion ($previous → $TAG) in ${BOLD}$PREFIX${RESET}"
 else
 	ok "Installed Companion $TAG to ${BOLD}$PREFIX${RESET}"
