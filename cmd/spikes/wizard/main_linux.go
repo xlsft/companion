@@ -27,8 +27,8 @@ import (
 	gioapp "gioui.org/app"
 
 	"github.com/xlsft/companion/internal/app"
-	"github.com/xlsft/companion/internal/buildinfo"
 	"github.com/xlsft/companion/internal/audio"
+	"github.com/xlsft/companion/internal/buildinfo"
 	"github.com/xlsft/companion/internal/llm"
 	"github.com/xlsft/companion/internal/models"
 	"github.com/xlsft/companion/internal/models/hw"

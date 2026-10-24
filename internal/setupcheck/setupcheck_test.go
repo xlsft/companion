@@ -304,7 +304,9 @@ func TestPlatformResult(t *testing.T) {
 }
 
 func TestPlatformDetectFails(t *testing.T) {
-	p := Platform{Detect: func(context.Context) (contracts.CapabilityReport, error) { return contracts.CapabilityReport{}, errBoom }}
+	p := Platform{Detect: func(context.Context) (contracts.CapabilityReport, error) {
+		return contracts.CapabilityReport{}, errBoom
+	}}
 	if got := p.Run(context.Background()); got.Code != CodeDetectFailed {
 		t.Errorf("got %q", got.Code)
 	}
@@ -342,7 +344,7 @@ func TestEndToEnd(t *testing.T) {
 		{name: "wrong phrase", stt: &fakeSTT{final: speech("thanks for watching")}, code: CodeMismatch,
 			detail: map[string]string{"speech": "ok", "stt": CodeMismatch, "capture": skip, "llm": skip, "tts": skip, "pointing": skip}},
 		{name: "no capture", edit: func(e *EndToEnd, _ *fakeLLM, _ *fakeSpeaker, _ *fakeHints) { e.Capturer = nil },
-			code: readiness.PermUnavailable,
+			code:   readiness.PermUnavailable,
 			detail: map[string]string{"speech": "ok", "stt": "ok", "capture": readiness.PermUnavailable, "llm": skip, "tts": skip, "pointing": skip}},
 		{name: "model timeout", edit: func(_ *EndToEnd, p *fakeLLM, _ *fakeSpeaker, _ *fakeHints) { p.err = llm.ErrTimeout },
 			code: "timeout", detail: all(map[string]string{"llm": "timeout", "tts": skip, "pointing": skip})},
@@ -350,7 +352,9 @@ func TestEndToEnd(t *testing.T) {
 			code: "auth", detail: all(map[string]string{"llm": "auth", "tts": skip, "pointing": skip})},
 		{name: "empty reply", edit: func(_ *EndToEnd, p *fakeLLM, _ *fakeSpeaker, _ *fakeHints) { p.reply = "  " },
 			code: CodeEmptyReply, detail: all(map[string]string{"llm": CodeEmptyReply, "tts": skip, "pointing": skip})},
-		{name: "no voice", edit: func(e *EndToEnd, _ *fakeLLM, _ *fakeSpeaker, _ *fakeHints) { e.Configured = func() bool { return false } },
+		{name: "no voice", edit: func(e *EndToEnd, _ *fakeLLM, _ *fakeSpeaker, _ *fakeHints) {
+			e.Configured = func() bool { return false }
+		},
 			code: CodeNotConfigured, detail: all(map[string]string{"tts": CodeNotConfigured, "pointing": skip})},
 		{name: "stale hint", edit: func(_ *EndToEnd, _ *fakeLLM, _ *fakeSpeaker, h *fakeHints) { h.err = contracts.ErrStale },
 			code: "stale", detail: all(map[string]string{"pointing": "stale"})},
