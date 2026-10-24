@@ -261,7 +261,7 @@ func demoView(guided bool) chat.View {
 			Title: lines.guideTitle,
 			Phase: chat.PhaseSpeaking,
 			Messages: []chat.Message{
-				{Role: chat.RoleUser, Text: lines.guideTurns[0], Via: chat.ViaVoice, STTModel: "whisper medium", At: at},
+				{Role: chat.RoleUser, Text: lines.guideTurns[0], Via: chat.ViaVoice, STTModel: "Parakeet TDT v3", At: at},
 				{Role: chat.RoleAssistant, Text: lines.guideTurns[1], Streaming: true},
 			},
 		}
@@ -271,7 +271,7 @@ func demoView(guided bool) chat.View {
 		Title: lines.title,
 		Phase: chat.PhaseSpeaking,
 		Messages: []chat.Message{
-			{Role: chat.RoleUser, Text: t[0], Via: chat.ViaVoice, STTModel: "whisper medium", At: at},
+			{Role: chat.RoleUser, Text: t[0], Via: chat.ViaVoice, STTModel: "Parakeet TDT v3", At: at},
 			{Role: chat.RoleAssistant, Text: t[1]},
 			{Role: chat.RoleUser, Text: t[2], At: at.Add(time.Minute)},
 			{Role: chat.RoleAssistant, Text: t[3], Streaming: true},
