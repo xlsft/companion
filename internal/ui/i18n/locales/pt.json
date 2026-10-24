@@ -534,5 +534,6 @@
   "dictation.err.busy": "O Companion está a ouvir um pedido: termine-o primeiro",
   "dictation.err.unsupported": "Este sistema não deixa as aplicações escreverem noutras janelas",
   "dictation.err.denied": "A escrita noutras aplicações não foi permitida no diálogo do sistema",
-  "dictation.err.insert_failed": "A escrita parou a meio: verifique o texto"
+  "dictation.err.insert_failed": "A escrita parou a meio: verifique o texto",
+  "guide.watching": "Aguardando você fazer a etapa"
 }

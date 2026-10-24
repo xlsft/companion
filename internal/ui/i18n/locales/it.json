@@ -534,5 +534,6 @@
   "dictation.err.busy": "Companion sta ascoltando una richiesta: completala prima",
   "dictation.err.unsupported": "Questo sistema non consente alle app di scrivere in altre finestre",
   "dictation.err.denied": "La scrittura in altre app non è stata consentita nella finestra di sistema",
-  "dictation.err.insert_failed": "La scrittura si è interrotta a metà: controlla il testo"
+  "dictation.err.insert_failed": "La scrittura si è interrotta a metà: controlla il testo",
+  "guide.watching": "Aspetto che tu faccia il passo"
 }

@@ -65,6 +65,10 @@ type fakeAPI struct {
 	spoken []string
 	// marked lists the steps (1-based) the model re-marked.
 	marked []int
+	// confirm makes the model say a step is done when asked after the
+	// screen changed; checks counts those requests.
+	confirm bool
+	checks  int
 }
 
 func (f *fakeAPI) abandoned(kind string) bool {
@@ -121,6 +125,10 @@ func (f *fakeAPI) chat(w http.ResponseWriter, r *http.Request) {
 	}
 	walk := f.walk
 	f.mu.Unlock()
+	var last string
+	if n := len(req.Messages); n > 0 {
+		last = string(req.Messages[n-1].Content)
+	}
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	fl := w.(http.Flusher)
@@ -134,7 +142,7 @@ func (f *fakeAPI) chat(w http.ResponseWriter, r *http.Request) {
 		return map[string]any{"choices": []any{map[string]any{"index": 0, "delta": d}}}
 	}
 	if walk {
-		f.walkChat(body, toolRound, send, delta)
+		f.walkChat(body, last, toolRound, send, delta)
 		send(map[string]any{"choices": []any{map[string]any{"index": 0, "delta": map[string]any{}, "finish_reason": "stop"}}})
 		fmt.Fprint(w, "data: [DONE]\n\n")
 		fl.Flush()
@@ -501,16 +509,34 @@ var (
 	walkMarks = [][2]float64{{0.3, 0.4}, {0.6, 0.5}, {0.7, 0.6}}
 )
 
-// walkChat answers the request with start_walkthrough, and a request to
-// mark step n on a new screenshot with an annotate call.
-func (f *fakeAPI) walkChat(req []byte, toolRound bool, send func(any), delta func(map[string]any) map[string]any) {
+// walkChat answers the request with start_walkthrough, "what's next"
+// with walkthrough_control, a request to mark step n on a new screenshot
+// with an annotate call, and a check after the screen changed with
+// walkthrough_control once the test has made the change.
+func (f *fakeAPI) walkChat(req []byte, last string, toolRound bool, send func(any), delta func(map[string]any) map[string]any) {
 	call := func(id, name string, args any) {
 		b, _ := json.Marshal(args)
 		send(delta(map[string]any{"tool_calls": []any{map[string]any{"index": 0, "id": id,
 			"function": map[string]any{"name": name, "arguments": string(b)}}}}))
 	}
+	switch {
+	case strings.Contains(string(req), "has just changed"):
+		f.mu.Lock()
+		f.checks++
+		confirm := f.confirm
+		f.mu.Unlock()
+		if confirm && !toolRound {
+			call("check", "walkthrough_control", map[string]any{"action": "next", "reason": "сделано"})
+		}
+		return
+	case strings.Contains(last, "что дальше"):
+		send(delta(map[string]any{"content": "Хорошо. "}))
+		call("ctl", "walkthrough_control", map[string]any{"action": "next"})
+		return
+	}
 	for n := range walkSteps {
-		if !strings.Contains(string(req), fmt.Sprintf("step %d of %d", n+1, len(walkSteps))) {
+		if !strings.Contains(string(req), "Mark where the user has to act") ||
+			!strings.Contains(string(req), fmt.Sprintf("step %d of %d", n+1, len(walkSteps))) {
 			continue
 		}
 		if toolRound {
@@ -581,9 +607,44 @@ func (d *drawLog) lastShow() (contracts.Point, bool) {
 	return contracts.Point{}, false
 }
 
+// paintedScreen is the screen as the step watcher samples it: the real
+// capture, with its middle painted over once lit, as if the user's click
+// had opened a panel there.
+type paintedScreen struct {
+	contracts.ScreenCapturer
+	mu  sync.Mutex
+	lit bool
+	n   int
+}
+
+func (p *paintedScreen) light(on bool) { p.mu.Lock(); p.lit = on; p.mu.Unlock() }
+
+func (p *paintedScreen) samples() int { p.mu.Lock(); defer p.mu.Unlock(); return p.n }
+
+func (p *paintedScreen) Capture(ctx context.Context, req contracts.CaptureRequest) ([]*contracts.Capture, error) {
+	caps, err := p.ScreenCapturer.Capture(ctx, req)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.n++
+	if err != nil || !p.lit {
+		return caps, err
+	}
+	for _, c := range caps {
+		b := c.Image.Bounds()
+		for y := b.Min.Y + b.Dy()/5; y < b.Max.Y-b.Dy()/5; y++ {
+			for x := b.Min.X + b.Dx()/5; x < b.Max.X-b.Dx()/5; x++ {
+				i := c.Image.PixOffset(x, y)
+				copy(c.Image.Pix[i:i+4], []uint8{0x20, 0x60, 0xE0, 0xFF})
+			}
+		}
+	}
+	return caps, nil
+}
+
 // TestLiveWalkthrough has the model start a three-step walkthrough and
-// drives it by voice intent, from the card and with Escape, checking the
-// hint and the speech of every step and the stored progress (OC-68):
+// drives it by voice through the model, from the card, by doing a step on
+// the (painted) screen and with Escape, checking the hint and the speech
+// of every step and the stored progress (OC-68):
 //
 //	go test -tags=novulkan,live -run TestLiveWalkthrough -v ./cmd/companion
 func TestLiveWalkthrough(t *testing.T) {
@@ -595,6 +656,20 @@ func TestLiveWalkthrough(t *testing.T) {
 	if c.orch.Overlay != nil {
 		draws = &drawLog{Overlay: c.orch.Overlay}
 		c.orch.Overlay = draws
+	}
+	// The watcher samples a screen the test can change, faster than in
+	// the app so the run stays short.
+	var screen *paintedScreen
+	if c.capturer != nil {
+		screen = &paintedScreen{ScreenCapturer: c.capturer}
+		presenter := &talk.Presenter{Orch: c.orch}
+		if c.overlay != nil {
+			presenter.Scene = c.overlay
+		}
+		c.guide.Close()
+		c.guide = walkthrough.New(walkthrough.Config{Presenter: presenter, Store: walkthrough.NewKVStore(store.NewKV(c.db)),
+			Watch: &walkthrough.Watch{Capturer: screen, Interval: 500 * time.Millisecond}})
+		c.orch.Guide, c.ctl.Guide = c.guide, c.guide
 	}
 	t0 := time.Now()
 	waitFor := func(what string, cond func() bool) {
@@ -639,8 +714,8 @@ func TestLiveWalkthrough(t *testing.T) {
 		t.Fatalf("view %+v", v)
 	}
 
-	// By voice: the intent never reaches the model as a question.
-	if err := c.ctl.Post(session.SubmitText{Text: "Дальше."}); err != nil {
+	// By voice: the model hears "what's next" and moves on.
+	if err := c.ctl.Post(session.SubmitText{Text: "Готово, что дальше?"}); err != nil {
 		t.Fatal(err)
 	}
 	step("voice next", 1, 1)
@@ -659,13 +734,36 @@ func TestLiveWalkthrough(t *testing.T) {
 	}
 	step("card previous", 1, 2)
 
+	// Auto-advance: nothing happens while the screen stays as it is (the
+	// hint's own glint included); once it changes and settles the model
+	// is asked and confirms.
+	at := 1
+	if screen != nil {
+		waitFor("watching", func() bool { return c.guide.View().Watching })
+		n0 := screen.samples()
+		waitFor("quiet samples", func() bool { return screen.samples() >= n0+4 })
+		api.mu.Lock()
+		quiet := api.checks
+		api.confirm = true
+		api.mu.Unlock()
+		t.Logf("%7s watching, %d checks asked while the screen was quiet", time.Since(t0).Round(time.Millisecond), quiet)
+		screen.light(true)
+		lit := time.Now()
+		step("auto-advance", 2, 2)
+		t.Logf("advanced %v after the change", time.Since(lit).Round(time.Millisecond))
+		screen.light(false)
+		at = 2
+	} else {
+		t.Log("no screen capture: auto-advance not checked")
+	}
+
 	// A restart finds the walkthrough where it was, paused.
 	again := walkthrough.New(walkthrough.Config{Presenter: &talk.Presenter{Orch: c.orch}, Store: walkthrough.NewKVStore(store.NewKV(c.db))})
 	if err := again.Restore(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if v := again.View(); v.Status != walkthrough.StatusPaused || v.Index != 1 {
-		t.Errorf("restored %+v, want paused at step 2", v)
+	if v := again.View(); v.Status != walkthrough.StatusPaused || v.Index != at {
+		t.Errorf("restored %+v, want paused at step %d", v, at+1)
 	}
 	again.Close()
 
@@ -682,8 +780,8 @@ func TestLiveWalkthrough(t *testing.T) {
 	}
 	api.mu.Lock()
 	defer api.mu.Unlock()
-	t.Logf("model rounds %d, steps re-marked on new screenshots %v, speech requests %d", api.chats, api.marked, api.speeches)
-	if c.captureErr == nil && c.overlayErr == nil && fmt.Sprint(api.marked) != "[2 3 2]" {
-		t.Errorf("re-marked steps %v, want [2 3 2]", api.marked)
+	t.Logf("model rounds %d, steps re-marked on new screenshots %v, step checks %d, speech requests %d", api.chats, api.marked, api.checks, api.speeches)
+	if c.captureErr == nil && c.overlayErr == nil && fmt.Sprint(api.marked) != "[2 3 2 3]" {
+		t.Errorf("re-marked steps %v, want [2 3 2 3]", api.marked)
 	}
 }

@@ -534,5 +534,6 @@
   "dictation.err.busy": "Companion hört gerade eine Anfrage: Schließen Sie sie zuerst ab",
   "dictation.err.unsupported": "Dieses System erlaubt Apps nicht, in andere Fenster zu tippen",
   "dictation.err.denied": "Das Tippen in andere Apps wurde im Systemdialog nicht erlaubt",
-  "dictation.err.insert_failed": "Das Tippen brach mittendrin ab: Prüfen Sie den Text"
+  "dictation.err.insert_failed": "Das Tippen brach mittendrin ab: Prüfen Sie den Text",
+  "guide.watching": "Ich achte darauf, wenn Sie den Schritt erledigen"
 }

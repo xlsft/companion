@@ -534,5 +534,6 @@
   "dictation.err.busy": "Companion está escuchando una petición: termínala primero",
   "dictation.err.unsupported": "Este sistema no permite que las aplicaciones escriban en otras ventanas",
   "dictation.err.denied": "En el diálogo del sistema no se permitió escribir en otras aplicaciones",
-  "dictation.err.insert_failed": "La escritura se detuvo a medias: revisa el texto"
+  "dictation.err.insert_failed": "La escritura se detuvo a medias: revisa el texto",
+  "guide.watching": "Atento a cuando hagas el paso"
 }

@@ -534,5 +534,6 @@
   "dictation.err.busy": "Companion écoute une demande : terminez-la d’abord",
   "dictation.err.unsupported": "Ce système ne permet pas aux applications de saisir dans d’autres fenêtres",
   "dictation.err.denied": "La saisie dans d’autres applications n’a pas été autorisée dans la boîte de dialogue du système",
-  "dictation.err.insert_failed": "La saisie s’est arrêtée en cours de route : vérifiez le texte"
+  "dictation.err.insert_failed": "La saisie s’est arrêtée en cours de route : vérifiez le texte",
+  "guide.watching": "J’attends que vous fassiez l’étape"
 }

@@ -68,41 +68,6 @@ func TestApply(t *testing.T) {
 	}
 }
 
-func TestParseIntent(t *testing.T) {
-	tests := []struct {
-		in   string
-		want Command
-		ok   bool
-	}{
-		{"Дальше.", CmdNext, true},
-		{"дальше, пожалуйста", CmdNext, true},
-		{"Ну, готово!", CmdNext, true},
-		{"Next step", CmdNext, true},
-		{"OK, I’m done.", CmdNext, true},
-		{"Назад", CmdPrev, true},
-		{"go back please", CmdPrev, true},
-		{"Повтори ещё раз", CmdRepeat, true},
-		{"Repeat that.", CmdRepeat, true},
-		{"Пауза", CmdPause, true},
-		{"hold on", CmdPause, true},
-		{"Продолжай", CmdResume, true},
-		{"Resume", CmdResume, true},
-		{"Стоп!", CmdStop, true},
-		{"cancel", CmdStop, true},
-		{"", "", false},
-		{"   ", "", false},
-		{"стоп, а как убрать заливку у фрейма?", "", false},
-		{"what is next to the button", "", false},
-		{"где кнопка?", "", false},
-	}
-	for _, tt := range tests {
-		got, ok := ParseIntent(tt.in)
-		if got != tt.want || ok != tt.ok {
-			t.Errorf("ParseIntent(%q) = %q, %v; want %q, %v", tt.in, got, ok, tt.want, tt.ok)
-		}
-	}
-}
-
 func TestFromToolCall(t *testing.T) {
 	ring := `[{"kind":"ring","points":[[0.5,0.5]]}]`
 	tests := []struct {
@@ -245,19 +210,34 @@ type fakePresenter struct {
 	said   []string
 	ended  []contracts.SessionRef
 	revise func(Presentation) Step
-	block  chan struct{} // Say waits on it when set
-	saidCh chan string
+	// area is where Show says it drew; check answers Check.
+	area    contracts.Rect
+	check   func(Presentation) Verdict
+	checked []Presentation
+	block   chan struct{} // Say waits on it when set
+	saidCh  chan string
 }
 
-func (f *fakePresenter) Show(_ context.Context, p Presentation) (Step, error) {
+func (f *fakePresenter) Show(_ context.Context, p Presentation) (Shown, error) {
 	f.mu.Lock()
 	f.shown = append(f.shown, p)
 	rev := f.revise
 	f.mu.Unlock()
 	if rev != nil {
-		return rev(p), nil
+		return Shown{Step: rev(p)}, nil
 	}
-	return p.Step, nil
+	return Shown{Step: p.Step, Area: f.area}, nil
+}
+
+func (f *fakePresenter) Check(ctx context.Context, p Presentation) (Verdict, error) {
+	f.mu.Lock()
+	f.checked = append(f.checked, p)
+	check := f.check
+	f.mu.Unlock()
+	if check == nil {
+		return Verdict{}, nil
+	}
+	return check(p), nil
 }
 
 func (f *fakePresenter) Say(ctx context.Context, text string) error {

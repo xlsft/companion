@@ -534,5 +534,6 @@
   "dictation.err.busy": "Companion 正在聆听请求：请先完成它",
   "dictation.err.unsupported": "此系统不允许应用向其他窗口输入文字",
   "dictation.err.denied": "系统对话框中未允许向其他应用输入文字",
-  "dictation.err.insert_failed": "输入中途停止：请检查文字"
+  "dictation.err.insert_failed": "输入中途停止：请检查文字",
+  "guide.watching": "正在等待你完成这一步"
 }

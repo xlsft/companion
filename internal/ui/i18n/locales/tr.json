@@ -534,5 +534,6 @@
   "dictation.err.busy": "Companion bir isteği dinliyor: önce onu bitirin",
   "dictation.err.unsupported": "Bu sistem uygulamaların başka pencerelere yazmasına izin vermiyor",
   "dictation.err.denied": "Sistem iletişim kutusunda başka uygulamalara yazmaya izin verilmedi",
-  "dictation.err.insert_failed": "Yazma yarıda kesildi: metni kontrol edin"
+  "dictation.err.insert_failed": "Yazma yarıda kesildi: metni kontrol edin",
+  "guide.watching": "Adımı yapmanızı bekliyorum"
 }

@@ -49,6 +49,9 @@ func (s kvStore) Load(ctx context.Context) (State, bool, error) {
 		// Unusable leftovers are dropped, never shown half-broken.
 		return State{}, false, nil
 	}
+	if len(st.Done) != len(st.Plan.Steps) {
+		st.Done = nil
+	}
 	return st, true, nil
 }
 

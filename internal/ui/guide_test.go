@@ -36,6 +36,8 @@ func TestGuideCardControls(t *testing.T) {
 	first.Index, first.Prev = 0, ""
 	paused := running
 	paused.Status = walkthrough.StatusPaused
+	watching := running
+	watching.Watching = true
 	tests := []struct {
 		name  string
 		view  walkthrough.View
@@ -43,6 +45,7 @@ func TestGuideCardControls(t *testing.T) {
 		want  string
 	}{
 		{"next", running, func(c *guideCard) { c.nextBtn.Click() }, "next"},
+		{"next while watching for the user", watching, func(c *guideCard) { c.nextBtn.Click() }, "next"},
 		{"previous", running, func(c *guideCard) { c.prevBtn.Click() }, "previous"},
 		{"previous on the first step is disabled", first, func(c *guideCard) { c.prevBtn.Click() }, ""},
 		{"repeat", running, func(c *guideCard) { c.repeatBtn.Click() }, "repeat"},

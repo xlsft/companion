@@ -1,8 +1,10 @@
 // Package walkthrough guides the user through a multi-step task on their
 // screen (OC-68): the model plans a goal and ordered steps, each step is
-// shown with overlay hints and spoken, and the user moves through them by
-// voice or from the chat card. Progress is stored, so an unfinished
-// walkthrough is still there after a restart.
+// shown with overlay hints and spoken, and the walkthrough moves on when
+// the model decides so, from what the user says or from what it sees on
+// the screen once the user acted (auto-advance), or from the chat card.
+// Progress is stored, so an unfinished walkthrough is still there after a
+// restart.
 //
 // The package holds no UI and no model code: the Presenter (internal/talk)
 // draws and speaks a step, the Store keeps the progress. Step text is
@@ -13,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -40,10 +43,13 @@ const (
 	CmdPause  Command = "pause"
 	CmdResume Command = "resume"
 	CmdStop   Command = "stop"
+	// CmdGoto jumps to a step; it comes with the step's number, so it is
+	// applied with GoTo, not Apply.
+	CmdGoto Command = "goto"
 )
 
 // Commands lists every command.
-var Commands = []Command{CmdNext, CmdPrev, CmdRepeat, CmdPause, CmdResume, CmdStop}
+var Commands = []Command{CmdNext, CmdPrev, CmdRepeat, CmdPause, CmdResume, CmdStop, CmdGoto}
 
 // Step is one step of a plan.
 type Step struct {
@@ -98,6 +104,9 @@ type State struct {
 	Status Status `json:"status"`
 	// Index is the current step.
 	Index int `json:"index"`
+	// Done marks the steps the user passed with next; nil before the
+	// first. A step jumped over is not done.
+	Done []bool `json:"done,omitempty"`
 	// Fresh: the current step's Shapes were planned on the screenshot
 	// that is still on record with the overlay, so they can be drawn as
 	// they are. Any other presentation takes a new screenshot first.
@@ -135,6 +144,10 @@ func (s State) Apply(cmd Command) (State, Effect, error) {
 	last := len(s.Plan.Steps) - 1
 	switch cmd {
 	case CmdNext:
+		done := make([]bool, len(s.Plan.Steps))
+		copy(done, s.Done)
+		done[s.Index] = true
+		s.Done = done
 		if s.Index >= last {
 			s.Status = StatusDone
 			return s, EffectEnd, nil
@@ -159,11 +172,30 @@ func (s State) Apply(cmd Command) (State, Effect, error) {
 	default:
 		return s, EffectNone, fmt.Errorf("%w %q", ErrUnknown, cmd)
 	}
+	return s.presented()
+}
+
+// GoTo jumps to step i (0-based), resuming a paused walkthrough.
+func (s State) GoTo(i int) (State, Effect, error) {
+	if !s.Status.Active() {
+		return s, EffectNone, ErrNotActive
+	}
+	if i < 0 || i >= len(s.Plan.Steps) {
+		return s, EffectNone, fmt.Errorf("%w: no step %d", ErrUnknown, i+1)
+	}
+	s.Index = i
+	return s.presented()
+}
+
+func (s State) presented() (State, Effect, error) {
 	s.Status = StatusRunning
 	// The screen has moved on since the plan, or since the last showing.
 	s.Fresh = false
 	return s, EffectPresent, nil
 }
+
+// IsDone reports whether step i was passed.
+func (s State) IsDone(i int) bool { return i >= 0 && i < len(s.Done) && s.Done[i] }
 
 // View is a walkthrough as the chat card shows it. Its text must never be
 // logged.
@@ -178,6 +210,13 @@ type View struct {
 	// Preparing: the current step's hints are being worked out on a new
 	// screenshot.
 	Preparing bool
+	// Watching: the screen is watched for the user doing the step, which
+	// then moves the walkthrough on by itself.
+	Watching bool
+	// Steps are every step's title and Done which of them were passed,
+	// for the model's picture of the walkthrough.
+	Steps []string
+	Done  []bool
 }
 
 // Active reports whether the card is shown.
@@ -191,5 +230,32 @@ func (s State) view() View {
 	if s.Index > 0 && s.Index <= len(s.Plan.Steps) {
 		v.Prev = s.Plan.Steps[s.Index-1].Title
 	}
+	for i, st := range s.Plan.Steps {
+		v.Steps = append(v.Steps, st.Title)
+		v.Done = append(v.Done, s.IsDone(i))
+	}
 	return v
+}
+
+// Brief describes the walkthrough for the model: the goal, every step
+// with what is done and which is current, and the current instruction.
+func (v View) Brief() string {
+	var b strings.Builder
+	state := "running"
+	if v.Status == StatusPaused {
+		state = "paused"
+	}
+	fmt.Fprintf(&b, "Walkthrough in progress (%s). Goal: %q. Steps:", state, v.Goal)
+	for i, t := range v.Steps {
+		mark := ""
+		switch {
+		case i == v.Index:
+			mark = " [current]"
+		case i < len(v.Done) && v.Done[i]:
+			mark = " [done]"
+		}
+		fmt.Fprintf(&b, " %d. %q%s;", i+1, t, mark)
+	}
+	fmt.Fprintf(&b, " Current step %d of %d: %q, instruction: %q.", v.Index+1, v.Total, v.Title, v.Text)
+	return b.String()
 }

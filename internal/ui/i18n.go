@@ -84,6 +84,7 @@ var catalog = map[string][2]string{
 	"guide.finish":    {"Finish", "Готово"},
 	"guide.stop":      {"End walkthrough", "Завершить"},
 	"guide.preparing": {"Looking at the screen…", "Смотрю на экран…"},
+	"guide.watching":  {"Watching for you to do the step", "Слежу, когда вы выполните шаг"},
 	"guide.error":     {"Couldn't do that. Try again.", "Не получилось. Попробуйте ещё раз."},
 
 	"about.title":  {"About Companion", "О Companion"},

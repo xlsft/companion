@@ -534,5 +534,6 @@
   "dictation.err.busy": "Companion słucha prośby: najpierw ją zakończ",
   "dictation.err.unsupported": "Ten system nie pozwala aplikacjom pisać w innych oknach",
   "dictation.err.denied": "W oknie systemowym nie zezwolono na wpisywanie w innych aplikacjach",
-  "dictation.err.insert_failed": "Wpisywanie przerwało się w połowie: sprawdź tekst"
+  "dictation.err.insert_failed": "Wpisywanie przerwało się w połowie: sprawdź tekst",
+  "guide.watching": "Czekam, aż wykonasz krok"
 }
