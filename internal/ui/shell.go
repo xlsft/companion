@@ -15,8 +15,10 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/xlsft/openclick/internal/readiness"
 	"github.com/xlsft/openclick/internal/settings"
 	"github.com/xlsft/openclick/internal/ui/theme"
+	"github.com/xlsft/openclick/internal/ui/wizard"
 	"github.com/xlsft/openclick/pkg/contracts"
 )
 
@@ -74,10 +76,16 @@ type SettingsStore interface {
 	Subscribe() (<-chan settings.Settings, func())
 }
 
-// Options configure a Shell. Settings is required.
+// Options configure a Shell. Settings is required, Gate too in setup mode.
 type Options struct {
 	Mode     Mode
 	Settings SettingsStore
+	// Gate decides readiness; the wizard runs its checks and the shell
+	// enters main mode once it is Ready (OC-70).
+	Gate *readiness.Gate
+	// Setup are the wizard's step backends; nil ones leave their step's
+	// controls disabled.
+	Setup wizard.Backends
 	// Tray may be nil; then closing the last window quits the app.
 	Tray contracts.Tray
 	// Diagnose produces the capability report for the Diagnostics page.
@@ -145,6 +153,9 @@ func (s *Shell) Start(ctx context.Context) error {
 	if s.opts.Settings == nil {
 		return errors.New("ui: Options.Settings is required")
 	}
+	if s.opts.Mode == ModeSetup && s.opts.Gate == nil {
+		return errors.New("ui: Options.Gate is required in setup mode")
+	}
 	lang := langOf(s.opts.Settings.Get().UI.Language)
 	ch, unsub := s.opts.Settings.Subscribe()
 	s.mu.Lock()
@@ -180,6 +191,7 @@ func (s *Shell) Stop(ctx context.Context) error {
 	s.stopping = true
 	wins := []window{s.wizWin, s.mainWin}
 	s.wizWin, s.mainWin = nil, nil
+	wizUI := s.wizard
 	unsub := s.unsub
 	trayOK := s.trayOK
 	s.mu.Unlock()
@@ -187,6 +199,9 @@ func (s *Shell) Stop(ctx context.Context) error {
 		if w != nil {
 			w.Close()
 		}
+	}
+	if wizUI != nil {
+		wizUI.close()
 	}
 	if unsub != nil {
 		unsub()
@@ -226,7 +241,7 @@ func (s *Shell) EnterMain() error {
 		return errors.New("ui: shell is stopping")
 	}
 	s.mode = ModeMain
-	wiz := s.wizWin
+	wiz, wizUI := s.wizWin, s.wizard
 	s.wizWin = nil
 	s.wizard = nil
 	if wiz != nil {
@@ -235,6 +250,9 @@ func (s *Shell) EnterMain() error {
 	started, trayOK, lang := s.started, s.trayOK, s.lang
 	s.mu.Unlock()
 
+	if wizUI != nil {
+		wizUI.close()
+	}
 	if wiz != nil {
 		wiz.Close()
 	}
@@ -266,7 +284,7 @@ func (s *Shell) Open() {
 			s.wizard = newWizardUI(s)
 		}
 		s.wizWin = s.newWindow(windowSpec{
-			Title: T(s.lang, "wizard.title"), Width: 640, Height: 520,
+			Title: T(s.lang, "wizard.title"), Width: 900, Height: 680,
 			Content: s.wizard, Shell: s, OnClosed: s.windowClosed,
 		})
 		return
@@ -328,14 +346,21 @@ func (s *Shell) windowClosed(w window) {
 	s.mu.Lock()
 	byShell := s.closing[w]
 	delete(s.closing, w)
+	var wizUI *wizardUI
 	if s.wizWin == w {
 		s.wizWin = nil
+		// Closing the window cancels the wizard's work; reopening builds a
+		// fresh one from the Gate's persisted progress.
+		wizUI, s.wizard = s.wizard, nil
 	}
 	if s.mainWin == w {
 		s.mainWin = nil
 	}
 	quit := !byShell && !s.stopping && !s.trayOK && s.wizWin == nil && s.mainWin == nil
 	s.mu.Unlock()
+	if wizUI != nil {
+		wizUI.close()
+	}
 	if quit {
 		s.Quit()
 	}

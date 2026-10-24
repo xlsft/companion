@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xlsft/openclick/internal/readiness"
 	"github.com/xlsft/openclick/internal/settings"
 	"github.com/xlsft/openclick/internal/store"
 	"github.com/xlsft/openclick/pkg/contracts"
@@ -108,12 +109,47 @@ type harness struct {
 	wins  *fakeWindows
 	tray  *fakeTray
 	quits atomic.Int32
+	gate  *readiness.Gate
+	pass  atomic.Bool // the gate's checks pass
+}
+
+type memProgress struct {
+	mu   sync.Mutex
+	data []byte
+}
+
+func (m *memProgress) Load(context.Context) ([]byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.data, nil
+}
+
+func (m *memProgress) Save(_ context.Context, d []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.data = d
+	return nil
 }
 
 func newHarness(t *testing.T, mode Mode, tray *fakeTray) *harness {
 	t.Helper()
 	h := &harness{wins: &fakeWindows{}, tray: tray}
+	checks := map[readiness.Step]readiness.Check{}
+	for _, st := range readiness.Steps {
+		checks[st] = func(context.Context) readiness.Result {
+			if h.pass.Load() {
+				return readiness.Result{Status: readiness.Passed}
+			}
+			return readiness.Result{Status: readiness.Failed, Code: "not_wired"}
+		}
+	}
+	g, err := readiness.Open(context.Background(), &memProgress{}, checks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.gate = g
 	opts := Options{
+		Gate:     g,
 		Mode:     mode,
 		Settings: newSettings(t),
 		Quit:     func() { h.quits.Add(1) },
@@ -352,6 +388,45 @@ func TestNavShortcutAndScale(t *testing.T) {
 	h.sh.stepScale(0)
 	if _, _, s := h.sh.look(); s != 1 {
 		t.Errorf("scale = %v", s)
+	}
+}
+
+// The only way out of setup is the Gate becoming Ready (FR-ONB-002/010).
+func TestReadyGateEntersMainOnce(t *testing.T) {
+	h := newHarness(t, ModeSetup, &fakeTray{})
+	ctx := context.Background()
+	if _, err := h.gate.Run(ctx, readiness.StepPermissions); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(20 * time.Millisecond)
+	if h.sh.Mode() != ModeSetup {
+		t.Fatal("a failed check left setup")
+	}
+	h.pass.Store(true)
+	for _, st := range readiness.Steps {
+		if _, err := h.gate.Run(ctx, st); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for h.sh.Mode() != ModeMain {
+		if time.Now().After(deadline) {
+			t.Fatal("ready gate did not enter main mode")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if _, n := h.mainBuilt(); n != 1 {
+		t.Errorf("main builds = %d", n)
+	}
+	if got := contentKinds(h.wins.all()); !slices.Equal(got, []string{"wizard", "main"}) {
+		t.Errorf("windows = %v", got)
+	}
+}
+
+func TestStartRequiresGateInSetup(t *testing.T) {
+	sh := newShell(Options{Mode: ModeSetup, Settings: newSettings(t)}, (&fakeWindows{}).factory)
+	if err := sh.Start(context.Background()); err == nil {
+		t.Error("expected error without a Gate")
 	}
 }
 

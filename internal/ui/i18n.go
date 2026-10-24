@@ -1,14 +1,16 @@
 package ui
 
-import "fmt"
+import "github.com/xlsft/openclick/internal/ui/i18n"
 
 // Lang is a UI language; values match settings.UI.Language.
-type Lang string
+type Lang = i18n.Lang
 
 const (
-	LangRU Lang = "ru"
-	LangEN Lang = "en"
+	LangRU = i18n.RU
+	LangEN = i18n.EN
 )
+
+func init() { i18n.Register(catalog) }
 
 // catalog maps a key to its {en, ru} text. A real catalogue arrives with
 // localisation work; the shell only needs its own labels.
@@ -29,13 +31,8 @@ var catalog = map[string][2]string{
 	"tray.diagnostics": {"Diagnostics", "Диагностика"},
 	"tray.quit":        {"Quit", "Выход"},
 
-	"wizard.title":       {"Companion setup", "Настройка Companion"},
-	"wizard.heading":     {"Let's set up Companion", "Настроим Companion"},
-	"wizard.body":        {"The setup wizard will check permissions, the speech model and providers. Until setup is complete only this window is available.", "Мастер проверит разрешения, модель распознавания речи и провайдеров. Пока настройка не завершена, доступно только это окно."},
-	"wizard.placeholder": {"Setup steps are not implemented yet.", "Шаги настройки пока не реализованы."},
-	"wizard.continue":    {"Finish setup (debug)", "Завершить настройку (отладка)"},
-	"wizard.diagnostics": {"Diagnostics", "Диагностика"},
-	"wizard.back":        {"Back to setup", "Назад к настройке"},
+	"wizard.title": {"Companion setup", "Настройка Companion"},
+	"wizard.back":  {"Back to setup", "Назад к настройке"},
 
 	"home.heading":  {"Companion", "Companion"},
 	"home.body":     {"Voice and screen assistant. Talk, chats and history arrive in later versions.", "Голосовой и экранный помощник. Разговор, чаты и история появятся в следующих версиях."},
@@ -99,33 +96,12 @@ var catalog = map[string][2]string{
 	"diag.running": {"Checking the system…", "Проверяем систему…"},
 	"diag.failed":  {"Detection finished with errors; results may be partial.", "Проверка завершилась с ошибками; результаты могут быть неполными."},
 	"diag.system":  {"System: %s, session %s, desktop %s", "Система: %s, сеанс %s, окружение %s"},
-
-	"status.available":        {"available", "доступно"},
-	"status.degraded":         {"limited", "ограничено"},
-	"status.needs_permission": {"needs permission", "нужно разрешение"},
-	"status.unavailable":      {"unavailable", "недоступно"},
-	"status.unknown":          {"not checked", "не проверено"},
 }
 
-// T returns the text for key in l, falling back to English and then to the
-// key itself so a missing entry is visible but harmless.
-func T(l Lang, key string) string {
-	s, ok := catalog[key]
-	if !ok {
-		return key
-	}
-	if l == LangRU && s[1] != "" {
-		return s[1]
-	}
-	return s[0]
-}
+// T returns the text for key in l (see i18n.T).
+func T(l Lang, key string) string { return i18n.T(l, key) }
 
 // Tf is T with fmt.Sprintf arguments.
-func Tf(l Lang, key string, args ...any) string { return fmt.Sprintf(T(l, key), args...) }
+func Tf(l Lang, key string, args ...any) string { return i18n.Tf(l, key, args...) }
 
-func langOf(code string) Lang {
-	if code == string(LangEN) {
-		return LangEN
-	}
-	return LangRU
-}
+func langOf(code string) Lang { return i18n.Of(code) }
