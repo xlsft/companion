@@ -96,7 +96,7 @@ The session is removed when the response is sent. If `session.cancel` arrives du
 
 ### `session.partial` (notification, sidecar → core)
 
-`{session_id, seq, text, stable}`. Produced by the rolling decoder: every `partial-interval` (default 700 ms) of new audio, once VAD has heard speech, the last `partial-window` (default 10 s) of audio is decoded with a cheaper single-segment setting. At most one partial decode runs per session; if one is still running when the next interval passes, that interval is skipped. `stable` is reserved for a future agreement-based stabiliser and is currently always `false`; every partial replaces the previous one. No partials are sent after `session.finish` or `session.cancel` was received.
+`{session_id, seq, text, stable}`. Produced by the rolling decoder: every `partial-interval` (default 700 ms) of new audio, once VAD has heard speech, the last `partial-window` (default 10 s) of audio is decoded with a cheaper single-segment setting. At most one partial decode runs per session; while one runs, new audio keeps accumulating and the next decode starts with the first chunk after it completes, so a slow engine lowers the partial rate instead of queueing work. `stable` is reserved for a future agreement-based stabiliser and is currently always `false`; every partial replaces the previous one. No partials are sent after `session.finish` or `session.cancel` was received.
 
 ### `session.vad` (notification, sidecar → core)
 
