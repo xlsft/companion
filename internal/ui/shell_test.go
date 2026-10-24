@@ -21,7 +21,12 @@ import (
 type stubHotkeys struct{}
 
 func (stubHotkeys) Hotkeys() wizard.HotkeyStatus {
-	return wizard.HotkeyStatus{Talk: "super+space", Cancel: "super+backspace", State: wizard.HotkeyApplied, ToggleOnly: true}
+	return wizard.HotkeyStatus{Talk: "super+space", Cancel: "super+backspace", State: wizard.HotkeyApplied, ToggleOnly: true,
+		Dictate: "ctrl+alt+space", DictateState: wizard.HotkeyApplied}
+}
+
+func (stubHotkeys) ApplyDictateHotkey(_ context.Context, chord string) wizard.HotkeyStatus {
+	return wizard.HotkeyStatus{Talk: "super+space", Cancel: "super+backspace", Dictate: chord, State: wizard.HotkeyApplied, DictateState: wizard.HotkeyApplied}
 }
 
 func (stubHotkeys) ApplyHotkeys(_ context.Context, talk, cancel string) wizard.HotkeyStatus {

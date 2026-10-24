@@ -78,6 +78,46 @@ func TestValidatePair(t *testing.T) {
 	}
 }
 
+func TestValidateDictate(t *testing.T) {
+	talk := contracts.Hotkey{Mods: contracts.ModSuper, Key: "space"}
+	cancel := contracts.Hotkey{Mods: contracts.ModSuper, Key: "backspace"}
+	tests := []struct {
+		in, code string
+	}{
+		{DefaultDictate, ""},
+		{"super+alt+d", ""},
+		{"super+space", CodeDuplicate},
+		{"super+backspace", CodeDuplicate},
+		{"f9", CodeNoModifier},
+		{"ctrl+v", CodeReserved},
+		{"", CodeEmpty},
+		{"super+nope", CodeUnknownKey},
+	}
+	for _, tt := range tests {
+		if _, err := ValidateDictate(tt.in, talk, cancel); Code(err) != tt.code {
+			t.Errorf("ValidateDictate(%q) = %v, want code %q", tt.in, err, tt.code)
+		}
+	}
+}
+
+func TestPickDictate(t *testing.T) {
+	ctrlAltSpace := contracts.Hotkey{Mods: contracts.ModCtrl | contracts.ModAlt, Key: "space"}
+	superAltSpace := contracts.Hotkey{Mods: contracts.ModSuper | contracts.ModAlt, Key: "space"}
+	tests := []struct {
+		talk, cancel contracts.Hotkey
+		want         string
+	}{
+		{contracts.Hotkey{Mods: contracts.ModSuper, Key: "space"}, contracts.Hotkey{Mods: contracts.ModSuper, Key: "escape"}, DefaultDictate},
+		{ctrlAltSpace, contracts.Hotkey{Key: "f9"}, "super+alt+space"},
+		{ctrlAltSpace, superAltSpace, "ctrl+alt+d"},
+	}
+	for _, tt := range tests {
+		if got := PickDictate(tt.talk, tt.cancel); got != tt.want {
+			t.Errorf("PickDictate(%v, %v) = %q, want %q", tt.talk, tt.cancel, got, tt.want)
+		}
+	}
+}
+
 func TestCaps(t *testing.T) {
 	h := contracts.Hotkey{Mods: contracts.ModSuper | contracts.ModShift, Key: "backspace"}
 	tests := []struct {

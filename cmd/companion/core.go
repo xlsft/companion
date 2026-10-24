@@ -15,6 +15,7 @@ import (
 	"github.com/xlsft/companion/internal/audio"
 	"github.com/xlsft/companion/internal/audio/playback"
 	"github.com/xlsft/companion/internal/chat"
+	"github.com/xlsft/companion/internal/dictation"
 	"github.com/xlsft/companion/internal/displays"
 	"github.com/xlsft/companion/internal/history"
 	"github.com/xlsft/companion/internal/llm"
@@ -25,6 +26,7 @@ import (
 	"github.com/xlsft/companion/internal/platform/capture"
 	pdisplays "github.com/xlsft/companion/internal/platform/displays"
 	"github.com/xlsft/companion/internal/platform/hotkeys"
+	"github.com/xlsft/companion/internal/platform/insert"
 	poverlay "github.com/xlsft/companion/internal/platform/overlay"
 	"github.com/xlsft/companion/internal/providers"
 	"github.com/xlsft/companion/internal/readiness"
@@ -89,8 +91,15 @@ type core struct {
 	// hkMu serialises registering and applying the shortcuts; hkBound
 	// are the chords registered, hkStatus how binding them went.
 	hkMu     sync.Mutex
-	hkBound  [2]string
+	hkBound  [3]string
 	hkStatus wizard.HotkeyStatus
+	// dictateErr is why the service refused the Dictate chord while it
+	// took Talk and Cancel.
+	dictateErr error
+
+	// dictation types what is said into the focused field (OC-78).
+	inserter  *insert.Inserter
+	dictation *dictation.Service
 
 	sttCheck *setupcheck.STT // keeps the last setup transcript in memory
 
@@ -176,6 +185,23 @@ func newCore(ctx context.Context, log *slog.Logger, dataDir string, db *store.DB
 		c.orch.Overlay = c.overlay
 	}
 	c.talk = session.New(c.orch, session.Config{Settings: sessionSettings(svc.Get())})
+	c.inserter = insert.New(report, insert.Options{
+		TokenPath:    filepath.Join(dataDir, "remote-desktop.token"),
+		UseClipboard: func() bool { return c.settings.Get().Voice.DictationClipboard },
+	})
+	c.dictation = dictation.New(dictation.Config{
+		Recorder: &dictation.MicRecorder{
+			Mic: c.mic,
+			STT: func(ctx context.Context, opts ...stt.SessionOption) (dictation.STTSession, error) {
+				return c.stt.StartSession(ctx, opts...)
+			},
+			Device:   func() string { return micDevice(c.settings.Get()) },
+			Language: func() string { return sttLanguage(c.settings.Get()) },
+		},
+		Inserter: c.inserter,
+		Busy:     c.talkHasMic,
+		Log:      log,
+	})
 	c.ctl = &talk.Control{Session: c.talk}
 	presenter := &talk.Presenter{Orch: c.orch}
 	if c.overlay != nil {
@@ -271,6 +297,8 @@ func (c *core) Stop(ctx context.Context) error {
 	c.chat.Close()
 	c.memory.Close()
 	errs = append(errs, c.talk.Close())
+	c.dictation.Close()
+	errs = append(errs, c.inserter.Close())
 	if c.hotkeys != nil {
 		errs = append(errs, c.hotkeys.Close())
 	}
@@ -308,14 +336,36 @@ func (c *core) launchSTT(ctx context.Context) (*stt.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	lang := c.settings.Get().Voice.Language
-	if lang == "" {
-		lang = protocol.LanguageAuto
-	}
 	return stt.Start(ctx, stt.Config{
 		Path: c.sidecar,
-		Init: protocol.InitializeParams{ModelPath: m.Path, Language: lang, Backend: protocol.BackendCPU},
+		Init: protocol.InitializeParams{ModelPath: m.Path, Language: sttLanguage(c.settings.Get()), Backend: protocol.BackendCPU},
 	})
+}
+
+// dictationUI is dictation as the main window shows it.
+type dictationUI struct {
+	*dictation.Service
+	c *core
+}
+
+func (d dictationUI) Shortcut() string { return chordLabel(d.c.settings.Get().Voice.DictateHotkey) }
+
+// sttLanguage is the recognition language from settings.
+func sttLanguage(s settings.Settings) string {
+	if s.Voice.Language == "" {
+		return protocol.LanguageAuto
+	}
+	return s.Voice.Language
+}
+
+// talkHasMic reports that a Talk request is recording or decoding, so
+// dictation must not open the microphone beside it.
+func (c *core) talkHasMic() bool {
+	switch c.talk.Current().State {
+	case session.StateListening, session.StateTranscribing:
+		return true
+	}
+	return false
 }
 
 // restartSTT relaunches recognition after a model change or from

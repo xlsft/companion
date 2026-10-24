@@ -34,6 +34,12 @@ func (p setupPermissions) ApplyHotkeys(ctx context.Context, talk, cancel string)
 	return p.c.applyHotkeys(ctx, talk, cancel)
 }
 
+func (p setupPermissions) ApplyDictateHotkey(ctx context.Context, chord string) wizard.HotkeyStatus {
+	return p.c.applyDictateHotkey(ctx, chord)
+}
+
+var _ wizard.DictateHotkeys = setupPermissions{}
+
 type setupSTT struct{ c *core }
 
 func (s setupSTT) Hardware(ctx context.Context) hw.Profile { return hw.Detect(ctx, s.c.modelsDir) }

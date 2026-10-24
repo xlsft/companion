@@ -22,7 +22,12 @@ const (
 	globExtToplevelList = "ext_foreign_toplevel_list_v1"
 	globWlrToplevelMgr  = "zwlr_foreign_toplevel_manager_v1"
 	globScreencopy      = "zwlr_screencopy_manager_v1"
+	globVirtualKeyboard = "zwp_virtual_keyboard_manager_v1"
 )
+
+// BackendVirtualKeyboard types through zwp_virtual_keyboard_v1, for
+// compositors whose RemoteDesktop portal has no keyboard (niri, OC-6).
+const BackendVirtualKeyboard = "wayland-virtual-keyboard"
 
 // Hotkey backend names reported in CapabilityState.Backend; the chooser in
 // internal/platform/hotkeys reports the same names at runtime.
@@ -46,6 +51,10 @@ type portalProbe struct {
 	Present bool
 	Version uint32
 	Err     string // short technical reason when not present
+	// Devices is RemoteDesktop's AvailableDeviceTypes bit set (1 keyboard,
+	// 2 pointer, 4 touchscreen), when DevicesKnown.
+	Devices      uint32
+	DevicesKnown bool
 }
 
 // busName is the outcome of checking a well-known bus name.
@@ -182,6 +191,9 @@ func mapLinux(f linuxFacts) contracts.CapabilityReport {
 	for iface, p := range f.Portals {
 		portalFact(r.Facts, "portal."+iface[strings.LastIndex(iface, ".")+1:]+".version", p)
 	}
+	if p := f.Portals[portalRemoteDesktop]; p.DevicesKnown {
+		r.Facts["portal.RemoteDesktop.devices"] = strconv.FormatUint(uint64(p.Devices), 10)
+	}
 	r.Facts["secret_service"] = busFact(f.SecretService)
 	r.Facts["atspi"] = busFact(f.ATSPI)
 	r.Facts["pipewire.socket"] = boolFact(f.PipeWire)
@@ -194,6 +206,7 @@ func mapLinux(f linuxFacts) contracts.CapabilityReport {
 			r.Facts["wayland.ext_foreign_toplevel_list"] = boolFact(f.hasGlobal(globExtToplevelList))
 			r.Facts["wayland.wlr_foreign_toplevel_manager"] = boolFact(f.hasGlobal(globWlrToplevelMgr))
 			r.Facts["wayland.screencopy"] = boolFact(f.hasGlobal(globScreencopy))
+			r.Facts["wayland.virtual_keyboard"] = boolFact(f.hasGlobal(globVirtualKeyboard))
 			names := make([]string, 0, len(f.Globals))
 			for _, g := range f.Globals {
 				names = append(names, g.Interface+"@"+strconv.FormatUint(uint64(g.Version), 10))
@@ -292,15 +305,24 @@ func mapLinux(f linuxFacts) contracts.CapabilityReport {
 			set(contracts.CapOverlayClickThrough, unavail(globLayerShell+" not advertised", contracts.CapOverlayFallbackPanel))
 		}
 
-		if p, why := portal(portalRemoteDesktop); p.Present {
+		rd, whyRD := portal(portalRemoteDesktop)
+		if rd.Present {
 			s := avail("xdg-portal:RemoteDesktop")
 			s.Reason = "user consent is requested on first use"
 			set(contracts.CapInputInjection, s)
 			s.Backend = "xdg-portal:RemoteDesktop"
 			set(contracts.CapTextInsertion, s)
 		} else {
-			set(contracts.CapInputInjection, unavail(why, ""))
-			set(contracts.CapTextInsertion, unavail(why, ""))
+			set(contracts.CapInputInjection, unavail(whyRD, ""))
+			set(contracts.CapTextInsertion, unavail(whyRD, ""))
+		}
+		// A portal whose backend offers no keyboard cannot type (niri's
+		// GNOME backend, OC-6); the compositor's virtual keyboard can.
+		if rd.Present && rd.DevicesKnown && rd.Devices&1 == 0 {
+			set(contracts.CapTextInsertion, unavail("RemoteDesktop portal offers no keyboard", ""))
+		}
+		if st := r.Capabilities[contracts.CapTextInsertion]; st.Status != contracts.StatusAvailable && f.hasGlobal(globVirtualKeyboard) {
+			set(contracts.CapTextInsertion, avail(BackendVirtualKeyboard))
 		}
 
 	default:

@@ -20,3 +20,11 @@ type InputInjector interface {
 	KeyChord(ctx context.Context, chord Hotkey) error
 	TypeText(ctx context.Context, text string) error
 }
+
+// TextInserter types text into whatever field has keyboard focus, in any
+// app (dictation, OC-78). It returns ErrUnsupported or ErrPermissionDenied
+// (wrapped with CapTextInsertion) only when nothing was typed, and leaves
+// the clipboard as it found it.
+type TextInserter interface {
+	InsertText(ctx context.Context, text string) error
+}

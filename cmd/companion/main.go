@@ -121,6 +121,7 @@ func main() {
 		Diagnose:   detect.New().Detect,
 		Updates:    upd,
 		Memory:     c.memory,
+		Dictation:  dictationUI{c.dictation, c},
 		Quit:       stop,
 		Log:        log,
 		Appearance: scheme,

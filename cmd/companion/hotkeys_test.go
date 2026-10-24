@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/xlsft/companion/internal/dictation"
+	"github.com/xlsft/companion/internal/platform/control"
 	"github.com/xlsft/companion/internal/platform/hotkeys"
 	"github.com/xlsft/companion/internal/platform/keybind"
 	"github.com/xlsft/companion/internal/readiness"
@@ -110,7 +112,8 @@ func TestApplyHotkeysNiri(t *testing.T) {
 func TestApplyHotkeysManual(t *testing.T) {
 	c, _ := hotkeyCore(t, "", "KDE")
 	st := c.applyHotkeys(context.Background(), "super+space", "super+backspace")
-	if st.State != wizard.HotkeyManual || len(st.Commands) != 2 || !strings.HasSuffix(st.Commands[0], " ctl talk-toggle") {
+	if st.State != wizard.HotkeyManual || len(st.Commands) != 3 || !strings.HasSuffix(st.Commands[0], " ctl talk-toggle") ||
+		!strings.HasSuffix(st.Commands[2], " ctl dictate-toggle") || st.DictateState != wizard.HotkeyManual {
 		t.Errorf("%+v", st)
 	}
 	if got := permission(c); got != readiness.PermNeedsBinding {
@@ -133,3 +136,93 @@ func TestSettingsChangeRebinds(t *testing.T) {
 		t.Errorf("bound %v", c.hkBound)
 	}
 }
+
+func TestApplyDictateNiri(t *testing.T) {
+	c, cfg := hotkeyCore(t, "niri", "niri")
+	path := filepath.Join(cfg, "niri", "config.kdl")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("binds {\n    Ctrl+Alt+D { spawn \"x\"; }\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	// Talk's Apply binds the default Dictate chord along.
+	if st := c.applyHotkeys(ctx, "super+space", "super+backspace"); st.State != wizard.HotkeyApplied || st.DictateState != wizard.HotkeyApplied {
+		t.Fatalf("talk apply: %+v", st)
+	}
+	tests := []struct {
+		name, chord string
+		state       wizard.HotkeyState
+		code        string
+		stored      string
+	}{
+		{"taken by the user", "ctrl+alt+d", wizard.HotkeyFailed, keybind.CodeConflict, "ctrl+alt+space"},
+		{"same as talk", "super+space", wizard.HotkeyFailed, "same_as_other", "ctrl+alt+space"},
+		{"no modifier", "f8", wizard.HotkeyFailed, "needs_modifier", "ctrl+alt+space"},
+		{"applied", "Super+Alt+D", wizard.HotkeyApplied, "", "alt+super+d"},
+	}
+	for _, tt := range tests {
+		st := c.applyDictateHotkey(ctx, tt.chord)
+		if st.DictateState != tt.state || st.DictateCode != tt.code {
+			t.Errorf("%s: %+v", tt.name, st)
+		}
+		if st.State != wizard.HotkeyApplied {
+			t.Errorf("%s: Talk lost: %+v", tt.name, st)
+		}
+		if got := c.settings.Get().Voice.DictateHotkey; got != tt.stored {
+			t.Errorf("%s: stored %q, want %q", tt.name, got, tt.stored)
+		}
+	}
+	b, _ := os.ReadFile(path)
+	if !strings.Contains(string(b), `Alt+Super+d repeat=false hotkey-overlay-title="Companion: dictate"`) {
+		t.Errorf("config:\n%s", b)
+	}
+	// A block from before dictation existed keeps Talk applied.
+	if st := c.applyChords(ctx, "super+space", "super+backspace", "", false); st.State != wizard.HotkeyApplied || st.DictateState != wizard.HotkeyNotApplied {
+		t.Fatalf("without dictate: %+v", st)
+	}
+	if err := c.settings.Update(ctx, func(s *settings.Settings) { s.Voice.DictateHotkey = "ctrl+alt+space" }); err != nil {
+		t.Fatal(err)
+	}
+	c.hkMu.Lock()
+	c.refreshAppliedLocked(ctx)
+	c.hkMu.Unlock()
+	if st := c.hotkeyStatus(); st.State != wizard.HotkeyApplied || st.DictateState != wizard.HotkeyNotApplied || st.Dictate != "ctrl+alt+space" {
+		t.Errorf("old block: %+v", st)
+	}
+	// Talk's editor drops a Dictate chord that is taken instead of failing.
+	if err := c.settings.Update(ctx, func(s *settings.Settings) { s.Voice.DictateHotkey = "ctrl+alt+d" }); err != nil {
+		t.Fatal(err)
+	}
+	if st := c.applyHotkeys(ctx, "super+space", "super+backspace"); st.State != wizard.HotkeyApplied || st.DictateState != wizard.HotkeyFailed {
+		t.Errorf("taken dictate on talk apply: %+v", st)
+	}
+}
+
+func TestRouteDictation(t *testing.T) {
+	c := &core{dictation: dictation.New(dictation.Config{Recorder: stubRecorder{}, Inserter: stubInserter{}})}
+	defer c.dictation.Close()
+	if c.routeDictation(contracts.HotkeyEvent{ID: control.CancelID, Kind: contracts.HotkeyPressed}) {
+		t.Error("Cancel taken with no dictation")
+	}
+	if c.routeDictation(contracts.HotkeyEvent{ID: control.TalkID, Kind: contracts.HotkeyToggled}) {
+		t.Error("Talk taken")
+	}
+	if !c.routeDictation(contracts.HotkeyEvent{ID: control.DictateID, Kind: contracts.HotkeyToggled}) || !c.dictation.Active() {
+		t.Fatal("dictation not started")
+	}
+	if !c.routeDictation(contracts.HotkeyEvent{ID: control.CancelID, Kind: contracts.HotkeyPressed}) {
+		t.Error("Cancel did not stop the dictation")
+	}
+}
+
+type stubRecorder struct{}
+
+func (stubRecorder) Start(context.Context) error            { return nil }
+func (stubRecorder) Finish(context.Context) (string, error) { return "", nil }
+func (stubRecorder) Cancel()                                {}
+
+type stubInserter struct{}
+
+func (stubInserter) InsertText(context.Context, string) error { return nil }

@@ -119,7 +119,7 @@ type settingsPage struct {
 	speed        kit.Slider
 	speedPending bool
 
-	keepShots, memory, saveText, shareDiag, login, tray widget.Bool
+	keepShots, memory, saveText, shareDiag, login, tray, dictClip widget.Bool
 
 	// updates is the updater behind the General section's update rows;
 	// nil leaves "Check now" out.
@@ -137,6 +137,8 @@ type settingsPage struct {
 	hotkeys *wizard.HotkeyEditor
 	// models picks the speech model; nil without an STT backend.
 	models *wizard.ModelPicker
+	// dictate edits the dictation shortcut; nil without a backend.
+	dictate *wizard.DictateEditor
 }
 
 func newSettingsPage(store SettingsStore) *settingsPage {
@@ -193,6 +195,7 @@ func (p *settingsPage) update(gtx layout.Context) {
 		{&p.tray, func(s *settings.Settings, v bool) { s.Platform.TrayIcon = v }},
 		{&p.autoUpd, func(s *settings.Settings, v bool) { s.Updates.AutoCheck = v }},
 		{&p.preUpd, func(s *settings.Settings, v bool) { s.Updates.Prereleases = v }},
+		{&p.dictClip, func(s *settings.Settings, v bool) { s.Voice.DictationClipboard = v }},
 	} {
 		if b.w.Update(gtx) {
 			v, set := b.w.Value, b.set
@@ -229,6 +232,7 @@ func (p *settingsPage) sync(s settings.Settings) {
 	p.tray.Value = s.Platform.TrayIcon
 	p.autoUpd.Value = s.Updates.AutoCheck
 	p.preUpd.Value = s.Updates.Prereleases
+	p.dictClip.Value = s.Voice.DictationClipboard
 	if !p.speed.Float.Dragging() && !p.speedPending {
 		p.speed.Float.Value = sliderFromSpeed(s.Voice.TTSSpeed)
 	}
@@ -370,6 +374,13 @@ func (p *settingsPage) sectionRows(gtx layout.Context, th *theme.Theme, l Lang, 
 			shortcuts = append(shortcuts, panelOf(th,
 				setting(th, l, "voice.shortcuts", "voice.shortcuts.d", true, nil),
 				kit.Pad(th, 16, 20, p.hotkeys.Layout(th, l, nil)),
+			))
+		}
+		if p.dictate != nil {
+			shortcuts = append(shortcuts, panelOf(th,
+				setting(th, l, "dictation.title", "dictation.title.d", true, nil),
+				kit.Pad(th, 16, 20, p.dictate.Layout(th, l, nil)),
+				setting(th, l, "dictation.clipboard", "dictation.clipboard.d", true, toggle(&p.dictClip, "dictation.clipboard")),
 			))
 		}
 		return append(shortcuts, panelOf(th,

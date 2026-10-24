@@ -81,6 +81,39 @@ func TestMapLinux(t *testing.T) {
 			},
 		},
 		{
+			name: "niri: portal without keyboard, virtual keyboard types",
+			facts: linuxFacts{SessionType: "wayland", WaylandDisplay: "wayland-1", Niri: true, Desktop: "niri",
+				Portals:        map[string]portalProbe{portalRemoteDesktop: {Present: true, Version: 2, DevicesKnown: true}},
+				WaylandChecked: true, Globals: []Global{{Interface: globVirtualKeyboard, Version: 1}}},
+			want: map[contracts.Capability]contracts.Status{contracts.CapTextInsertion: contracts.StatusAvailable},
+			extra: func(t *testing.T, r contracts.CapabilityReport) {
+				if b := r.State(contracts.CapTextInsertion).Backend; b != BackendVirtualKeyboard {
+					t.Errorf("text_insertion backend = %q", b)
+				}
+				if r.Facts["portal.RemoteDesktop.devices"] != "0" || r.Facts["wayland.virtual_keyboard"] != "true" {
+					t.Errorf("facts = %v", r.Facts)
+				}
+			},
+		},
+		{
+			name: "portal keyboard wins over virtual keyboard",
+			facts: linuxFacts{SessionType: "wayland", WaylandDisplay: "wayland-0", Desktop: "GNOME",
+				Portals:        map[string]portalProbe{portalRemoteDesktop: {Present: true, Version: 2, Devices: 3, DevicesKnown: true}},
+				WaylandChecked: true, Globals: []Global{{Interface: globVirtualKeyboard, Version: 1}}},
+			want: map[contracts.Capability]contracts.Status{contracts.CapTextInsertion: contracts.StatusAvailable},
+			extra: func(t *testing.T, r contracts.CapabilityReport) {
+				if b := r.State(contracts.CapTextInsertion).Backend; b != "xdg-portal:RemoteDesktop" {
+					t.Errorf("text_insertion backend = %q", b)
+				}
+			},
+		},
+		{
+			name: "no portal keyboard, no virtual keyboard",
+			facts: linuxFacts{SessionType: "wayland", WaylandDisplay: "wayland-0",
+				Portals: map[string]portalProbe{portalRemoteDesktop: {Present: true, Version: 2, DevicesKnown: true}}, WaylandChecked: true},
+			want: map[contracts.Capability]contracts.Status{contracts.CapTextInsertion: contracts.StatusUnavailable},
+		},
+		{
 			name: "wayland kde portal hotkeys",
 			facts: linuxFacts{SessionType: "wayland", WaylandDisplay: "wayland-0", Desktop: "KDE",
 				Portals: portals(true, true, true), PipeWire: true, WaylandChecked: true, Globals: layer},

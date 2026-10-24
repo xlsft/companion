@@ -623,3 +623,50 @@ func TestManualAndService(t *testing.T) {
 		t.Errorf("Commands = %q %q", talk, cancel)
 	}
 }
+
+// The dictation chord rides along in every desktop's block, with key-up
+// binds where the desktop has them, and counts for conflicts.
+func TestDictateBinds(t *testing.T) {
+	dreq := req
+	dreq.Dictate = ctrlAltK
+	e := "/opt/companion/bin/companion"
+	tests := []struct {
+		name  string
+		block string
+		want  []string
+	}{
+		{"niri", niriBlock(dreq), []string{`Ctrl+Alt+k repeat=false hotkey-overlay-title="Companion: dictate" { spawn "` + e + `" "ctl" "dictate-toggle"; }`}},
+		{"sway", swayBlock(dreq), []string{"bindsym Ctrl+Mod1+k exec " + e + " ctl dictate-press", "bindsym --release Ctrl+Mod1+k exec " + e + " ctl dictate-release"}},
+		{"hyprland", hyprBlock(dreq), []string{"bind = CTRL ALT, k, exec, " + e + " ctl dictate-press", "bindr = CTRL ALT, k, exec, " + e + " ctl dictate-release"}},
+	}
+	for _, tt := range tests {
+		for _, w := range tt.want {
+			if !strings.Contains(tt.block, w) {
+				t.Errorf("%s block lacks %q:\n%s", tt.name, w, tt.block)
+			}
+		}
+		if strings.Contains(niriBlock(req)+swayBlock(req)+hyprBlock(req), "dictate") {
+			t.Errorf("%s: a request without a dictation chord binds one", tt.name)
+		}
+	}
+	if b := gnomeBinds(dreq); len(b) != 3 || b[2].command != e+" ctl dictate-toggle" || b[2].binding != "<Control><Alt>k" {
+		t.Errorf("gnome binds = %+v", b)
+	}
+	if got := DictateCommand("/opt/my app/companion"); got != `'/opt/my app/companion' ctl dictate-toggle` {
+		t.Errorf("DictateCommand = %q", got)
+	}
+
+	tools := &fakeTools{}
+	env := testEnv(t, tools, nil)
+	path := filepath.Join(env.ConfigHome, "niri", "config.kdl")
+	write(t, path, niriUser)
+	write(t, filepath.Join(env.ConfigHome, "niri", "extra.kdl"), "binds {\n    Ctrl+Alt+K { spawn \"x\"; }\n}\n")
+	if _, err := Apply(context.Background(), MethodNiri, env, dreq); ErrorCode(err) != CodeConflict {
+		t.Errorf("taken dictation chord: %v", err)
+	}
+	bad := dreq
+	bad.Dictate = contracts.Hotkey{Mods: contracts.ModCtrl, Key: "nope"}
+	if _, err := Apply(context.Background(), MethodNiri, env, bad); ErrorCode(err) != CodeBadChord {
+		t.Errorf("bad dictation chord: %v", err)
+	}
+}

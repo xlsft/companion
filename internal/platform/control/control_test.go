@@ -58,6 +58,8 @@ func TestCtlLine(t *testing.T) {
 	for sub, want := range map[string]string{
 		"talk-toggle": "hotkey talk toggle", "talk-press": "hotkey talk press",
 		"talk-release": "hotkey talk release", "cancel": "hotkey cancel press", "ping": "ping",
+		"dictate-toggle": "hotkey dictate toggle", "dictate-press": "hotkey dictate press",
+		"dictate-release": "hotkey dictate release",
 	} {
 		got, err := CtlLine(sub)
 		if err != nil || got != want {

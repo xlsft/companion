@@ -57,6 +57,7 @@ func newService(ctx context.Context, kv *store.KV, current int, ups map[int]func
 	if err != nil {
 		return nil, err
 	}
+	upgraded.fitDictate()
 	if err := upgraded.Validate(); err != nil {
 		return nil, err
 	}

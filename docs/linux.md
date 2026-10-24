@@ -42,6 +42,7 @@ The AppImage is deliberately thin: it does not bundle the graphics stack, becaus
 | xdg-desktop-portal and a backend | screenshot, global shortcuts, remote desktop (below) | `xdg-desktop-portal` + backend | `xdg-desktop-portal` + backend | `xdg-desktop-portal` + backend |
 | Secret Service provider | API keys (never written to disk) | `gnome-keyring` or `kwallet` or `keepassxc` | same | same |
 | AT-SPI (optional) | accessibility tree for screen context | `at-spi2-core` | `at-spi2-core` | `at-spi2-core` |
+| wl-clipboard or xclip (optional) | dictation's paste-through-clipboard option | `wl-clipboard` / `xclip` | same | same |
 
 Miniaudio loads PulseAudio/ALSA/JACK at runtime (no link-time dependency), so the package names for audio servers are about what must be running, not what the binary links. `ldd companion` should show no "not found" lines.
 
@@ -70,7 +71,8 @@ The runtime decides from facts, not from the desktop's name: `internal/platform/
 | Hold-to-talk (key release) | unknown: depends on portal backend delivering `Deactivated` | unknown (same) | binding with `bindsym --release`; unknown until one fires | binding with `bindr` | no, niri binds fire on press only; use toggle | yes |
 | Screen capture | Screenshot portal (whole desktop, consent may be asked once) | Screenshot portal | `wlr-screencopy`, no consent | `wlr-screencopy` | Screenshot portal if present, else unavailable (?) | XGetImage |
 | Overlay (click-through) | no layer-shell (?): falls back to an ordinary panel window | no `zwlr_layer_shell_v1` on KWin as probed (?): fallback panel | wlr-layer-shell | wlr-layer-shell | layer-shell if advertised (?), else fallback panel | X11 shape |
-| Input injection, text insertion | RemoteDesktop portal, consent on first use | RemoteDesktop portal | portal only if a backend has RemoteDesktop (?), else unavailable | RemoteDesktop portal (?) | unavailable unless a RemoteDesktop portal exists | XTest |
+| Input injection | RemoteDesktop portal, consent on first use | RemoteDesktop portal | portal only if a backend has RemoteDesktop (?), else unavailable | RemoteDesktop portal (?) | unavailable unless a RemoteDesktop portal exists | XTest |
+| Text insertion (dictation) | RemoteDesktop portal keyboard, consent once (restore token kept) | RemoteDesktop portal | virtual keyboard (`zwp_virtual_keyboard_v1`) | portal, else virtual keyboard | virtual keyboard: the portal has no keyboard there | XTest |
 | Microphone | PipeWire socket; else unknown (ALSA/Pulse not probed) | same | same | same | same | same |
 | Secret store | org.freedesktop.secrets (gnome-keyring) | kwallet (Secret Service API) | needs a provider | needs a provider | needs a provider | needs a provider |
 | Accessibility | `org.a11y.Bus` if running | same | same, usually not started | same | same | same |
@@ -82,7 +84,7 @@ If no display session is detected (SSH, tty), every display capability is report
 
 ### Binding the hotkey without a portal
 
-Wherever `GlobalShortcuts` is absent or refused (sway, niri, most bare compositors), the core listens on `$XDG_RUNTIME_DIR/openclick/control.sock` and the compositor runs `companion ctl <command>` per key press. Commands: `talk-toggle`, `talk-press`, `talk-release`, `cancel`, `ping`. `ctl` is a quick client; it does not start the UI and exits non-zero if the core is not running. The setup wizard shows the same snippets with your actual binary path filled in.
+Wherever `GlobalShortcuts` is absent or refused (sway, niri, most bare compositors), the core listens on `$XDG_RUNTIME_DIR/openclick/control.sock` and the compositor runs `companion ctl <command>` per key press. Commands: `talk-toggle`, `talk-press`, `talk-release`, `cancel`, `dictate-toggle`, `dictate-press`, `dictate-release`, `ping`. `ctl` is a quick client; it does not start the UI and exits non-zero if the core is not running. The setup wizard shows the same snippets with your actual binary path filled in.
 
 niri (`~/.config/niri/config.kdl`; press-only, so toggle):
 

@@ -145,32 +145,7 @@ func (e *HotkeyEditor) view(th *theme.Theme, l i18n.Lang, st HotkeyStatus, apply
 		return s
 	}
 	tc, cc := e.validate()
-	field := func(r *kit.ShortcutRecorder, capKey, code string) layout.Widget {
-		cap := add(i18n.T(l, capKey))
-		for _, c := range r.Caps() {
-			add(c)
-		}
-		s := kit.RecorderStyle{
-			Placeholder: add(i18n.T(l, "hotkey.placeholder")),
-			Prompt:      i18n.T(l, "hotkey.prompt"),
-			Desc:        cap,
-			Invalid:     code != "",
-		}
-		if r.Recording() {
-			add(s.Prompt)
-		}
-		under := func(gtx layout.Context) layout.Dimensions { return layout.Dimensions{} }
-		if code != "" && !r.Recording() {
-			msg := add(i18n.T(l, "hotkey.invalid."+code))
-			under = func(gtx layout.Context) layout.Dimensions {
-				return kit.Text(th, 12, msg, th.Pal.Error).Layout(gtx)
-			}
-		}
-		return kit.Labeled(th, cap, kit.VStack(th, 4, func(gtx layout.Context) layout.Dimensions {
-			return r.Layout(gtx, th, s)
-		}, under))
-	}
-	fields := kit.Grid(th, 2, 12, field(&e.talk, "hotkey.talk", tc), field(&e.cancel, "hotkey.cancel", cc))
+	fields := kit.Grid(th, 2, 12, shortcutField(th, l, &e.talk, "hotkey.talk", tc, add), shortcutField(th, l, &e.cancel, "hotkey.cancel", cc, add))
 
 	btn := kit.ButtonStyle{Kind: kit.Primary, Small: true, Label: add(i18n.T(l, "hotkey.apply")), Icon: icon.Check}
 	if applying {
@@ -183,7 +158,10 @@ func (e *HotkeyEditor) view(th *theme.Theme, l i18n.Lang, st HotkeyStatus, apply
 		}
 		return btn.Layout(gtx, th, e.applyBtn())
 	}
-	line := kit.HStack(th, 12, apply, e.statusLine(th, l, st, applying, add))
+	line := kit.HStack(th, 12, apply, statusLine(th, l, applyView{
+		state: st.State, code: st.Code, chord: st.Talk, appliedKey: "hotkey.applied",
+		applying: applying, dirty: e.dirty,
+	}, add))
 	ws := []layout.Widget{fields, line}
 	if st.State == HotkeyApplied && st.ToggleOnly && !e.dirty {
 		ws = append(ws, kit.Muted(th, add(i18n.T(l, "hotkey.mode"))).Layout)
@@ -199,24 +177,61 @@ func (e *HotkeyEditor) view(th *theme.Theme, l i18n.Lang, st HotkeyStatus, apply
 	return kit.VStack(th, 12, ws...)
 }
 
+// shortcutField is one labelled recorder with its validation message.
+func shortcutField(th *theme.Theme, l i18n.Lang, r *kit.ShortcutRecorder, capKey, code string, add func(string) string) layout.Widget {
+	cap := add(i18n.T(l, capKey))
+	for _, c := range r.Caps() {
+		add(c)
+	}
+	s := kit.RecorderStyle{
+		Placeholder: add(i18n.T(l, "hotkey.placeholder")),
+		Prompt:      i18n.T(l, "hotkey.prompt"),
+		Desc:        cap,
+		Invalid:     code != "",
+	}
+	if r.Recording() {
+		add(s.Prompt)
+	}
+	under := func(gtx layout.Context) layout.Dimensions { return layout.Dimensions{} }
+	if code != "" && !r.Recording() {
+		msg := add(i18n.T(l, "hotkey.invalid."+code))
+		under = func(gtx layout.Context) layout.Dimensions {
+			return kit.Text(th, 12, msg, th.Pal.Error).Layout(gtx)
+		}
+	}
+	return kit.Labeled(th, cap, kit.VStack(th, 4, func(gtx layout.Context) layout.Dimensions {
+		return r.Layout(gtx, th, s)
+	}, under))
+}
+
+// applyView is what the line beside an editor's Apply reports.
+type applyView struct {
+	state HotkeyState
+	code  string
+	// chord is the stored chord the applied text names; appliedKey is
+	// that text ("Works: %s to talk").
+	chord, appliedKey string
+	applying, dirty   bool
+}
+
 // statusLine is the outcome beside Apply.
-func (e *HotkeyEditor) statusLine(th *theme.Theme, l i18n.Lang, st HotkeyStatus, applying bool, add func(string) string) layout.Widget {
+func statusLine(th *theme.Theme, l i18n.Lang, v applyView, add func(string) string) layout.Widget {
 	var s theme.Status
 	var txt string
 	switch {
-	case applying:
+	case v.applying:
 		return kit.Muted(th, add(i18n.T(l, "hotkey.applyingHint"))).Layout
-	case e.dirty:
+	case v.dirty:
 		s, txt = theme.StatusUnknown, i18n.T(l, "hotkey.unsaved")
-	case st.State == HotkeyApplied:
-		label := st.Talk
-		if h, err := shortcut.Parse(st.Talk); err == nil {
+	case v.state == HotkeyApplied:
+		label := v.chord
+		if h, err := shortcut.Parse(v.chord); err == nil {
 			label = shortcut.Label(h, runtime.GOOS)
 		}
-		s, txt = theme.StatusOK, i18n.Tf(l, "hotkey.applied", label)
-	case st.State == HotkeyFailed:
-		s, txt = theme.StatusError, hotkeyFailure(l, st.Code)
-	case st.State == HotkeyManual:
+		s, txt = theme.StatusOK, i18n.Tf(l, v.appliedKey, label)
+	case v.state == HotkeyFailed:
+		s, txt = theme.StatusError, hotkeyFailure(l, v.code)
+	case v.state == HotkeyManual:
 		s, txt = theme.StatusWarn, i18n.T(l, "hotkey.manualShort")
 	default:
 		s, txt = theme.StatusUnknown, i18n.T(l, "hotkey.notApplied")

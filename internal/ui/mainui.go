@@ -33,9 +33,10 @@ type mainUI struct {
 	// section is a Settings section to show on the next frame, or -1.
 	section settingsSection
 
-	chat   *chatModel
-	guide  *guideModel
-	update *updateBanner
+	chat    *chatModel
+	guide   *guideModel
+	update  *updateBanner
+	dictate *dictationBanner
 
 	newChatBtn widget.Clickable
 	aboutBtn   widget.Clickable
@@ -50,6 +51,7 @@ func newMainUI(sh *Shell) *mainUI {
 		chat:    newChatModel(sh.opts.Chat, sh.log, sh.invalidateAll),
 		guide:   newGuideModel(sh.opts.Guide, sh.log, sh.invalidateAll),
 		update:  newUpdateBanner(sh.opts.Updates),
+		dictate: newDictationBanner(sh.opts.Dictation),
 		navBtns: map[Route]*widget.Clickable{},
 		section: -1,
 	}
@@ -119,6 +121,9 @@ func (m *mainUI) page(r Route) page {
 		}
 		if be := m.sh.opts.Setup.Permissions; be != nil {
 			sp.hotkeys = &wizard.HotkeyEditor{Backend: be, Invalidate: m.sh.invalidateAll}
+			if d, ok := be.(wizard.DictateHotkeys); ok {
+				sp.dictate = &wizard.DictateEditor{Backend: d, Invalidate: m.sh.invalidateAll}
+			}
 		}
 		if be := m.sh.opts.Setup.STT; be != nil {
 			sp.models = &wizard.ModelPicker{Backend: be, Invalidate: m.sh.invalidateAll, Language: func() string {
@@ -154,11 +159,13 @@ func (m *mainUI) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dime
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			// The update notice spans the window above every section.
 			return m.update.wrap(gtx, th, l, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{}.Layout(gtx,
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions { return m.sidebar(gtx, th, l, cur) }),
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.VDivider(gtx, th) }),
-					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return pg.Layout(gtx, th, l) }),
-				)
+				return m.dictate.wrap(gtx, th, l, func(gtx layout.Context) layout.Dimensions {
+					return layout.Flex{}.Layout(gtx,
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions { return m.sidebar(gtx, th, l, cur) }),
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.VDivider(gtx, th) }),
+						layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return pg.Layout(gtx, th, l) }),
+					)
+				})
 			})
 		}),
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions { return m.about.Layout(gtx, th, l) }),
