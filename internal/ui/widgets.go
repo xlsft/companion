@@ -1,9 +1,6 @@
 package ui
 
 import (
-	"image"
-
-	"gioui.org/font"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -13,64 +10,22 @@ import (
 	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"gioui.org/widget"
-	"gioui.org/widget/material"
 
+	"github.com/xlsft/openclick/internal/ui/kit"
 	"github.com/xlsft/openclick/internal/ui/theme"
 )
 
-// focusRing draws a 2dp accent outline around w when focused, so keyboard
-// focus is visible beyond material's faint hover tint (FR-UI-007).
-func focusRing(gtx layout.Context, th *theme.Theme, focused bool, w layout.Widget) layout.Dimensions {
-	if !focused {
-		return w(gtx)
-	}
-	return widget.Border{Color: th.Pal.Accent, Width: 2, CornerRadius: 4}.Layout(gtx, w)
-}
-
-// button is a material button with a visible focus ring.
-func button(gtx layout.Context, th *theme.Theme, b *widget.Clickable, label string) layout.Dimensions {
-	return focusRing(gtx, th, gtx.Focused(b), material.Button(th.Theme, b, label).Layout)
-}
-
-func heading(th *theme.Theme, txt string) material.LabelStyle {
-	l := material.Label(th.Theme, th.Sp(1.6), txt)
-	l.Font.Weight = font.SemiBold
-	return l
-}
-
-func subheading(th *theme.Theme, txt string) material.LabelStyle {
-	l := material.Label(th.Theme, th.Sp(1.15), txt)
-	l.Font.Weight = font.SemiBold
-	return l
-}
-
-func body(th *theme.Theme, txt string) material.LabelStyle {
-	return material.Label(th.Theme, th.Sp(1), txt)
-}
-
-func muted(th *theme.Theme, txt string) material.LabelStyle {
-	l := material.Label(th.Theme, th.Sp(0.9), txt)
-	l.Color = th.Pal.Muted
-	return l
-}
-
-func vspace(dp unit.Dp) layout.FlexChild {
-	return layout.Rigid(layout.Spacer{Height: dp}.Layout)
-}
-
-// card draws w on a rounded surface.
-func card(gtx layout.Context, th *theme.Theme, w layout.Widget) layout.Dimensions {
-	return layout.Background{}.Layout(gtx,
-		func(gtx layout.Context) layout.Dimensions {
-			rr := gtx.Dp(8)
-			defer clip.UniformRRect(image.Rectangle{Max: gtx.Constraints.Min}, rr).Push(gtx.Ops).Pop()
-			paint.Fill(gtx.Ops, th.Pal.Surface)
-			return layout.Dimensions{Size: gtx.Constraints.Min}
-		},
-		func(gtx layout.Context) layout.Dimensions {
-			return layout.UniformInset(16).Layout(gtx, w)
-		})
-}
+// Shared widgets live in kit so the wizard package can use them too.
+var (
+	focusRing  = kit.FocusRing
+	button     = kit.Button
+	heading    = kit.Heading
+	subheading = kit.Subheading
+	body       = kit.Body
+	muted      = kit.Muted
+	vspace     = kit.VSpace
+	card       = kit.Card
+)
 
 // placeholderPage stands in for sections that are not implemented yet.
 type placeholderPage struct{ route Route }
