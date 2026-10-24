@@ -1,9 +1,7 @@
-# openclick
+# Companion
 
-Local desktop voice/screen assistant (working name Companion). Go core, Gio UI, local whisper.cpp STT, BYOK LLM, external TTS, no backend.
+Local desktop voice/screen assistant. Go core, Gio UI, local STT (sherpa-onnx, whisper.cpp fallback), BYOK LLM, external TTS, no backend.
 
-- Product: PRD in YouTrack knowledge base article OC-A-1 (https://xlsft.youtrack.cloud/articles/OC-A-1).
-- Tasks: YouTrack project OC (OC-1…OC-130), tags P0/P1/P2, "depends on" links.
 - Architecture: `docs/adr/0001-desktop-architecture.md` — read before changing package layout.
 
 ## Layout
@@ -24,6 +22,6 @@ Local desktop voice/screen assistant (working name Companion). Go core, Gio UI, 
 
 ## Git
 
-- Atomic commits, one logical change each, message `type: summary (OC-N)`.
+- Atomic commits, one logical change each, conventional message `type: summary`.
 - Push right after every commit. Never make two commits without pushing in between.
 - End commit messages with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
