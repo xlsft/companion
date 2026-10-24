@@ -44,6 +44,9 @@ func TestCollectionHasTypefaces(t *testing.T) {
 		Sans:    {font.Normal, font.Medium, font.SemiBold},
 		Mono:    {font.Normal, font.Medium},
 		Display: {font.SemiBold},
+		cjkSC:   {font.Normal, font.Bold},
+		cjkJP:   {font.Normal, font.Bold},
+		cjkKR:   {font.Normal, font.Bold},
 	}
 	have := map[font.Typeface]map[font.Weight]bool{}
 	for _, f := range Collection() {

@@ -226,7 +226,7 @@ func newChatButton(gtx layout.Context, th *theme.Theme, c *widget.Clickable, lab
 						}),
 						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 							t := kit.Text(th, 11, "Ctrl+N", th.Pal.Subtle)
-							t.Font.Typeface = theme.Mono
+							t.Font.Typeface = th.Mono()
 							return kit.VCenter(gtx, h, t.Layout)
 						}),
 					)
