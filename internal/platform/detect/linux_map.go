@@ -13,6 +13,7 @@ const (
 	portalGlobalShortcuts = "org.freedesktop.portal.GlobalShortcuts"
 	portalScreenCast      = "org.freedesktop.portal.ScreenCast"
 	portalRemoteDesktop   = "org.freedesktop.portal.RemoteDesktop"
+	portalScreenshot      = "org.freedesktop.portal.Screenshot"
 )
 
 // Wayland globals that matter for capabilities.
@@ -20,7 +21,25 @@ const (
 	globLayerShell      = "zwlr_layer_shell_v1"
 	globExtToplevelList = "ext_foreign_toplevel_list_v1"
 	globWlrToplevelMgr  = "zwlr_foreign_toplevel_manager_v1"
+	globScreencopy      = "zwlr_screencopy_manager_v1"
 )
+
+// Hotkey backend names reported in CapabilityState.Backend; the chooser in
+// internal/platform/hotkeys reports the same names at runtime.
+const (
+	BackendX11Grab = "x11-grabkey"
+	BackendPortal  = "xdg-portal:GlobalShortcuts"
+	BackendIPC     = "ipc+compositor-binding"
+)
+
+// ipcHotkey is the control-socket fallback: it always works, but only after
+// the user binds a compositor key to "companion ctl".
+func ipcHotkey(why string) contracts.CapabilityState {
+	return contracts.CapabilityState{
+		Status: contracts.StatusDegraded, Backend: BackendIPC,
+		Reason: why + "; bind a compositor key to companion ctl",
+	}
+}
 
 // portalProbe is the outcome of reading one portal interface's version.
 type portalProbe struct {
@@ -174,6 +193,7 @@ func mapLinux(f linuxFacts) contracts.CapabilityReport {
 			r.Facts["wayland.layer_shell"] = boolFact(f.hasGlobal(globLayerShell))
 			r.Facts["wayland.ext_foreign_toplevel_list"] = boolFact(f.hasGlobal(globExtToplevelList))
 			r.Facts["wayland.wlr_foreign_toplevel_manager"] = boolFact(f.hasGlobal(globWlrToplevelMgr))
+			r.Facts["wayland.screencopy"] = boolFact(f.hasGlobal(globScreencopy))
 			names := make([]string, 0, len(f.Globals))
 			for _, g := range f.Globals {
 				names = append(names, g.Interface+"@"+strconv.FormatUint(uint64(g.Version), 10))
@@ -207,36 +227,58 @@ func mapLinux(f linuxFacts) contracts.CapabilityReport {
 
 	switch sess {
 	case contracts.SessionX11:
-		set(contracts.CapGlobalHotkey, avail("x11-xinput2"))
-		set(contracts.CapHotkeyRelease, avail("x11-xinput2"))
-		set(contracts.CapScreenCapture, avail("x11-xshm"))
+		set(contracts.CapGlobalHotkey, avail(BackendX11Grab))
+		set(contracts.CapHotkeyRelease, avail(BackendX11Grab))
+		set(contracts.CapScreenCapture, avail("x11-getimage"))
 		set(contracts.CapOverlayClickThrough, avail("x11-shape"))
 		set(contracts.CapInputInjection, avail("x11-xtest"))
 		set(contracts.CapTextInsertion, avail("x11-xtest"))
 
 	case contracts.SessionWayland:
-		if p, why := portal(portalGlobalShortcuts); p.Present {
-			set(contracts.CapGlobalHotkey, avail("xdg-portal:GlobalShortcuts"))
+		p, why := portal(portalGlobalShortcuts)
+		switch comp := compositorName(f); {
+		case comp == "niri":
+			// The portal is exported, but its GNOME backend refuses
+			// BindShortcuts on niri (OC-6), and niri binds fire on press
+			// only.
+			set(contracts.CapGlobalHotkey, ipcHotkey("GlobalShortcuts portal has no working backend on niri"))
+			set(contracts.CapHotkeyRelease, contracts.CapabilityState{
+				Status: contracts.StatusUnavailable, Backend: BackendIPC,
+				Reason: "niri binds fire on key press only", Fallback: contracts.FallbackToggleTalk,
+			})
+		case p.Present:
+			set(contracts.CapGlobalHotkey, avail(BackendPortal))
 			// Hold-to-talk needs the Deactivated signal; backends differ and
 			// the version number does not tell, so do not claim it.
 			s := unknown("Deactivated delivery depends on portal backend")
-			s.Backend = "xdg-portal:GlobalShortcuts"
+			s.Backend = BackendPortal
+			s.Fallback = contracts.FallbackToggleTalk
 			set(contracts.CapHotkeyRelease, s)
-		} else {
-			set(contracts.CapGlobalHotkey, unavail(why, ""))
-			set(contracts.CapHotkeyRelease, unavail(why, ""))
+		default:
+			// Sway and others: release binds exist on some compositors
+			// (bindsym --release), so release is known only once one fires.
+			set(contracts.CapGlobalHotkey, ipcHotkey(why))
+			s := unknown("depends on compositor release bindings")
+			s.Backend = BackendIPC
+			s.Fallback = contracts.FallbackToggleTalk
+			set(contracts.CapHotkeyRelease, s)
 		}
 
-		_, whySC := portal(portalScreenCast)
+		// Order matches internal/platform/capture.Candidates: screencopy
+		// needs no consent, the Screenshot portal works everywhere else.
+		// ScreenCast+PipeWire is not a backend yet (DMA-BUF import, OC-6).
+		_, whyShot := portal(portalScreenshot)
 		switch {
-		case !f.Portals[portalScreenCast].Present:
-			set(contracts.CapScreenCapture, unavail(whySC, ""))
-		case !f.PipeWire:
-			set(contracts.CapScreenCapture, unavail("pipewire socket missing", ""))
-		default:
-			s := avail("xdg-portal:ScreenCast+pipewire")
-			s.Reason = "user consent is requested on first use"
+		case f.hasGlobal(globScreencopy):
+			set(contracts.CapScreenCapture, avail("wlr-screencopy"))
+		case f.Portals[portalScreenshot].Present:
+			s := avail("xdg-portal:Screenshot")
+			s.Reason = "whole desktop per capture; permission may be requested once"
 			set(contracts.CapScreenCapture, s)
+		case f.Portals[portalScreenCast].Present:
+			set(contracts.CapScreenCapture, unavail("ScreenCast+PipeWire capture not implemented", ""))
+		default:
+			set(contracts.CapScreenCapture, unavail(whyShot, ""))
 		}
 
 		switch {

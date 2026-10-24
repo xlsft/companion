@@ -672,6 +672,8 @@ func TestFromHotkey(t *testing.T) {
 		{contracts.HotkeyEvent{ID: "talk", Kind: contracts.HotkeyPressed}, HotkeyDown{}},
 		{contracts.HotkeyEvent{ID: "talk", Kind: contracts.HotkeyReleased}, HotkeyUp{}},
 		{contracts.HotkeyEvent{ID: "cancel", Kind: contracts.HotkeyPressed}, Cancel{}},
+		{contracts.HotkeyEvent{ID: "talk", Kind: contracts.HotkeyToggled}, ToggleTalk{}},
+		{contracts.HotkeyEvent{ID: "cancel", Kind: contracts.HotkeyToggled}, Cancel{}},
 		{contracts.HotkeyEvent{ID: "cancel", Kind: contracts.HotkeyReleased}, nil},
 		{contracts.HotkeyEvent{ID: "dictate", Kind: contracts.HotkeyPressed}, nil},
 	}

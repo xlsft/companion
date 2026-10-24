@@ -16,6 +16,9 @@ var (
 	// ErrStale means an operation referenced a capture or display topology
 	// that no longer matches the screen (FR-SCREEN-005).
 	ErrStale = errors.New("stale screen state")
+	// ErrHotkeyConflict means another application already holds the chord;
+	// the wrapping error names the binding so the UI can ask for another.
+	ErrHotkeyConflict = errors.New("hotkey already taken by another application")
 )
 
 // CapabilityError ties a failure to a capability so diagnostics can show it.

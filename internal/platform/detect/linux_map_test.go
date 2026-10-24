@@ -19,7 +19,16 @@ func portals(gs, sc, rd bool) map[string]portalProbe {
 }
 
 func TestMapLinux(t *testing.T) {
-	layer := []Global{{Name: 1, Interface: globLayerShell, Version: 4}}
+	layer := []Global{{Name: 1, Interface: globLayerShell, Version: 4}, {Name: 2, Interface: globScreencopy, Version: 3}}
+	shot := portals(false, true, false)
+	shot[portalScreenshot] = portalProbe{Present: true, Version: 2}
+	captureBackend := func(want string) func(t *testing.T, r contracts.CapabilityReport) {
+		return func(t *testing.T, r contracts.CapabilityReport) {
+			if got := r.State(contracts.CapScreenCapture).Backend; got != want {
+				t.Errorf("screen_capture backend = %q, want %q", got, want)
+			}
+		}
+	}
 	tests := []struct {
 		name  string
 		facts linuxFacts
@@ -48,7 +57,7 @@ func TestMapLinux(t *testing.T) {
 				Portals: portals(true, true, true), PipeWire: true, WaylandChecked: true, Globals: layer,
 				ATSPI: busName{Activatable: true}, SecretService: busName{Owned: true}},
 			want: map[contracts.Capability]contracts.Status{
-				contracts.CapGlobalHotkey: contracts.StatusAvailable, contracts.CapHotkeyRelease: contracts.StatusUnknown,
+				contracts.CapGlobalHotkey: contracts.StatusDegraded, contracts.CapHotkeyRelease: contracts.StatusUnavailable,
 				contracts.CapScreenCapture: contracts.StatusAvailable, contracts.CapOverlayClickThrough: contracts.StatusAvailable,
 				contracts.CapInputInjection: contracts.StatusAvailable, contracts.CapAccessibility: contracts.StatusAvailable,
 				contracts.CapSecretStore: contracts.StatusAvailable, contracts.CapMicrophone: contracts.StatusAvailable,
@@ -57,8 +66,43 @@ func TestMapLinux(t *testing.T) {
 				if r.Compositor != "niri" || r.Session != contracts.SessionWayland {
 					t.Errorf("compositor/session = %q/%v", r.Compositor, r.Session)
 				}
-				if r.Facts["portal.GlobalShortcuts.version"] != "1" || r.Facts["wayland.layer_shell"] != "true" {
+				if r.Facts["portal.GlobalShortcuts.version"] != "1" || r.Facts["wayland.layer_shell"] != "true" ||
+					r.Facts["wayland.screencopy"] != "true" {
 					t.Errorf("facts = %v", r.Facts)
+				}
+				captureBackend("wlr-screencopy")(t, r)
+				// The portal exists on niri but cannot bind (OC-6).
+				if gh := r.State(contracts.CapGlobalHotkey); gh.Backend != BackendIPC {
+					t.Errorf("global_hotkey = %+v", gh)
+				}
+				if hr := r.State(contracts.CapHotkeyRelease); hr.Fallback != contracts.FallbackToggleTalk {
+					t.Errorf("hotkey_release = %+v", hr)
+				}
+			},
+		},
+		{
+			name: "wayland kde portal hotkeys",
+			facts: linuxFacts{SessionType: "wayland", WaylandDisplay: "wayland-0", Desktop: "KDE",
+				Portals: portals(true, true, true), PipeWire: true, WaylandChecked: true, Globals: layer},
+			want: map[contracts.Capability]contracts.Status{
+				contracts.CapGlobalHotkey: contracts.StatusAvailable, contracts.CapHotkeyRelease: contracts.StatusUnknown,
+			},
+			extra: func(t *testing.T, r contracts.CapabilityReport) {
+				if gh := r.State(contracts.CapGlobalHotkey); gh.Backend != BackendPortal {
+					t.Errorf("global_hotkey = %+v", gh)
+				}
+			},
+		},
+		{
+			name: "sway without GlobalShortcuts",
+			facts: linuxFacts{SessionType: "wayland", WaylandDisplay: "wayland-1", Sway: true,
+				Portals: portals(false, true, false), PipeWire: true, WaylandChecked: true, Globals: layer},
+			want: map[contracts.Capability]contracts.Status{
+				contracts.CapGlobalHotkey: contracts.StatusDegraded, contracts.CapHotkeyRelease: contracts.StatusUnknown,
+			},
+			extra: func(t *testing.T, r contracts.CapabilityReport) {
+				if hr := r.State(contracts.CapHotkeyRelease); hr.Backend != BackendIPC || hr.Fallback != contracts.FallbackToggleTalk {
+					t.Errorf("hotkey_release = %+v", hr)
 				}
 			},
 		},
@@ -67,7 +111,7 @@ func TestMapLinux(t *testing.T) {
 			facts: linuxFacts{SessionType: "wayland", WaylandDisplay: "wayland-0", Desktop: "GNOME", Portals: portals(false, false, false),
 				WaylandChecked: true, Globals: []Global{{Interface: "wl_compositor", Version: 6}}},
 			want: map[contracts.Capability]contracts.Status{
-				contracts.CapGlobalHotkey: contracts.StatusUnavailable, contracts.CapHotkeyRelease: contracts.StatusUnavailable,
+				contracts.CapGlobalHotkey: contracts.StatusDegraded, contracts.CapHotkeyRelease: contracts.StatusUnknown,
 				contracts.CapScreenCapture: contracts.StatusUnavailable, contracts.CapOverlayClickThrough: contracts.StatusUnavailable,
 				contracts.CapInputInjection: contracts.StatusUnavailable, contracts.CapAccessibility: contracts.StatusUnavailable,
 				contracts.CapSecretStore: contracts.StatusUnavailable, contracts.CapOverlayFallbackPanel: contracts.StatusAvailable,
@@ -91,10 +135,23 @@ func TestMapLinux(t *testing.T) {
 			},
 		},
 		{
+			name: "wayland screenshot portal without screencopy",
+			facts: linuxFacts{SessionType: "wayland", WaylandDisplay: "wayland-0", Desktop: "GNOME", Portals: shot,
+				PipeWire: true, WaylandChecked: true, Globals: []Global{{Interface: "wl_compositor", Version: 6}}},
+			want:  map[contracts.Capability]contracts.Status{contracts.CapScreenCapture: contracts.StatusAvailable},
+			extra: captureBackend("xdg-portal:Screenshot"),
+		},
+		{
+			name: "wayland screencast only is not a backend yet",
+			facts: linuxFacts{SessionType: "wayland", WaylandDisplay: "wayland-0", Portals: portals(false, true, false),
+				PipeWire: true, WaylandChecked: true},
+			want: map[contracts.Capability]contracts.Status{contracts.CapScreenCapture: contracts.StatusUnavailable},
+		},
+		{
 			name:  "session from WAYLAND_DISPLAY when type unset; bus down",
 			facts: linuxFacts{WaylandDisplay: "wayland-0", PortalBusErr: "connect failed", Portals: map[string]portalProbe{}},
 			want: map[contracts.Capability]contracts.Status{
-				contracts.CapGlobalHotkey: contracts.StatusUnavailable, contracts.CapSecretStore: contracts.StatusUnknown,
+				contracts.CapGlobalHotkey: contracts.StatusDegraded, contracts.CapSecretStore: contracts.StatusUnknown,
 				contracts.CapAccessibility: contracts.StatusUnknown,
 			},
 			extra: func(t *testing.T, r contracts.CapabilityReport) {
