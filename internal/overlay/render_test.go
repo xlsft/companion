@@ -45,10 +45,10 @@ func TestRenderShapes(t *testing.T) {
 			name:   "cursor is the logo arrow, tip on the point",
 			shapes: []shape{{kind: KindPoint, pts: []contracts.Point{pt(100, 100)}, scale: 1}},
 			probes: []probe{
-				{102, 110, "accent"}, // left arm of the head
-				{110, 102, "accent"}, // top arm of the head
-				{99, 99, "dark"},     // outline around the tip
-				{120, 104, "clear"},  // between the head's arms and the shaft
+				{102, 108, "accent"}, // left arm of the head
+				{108, 102, "accent"}, // top arm of the head
+				{98, 98, "clear"},    // no outline around the tip
+				{116, 103, "clear"},  // between the head's arms and the shaft
 				{90, 90, "clear"},
 			},
 		},

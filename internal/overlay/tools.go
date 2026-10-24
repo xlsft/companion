@@ -57,7 +57,7 @@ const pointAtSchema = `{
   "properties": {
     "x": {"type": "number", "minimum": 0, "maximum": 1},
     "y": {"type": "number", "minimum": 0, "maximum": 1},
-    "radius": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.5, "description": "Ring radius as a fraction of screenshot width; default 0.03"},
+    "radius": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.5, "description": "Ring radius as a fraction of screenshot width; default 0.02"},
     "label": {"type": "string", "maxLength": 80, "description": "Short label shown next to the ring"}
   },
   "required": ["x", "y"],
@@ -95,7 +95,7 @@ const annotateSchema = `{
 }`
 
 const (
-	defaultRingRadius = 0.03
+	defaultRingRadius = 0.02
 	maxFreehandPoints = 64
 	maxShapes         = 12
 )

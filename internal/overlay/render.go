@@ -23,7 +23,6 @@ var (
 	defaultColor = color.NRGBA{R: 0xFF, G: 0x8A, B: 0x00, A: 0xFF}
 	labelBg      = color.NRGBA{R: 0x11, G: 0x11, B: 0x11, A: 0xEB}
 	labelFg      = color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
-	outlineColor = color.NRGBA{R: 0x1A, G: 0x1A, B: 0x1A, A: 0xFF}
 )
 
 const (
@@ -349,7 +348,7 @@ func arrow(p *painter, from, to contracts.Point, w float64) {
 }
 
 // cursorSize is the logical width and height of the virtual cursor.
-const cursorSize = 24.0
+const cursorSize = 18.0
 
 // cursorContours is the logo mark, Unbounded's "↖", flattened to polygons
 // in a unit square with the arrow's tip at the origin. Using the logo
@@ -427,8 +426,8 @@ var cursorContours = func() [][]contracts.Point {
 	return cs
 }()
 
-// cursor draws the logo arrow with its tip at at: a soft drop shadow, a
-// dark outline so it reads on light and dark content alike, then the fill.
+// cursor draws the logo arrow with its tip at at over a soft drop shadow
+// that keeps it readable on light content.
 // Each contour fills on its own because the glyph's shaft and head overlap
 // and opposite windings would cancel.
 func cursor(dst *image.RGBA, at contracts.Point, k float64, c color.NRGBA) {
@@ -450,12 +449,6 @@ func cursor(dst *image.RGBA, at contracts.Point, k float64, c color.NRGBA) {
 	}
 	p.color(color.NRGBA{A: 0x40})
 	draw(0, 2.5*k)
-	p.color(outlineColor)
-	const ring = 8
-	for i := range ring {
-		a := 2 * math.Pi * float64(i) / ring
-		draw(1.5*k*math.Cos(a), 1.5*k*math.Sin(a))
-	}
 	p.color(c)
 	draw(0, 0)
 }
