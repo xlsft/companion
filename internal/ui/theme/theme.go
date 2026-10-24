@@ -38,16 +38,62 @@ type Palette struct {
 	Fg, Fg2, Muted, Subtle color.NRGBA
 	// Accent fills primary buttons under AccentFg text; AccentLine is the
 	// brand violet for marks, progress and focus; AccentText is accent
-	// coloured text and icons; AccentSoft tints selected items.
-	Accent, AccentFg, AccentLine, AccentText, AccentSoft color.NRGBA
+	// coloured text and icons.
+	Accent, AccentFg, AccentLine, AccentText color.NRGBA
 	// AccentDisabled/FgDisabled draw a disabled primary button.
 	AccentDisabled, FgDisabled color.NRGBA
-	Selected, Scrim            color.NRGBA
-	OK, Warn, Error            color.NRGBA
-	OKSoft, WarnSoft, ErrSoft  color.NRGBA
+	// Scrim dims the window under a dialog; it is the only translucent
+	// token.
+	Scrim           color.NRGBA
+	OK, Warn, Error color.NRGBA
+
+	// The tints below are opaque: the prototypes' rgba() tints mixed into
+	// their background in sRGB, as a browser composites them. Gio blends
+	// translucent fills in linear light, which makes low-alpha tints come
+	// out much stronger, so nothing translucent is painted (see mix).
+
+	// AccentSoft marks the selected navigation entry, the current step and
+	// tags; AccentTint the chosen card; AccentStrong the user's message.
+	AccentSoft, AccentTint, AccentStrong color.NRGBA
+	// Selected is the text selection.
+	Selected color.NRGBA
+	// OKSoft, WarnSoft and ErrSoft are badge fills on a Surface.
+	OKSoft, WarnSoft, ErrSoft color.NRGBA
+	// WarnTint and ErrTint tint a whole row or block that needs the user.
+	WarnTint, ErrTint color.NRGBA
 }
 
-var Dark = Palette{
+// tints are the prototypes' rgba() bases and alphas for the opaque tint
+// tokens of a palette.
+type tints struct {
+	accentSoft, accentTint, accentStrong float32
+	ok, warn, err                        float32
+	warnRow, errRow                      float32
+}
+
+// withTints fills in p's tint tokens, mixed into the backgrounds they are
+// drawn on: accent tints into Bg, status tints into Surface.
+func withTints(p Palette, t tints) Palette {
+	p.AccentSoft = mix(p.Bg, p.AccentLine, t.accentSoft)
+	p.AccentTint = mix(p.Bg, p.AccentLine, t.accentTint)
+	p.AccentStrong = mix(p.Bg, p.AccentLine, t.accentStrong)
+	p.Selected = p.AccentSoft
+	p.OKSoft = mix(p.Surface, rgb(0x10b981), t.ok)
+	p.WarnSoft = mix(p.Surface, rgb(0xf97316), t.warn)
+	p.ErrSoft = mix(p.Surface, rgb(0xef4444), t.err)
+	p.WarnTint = mix(p.Surface, rgb(0xf97316), t.warnRow)
+	p.ErrTint = mix(p.Surface, rgb(0xef4444), t.errRow)
+	return p
+}
+
+// mix is src at alpha a over the opaque dst, composited in sRGB as CSS
+// does.
+func mix(dst, src color.NRGBA, a float32) color.NRGBA {
+	m := func(d, s uint8) uint8 { return uint8(float32(d)*(1-a) + float32(s)*a + 0.5) }
+	return color.NRGBA{R: m(dst.R, src.R), G: m(dst.G, src.G), B: m(dst.B, src.B), A: 0xff}
+}
+
+var Dark = withTints(Palette{
 	Bg:             hsl(240, 5, 9),
 	Sidebar:        hsl(240, 5, 9),
 	Surface:        hsl(240, 5, 11),
@@ -64,20 +110,15 @@ var Dark = Palette{
 	AccentFg:       rgb(0xffffff),
 	AccentLine:     rgb(0x8b5cf6),
 	AccentText:     rgb(0xa78bfa),
-	AccentSoft:     rgba(0x8b5cf6, 0.12),
 	AccentDisabled: hsl(258, 40, 30),
 	FgDisabled:     hsl(240, 10, 75),
-	Selected:       rgba(0x8b5cf6, 0.12),
 	Scrim:          color.NRGBA{A: 0xaa},
 	OK:             rgb(0x34d399),
 	Warn:           rgb(0xfb923c),
 	Error:          rgb(0xf87171),
-	OKSoft:         rgba(0x10b981, 0.12),
-	WarnSoft:       rgba(0xf97316, 0.14),
-	ErrSoft:        rgba(0xef4444, 0.14),
-}
+}, tints{accentSoft: 0.12, accentTint: 0.08, accentStrong: 0.18, ok: 0.12, warn: 0.14, err: 0.14, warnRow: 0.05, errRow: 0.06})
 
-var Light = Palette{
+var Light = withTints(Palette{
 	Bg:             hsl(240, 5, 98),
 	Sidebar:        hsl(240, 5, 98),
 	Surface:        rgb(0xffffff),
@@ -94,18 +135,13 @@ var Light = Palette{
 	AccentFg:       rgb(0xffffff),
 	AccentLine:     rgb(0x8b5cf6),
 	AccentText:     rgb(0x6d28d9),
-	AccentSoft:     rgba(0x8b5cf6, 0.10),
 	AccentDisabled: hsl(258, 60, 85),
 	FgDisabled:     hsl(258, 20, 45),
-	Selected:       rgba(0x8b5cf6, 0.10),
 	Scrim:          color.NRGBA{A: 0x88},
 	OK:             rgb(0x047857),
 	Warn:           rgb(0xc2410c),
 	Error:          rgb(0xb91c1c),
-	OKSoft:         rgba(0x10b981, 0.12),
-	WarnSoft:       rgba(0xf97316, 0.12),
-	ErrSoft:        rgba(0xef4444, 0.10),
-}
+}, tints{accentSoft: 0.10, accentTint: 0.06, accentStrong: 0.16, ok: 0.12, warn: 0.12, err: 0.10, warnRow: 0.05, errRow: 0.05})
 
 // Typefaces of the bundled fonts (see fonts/).
 const (
@@ -214,12 +250,6 @@ func (t *Theme) Dp(v float32) unit.Dp { return unit.Dp(v * t.Scale) }
 
 func rgb(c uint32) color.NRGBA {
 	return color.NRGBA{R: uint8(c >> 16), G: uint8(c >> 8), B: uint8(c), A: 0xff}
-}
-
-func rgba(c uint32, alpha float32) color.NRGBA {
-	col := rgb(c)
-	col.A = uint8(alpha*255 + 0.5)
-	return col
 }
 
 // hsl takes CSS hsl() arguments (degrees, percent, percent) so tokens read
