@@ -19,6 +19,15 @@ type OverlaySurface interface {
 	Close() error
 }
 
+// OverlayDamagePresenter is optionally implemented by surfaces that can
+// update part of the screen. damage bounds every pixel that differs from
+// the previously presented frame; outside it frame equals that frame. Used
+// for animation, where uploading a whole display per frame would not keep
+// up.
+type OverlayDamagePresenter interface {
+	PresentDamage(ctx context.Context, frame *image.RGBA, damage image.Rectangle) error
+}
+
 // OverlayHost creates overlay surfaces. Backends that cannot make a
 // click-through surface return ErrUnsupported and the caller uses the
 // fallback panel with an annotated capture (FR-OVERLAY-009).

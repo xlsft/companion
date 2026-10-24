@@ -49,6 +49,10 @@ type buffer struct {
 	shm  *wl.ShmFile
 	w, h int
 	busy bool
+	// stale bounds the pixels where this buffer differs from the latest
+	// frame; buffers rotate, so each one misses the frames shown while it
+	// was busy or idle.
+	stale image.Rectangle
 }
 
 func (h *Host) newSurface(o *output) (*Surface, error) {
@@ -168,13 +172,25 @@ func (s *Surface) LastFrameLatency() time.Duration {
 // Present copies frame into a shm buffer and commits it. It does not wait
 // for the frame callback; LastFrameLatency reports it afterwards.
 func (s *Surface) Present(ctx context.Context, frame *image.RGBA) error {
+	return s.present(ctx, frame, frame.Bounds())
+}
+
+// PresentDamage is Present for a frame that differs from the previous one
+// only inside damage: only that area (plus what the chosen buffer missed
+// earlier) is converted, and only damage is reported to the compositor.
+func (s *Surface) PresentDamage(ctx context.Context, frame *image.RGBA, damage image.Rectangle) error {
+	return s.present(ctx, frame, damage.Intersect(frame.Bounds()))
+}
+
+func (s *Surface) present(ctx context.Context, frame *image.RGBA, damage image.Rectangle) error {
 	if err := s.waitConfigured(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	fw, fh := frame.Bounds().Dx(), frame.Bounds().Dy()
+	fb := frame.Bounds()
+	fw, fh := fb.Dx(), fb.Dy()
 	if fw <= 0 || fh <= 0 {
 		return errors.New("overlay: empty frame")
 	}
@@ -187,7 +203,13 @@ func (s *Surface) Present(ctx context.Context, frame *image.RGBA) error {
 	if err != nil {
 		return err
 	}
-	pixconv.RGBAToBGRA(buf.shm.Data, fw*4, frame)
+	for _, b := range s.bufs {
+		b.stale = b.stale.Union(damage)
+	}
+	if !buf.stale.Empty() {
+		pixconv.RGBAToBGRARect(buf.shm.Data, fw*4, frame, buf.stale)
+	}
+	buf.stale = image.Rectangle{}
 	buf.busy = true
 
 	c := s.h.c
@@ -201,8 +223,9 @@ func (s *Surface) Present(ctx context.Context, frame *image.RGBA) error {
 		bs := int32(max(1, math.Round(float64(fw)/float64(s.lw))))
 		_ = c.Send(s.surf, 8, wl.NewMsg().Int(bs)) // set_buffer_scale
 	}
+	d := damage.Sub(fb.Min)
 	if s.h.compositorVer >= 4 {
-		_ = c.Send(s.surf, 9, wl.NewMsg().Int(0).Int(0).Int(int32(fw)).Int(int32(fh))) // damage_buffer
+		_ = c.Send(s.surf, 9, wl.NewMsg().Int(int32(d.Min.X)).Int(int32(d.Min.Y)).Int(int32(d.Dx())).Int(int32(d.Dy()))) // damage_buffer
 	} else {
 		_ = c.Send(s.surf, 2, wl.NewMsg().Int(0).Int(0).Int(math.MaxInt32).Int(math.MaxInt32))
 	}
@@ -262,7 +285,8 @@ func (s *Surface) newBuffer(w, h int) (*buffer, error) {
 		shm.Close()
 		return nil, err
 	}
-	b := &buffer{shm: shm, w: w, h: h}
+	// A new buffer holds nothing of the current frame yet.
+	b := &buffer{shm: shm, w: w, h: h, stale: image.Rect(0, 0, w, h)}
 	b.id = c.NewObject(func(op uint16, ev *wl.Event) {
 		if op == 0 { // release
 			s.mu.Lock()

@@ -24,6 +24,25 @@ func RGBAToBGRA(dst []byte, dstStride int, src *image.RGBA) {
 	}
 }
 
+// RGBAToBGRARect is RGBAToBGRA for the part r of src only; dst has the
+// layout of the whole frame, origin at src.Bounds().Min.
+func RGBAToBGRARect(dst []byte, dstStride int, src *image.RGBA, r image.Rectangle) {
+	b := src.Bounds()
+	r = r.Intersect(b)
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		so := src.PixOffset(r.Min.X, y)
+		s := src.Pix[so : so+r.Dx()*4]
+		do := (y-b.Min.Y)*dstStride + (r.Min.X-b.Min.X)*4
+		d := dst[do : do+r.Dx()*4]
+		for i := 0; i < len(s); i += 4 {
+			d[i+0] = s[i+2]
+			d[i+1] = s[i+1]
+			d[i+2] = s[i+0]
+			d[i+3] = s[i+3]
+		}
+	}
+}
+
 // BGRxToRGBA converts a 32-bit buffer to an opaque image.RGBA, as delivered
 // by PipeWire screen-cast streams. swapRB is true for B,G,R,x byte order
 // and false for R,G,B,x.
