@@ -145,9 +145,9 @@ func FromToolCall(cc CallContext, name string, args json.RawMessage) ([]Command,
 			cc.show(cc.CallID+"/ring", Command{Kind: KindRing, Points: []contracts.Point{p}, Radius: r, Style: Style{Emphasis: true}}),
 		)
 		if a.Label != "" {
-			// Anchor the label just past the ring's halo; the renderer keeps
+			// Anchor the label just past the ring's glow; the renderer keeps
 			// it on screen near the right edge.
-			lp := contracts.Point{X: min(p.X+r*1.5, 1), Y: p.Y}
+			lp := contracts.Point{X: min(p.X+r*1.3, 1), Y: p.Y}
 			cmds = append(cmds, cc.show(cc.CallID+"/label", Command{Kind: KindLabel, Points: []contracts.Point{lp}, Text: a.Label}))
 		}
 	case ToolAnnotate:

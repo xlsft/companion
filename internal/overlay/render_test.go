@@ -22,20 +22,19 @@ func TestRenderShapes(t *testing.T) {
 		probes []probe
 	}{
 		{
-			name:   "ring with glow outside only",
+			name:   "plain ring is a single stroke",
 			shapes: []shape{{kind: KindRing, pts: []contracts.Point{pt(200, 150)}, radius: 40, scale: 1}},
+			probes: []probe{{200, 150, "clear"}, {240, 150, "accent"}, {246, 150, "clear"}, {252, 150, "clear"}},
+		},
+		{
+			name:   "emphasised ring glows outwards only",
+			shapes: []shape{{kind: KindRing, pts: []contracts.Point{pt(200, 150)}, radius: 40, scale: 1, style: Style{Emphasis: true}}},
 			probes: []probe{
-				{200, 150, "clear"}, // centre
 				{240, 150, "accent"},
-				{247, 150, "faint"}, // glow just outside the stroke
+				{246, 150, "faint"}, // glow just outside the stroke
 				{233, 150, "clear"}, // no glow into the hole
 				{270, 150, "clear"}, // glow has faded
 			},
-		},
-		{
-			name:   "emphasis halo",
-			shapes: []shape{{kind: KindRing, pts: []contracts.Point{pt(200, 150)}, radius: 40, scale: 1, style: Style{Emphasis: true}}},
-			probes: []probe{{252, 150, "faint"}},
 		},
 		{
 			name:   "dashed circle has gaps",
@@ -43,9 +42,15 @@ func TestRenderShapes(t *testing.T) {
 			probes: []probe{{240, 151, "accent"}, {200, 150, "clear"}},
 		},
 		{
-			name:   "cursor tip, outline and fill",
+			name:   "cursor is the logo arrow, tip on the point",
 			shapes: []shape{{kind: KindPoint, pts: []contracts.Point{pt(100, 100)}, scale: 1}},
-			probes: []probe{{101, 104, "accent"}, {99, 110, "dark"}, {90, 90, "clear"}},
+			probes: []probe{
+				{102, 110, "accent"}, // left arm of the head
+				{110, 102, "accent"}, // top arm of the head
+				{99, 99, "dark"},     // outline around the tip
+				{120, 104, "clear"},  // between the head's arms and the shaft
+				{90, 90, "clear"},
+			},
 		},
 		{
 			name:   "label plate",

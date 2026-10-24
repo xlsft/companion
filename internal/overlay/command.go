@@ -38,7 +38,7 @@ const (
 type Style struct {
 	Color       string  // "#RRGGBB" or "#RRGGBBAA"
 	StrokeWidth float64 // logical pixels
-	Emphasis    bool    // ring: outer halo; rect: dim the rest of the screen
+	Emphasis    bool    // ring: soft glow; rect: dim the rest of the screen
 	Dashed      bool    // circle: dashed stroke, for secondary marks
 }
 

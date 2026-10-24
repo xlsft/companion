@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
+	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/image/vector"
 
@@ -32,7 +33,6 @@ const (
 	// glowAlpha its opacity next to the stroke.
 	glowSpread = 10.0
 	glowAlpha  = 0.45
-	haloAlpha  = 0.5
 	cornerR    = 6.0
 	dimAlpha   = 0.28 // scrim around an emphasised rect
 	dashLen    = 7.0
@@ -75,21 +75,14 @@ func drawShape(dst *image.RGBA, s shape) {
 		cursor(dst, s.pts[0], k, c)
 	case KindRing:
 		ctr := s.pts[0]
-		box := around(ctr, s.radius+w/2+glowSpread*k)
+		p := newPainter(dst, around(ctr, s.radius+w/2+glowSpread*k))
 		if s.style.Emphasis {
-			box = around(ctr, s.radius+3*w+glowSpread*k)
+			// Like CSS box-shadow, the glow spreads outwards only.
+			glow(p, c, glowSpread*k, func(extra float64) { annulus(p, ctr, s.radius+extra/2, w+extra) })
 		}
-		p := newPainter(dst, box)
-		// Like CSS box-shadow, the glow spreads outwards only.
-		glow(p, c, glowSpread*k, func(extra float64) { annulus(p, ctr, s.radius+extra/2, w+extra) })
 		p.color(c)
 		annulus(p, ctr, s.radius, w)
 		p.fill()
-		if s.style.Emphasis {
-			p.color(alpha(c, haloAlpha))
-			annulus(p, ctr, s.radius+3*w, w/2)
-			p.fill()
-		}
 	case KindCircle:
 		ctr := s.pts[0]
 		p := newPainter(dst, around(ctr, s.radius+w))
@@ -355,39 +348,116 @@ func arrow(p *painter, from, to contracts.Point, w float64) {
 	p.fill()
 }
 
-// cursorShape is the virtual pointer from the prototypes in its 22×26 box,
-// tip at (2,2). It is a filled arrow with a dark outline, visually distinct
-// from the system pointer (FR-OVERLAY-002).
-var cursorShape = []contracts.Point{
-	{X: 2, Y: 2}, {X: 2, Y: 22}, {X: 7.5, Y: 17}, {X: 11, Y: 24.5},
-	{X: 14.5, Y: 23}, {X: 11, Y: 15.5}, {X: 18.5, Y: 15.5},
-}
+// cursorSize is the logical width and height of the virtual cursor.
+const cursorSize = 24.0
 
-// cursor draws the pointer with its tip at at: a soft drop shadow, the
-// outline, then the fill.
-func cursor(dst *image.RGBA, at contracts.Point, k float64, c color.NRGBA) {
-	place := func(dx, dy, grow float64) []contracts.Point {
-		pts := make([]contracts.Point, len(cursorShape))
-		for i, q := range cursorShape {
-			pts[i] = contracts.Point{
-				X: at.X + ((q.X-2)*grow+dx)*k,
-				Y: at.Y + ((q.Y-2)*grow+dy)*k,
+// cursorContours is the logo mark, Unbounded's "↖", flattened to polygons
+// in a unit square with the arrow's tip at the origin. Using the logo
+// keeps the virtual cursor recognisably Companion's and visually distinct
+// from the system pointer (FR-OVERLAY-002).
+var cursorContours = func() [][]contracts.Point {
+	f, err := sfnt.Parse(fonts.Must(fonts.Display))
+	if err != nil {
+		panic(err) // embedded font; cannot fail at runtime
+	}
+	var buf sfnt.Buffer
+	gi, err := f.GlyphIndex(&buf, '↖')
+	if err != nil || gi == 0 {
+		panic("overlay: logo glyph missing from the display font")
+	}
+	segs, err := f.LoadGlyph(&buf, gi, fixed.I(1000), nil)
+	if err != nil {
+		panic(err)
+	}
+	var cs [][]contracts.Point
+	var cur []contracts.Point
+	last := contracts.Point{}
+	pt := func(p fixed.Point26_6) contracts.Point {
+		return contracts.Point{X: float64(p.X) / 64, Y: float64(p.Y) / 64}
+	}
+	// Curves are flattened; the glyph is straight lines, so this is exact.
+	for _, sg := range segs {
+		switch sg.Op {
+		case sfnt.SegmentOpMoveTo:
+			if len(cur) > 2 {
+				cs = append(cs, cur)
 			}
+			cur = []contracts.Point{pt(sg.Args[0])}
+			last = cur[0]
+		case sfnt.SegmentOpLineTo:
+			last = pt(sg.Args[0])
+			cur = append(cur, last)
+		case sfnt.SegmentOpQuadTo:
+			c, e := pt(sg.Args[0]), pt(sg.Args[1])
+			for i := 1; i <= 8; i++ {
+				t := float64(i) / 8
+				u := 1 - t
+				cur = append(cur, contracts.Point{X: u*u*last.X + 2*u*t*c.X + t*t*e.X, Y: u*u*last.Y + 2*u*t*c.Y + t*t*e.Y})
+			}
+			last = e
+		case sfnt.SegmentOpCubeTo:
+			c1, c2, e := pt(sg.Args[0]), pt(sg.Args[1]), pt(sg.Args[2])
+			for i := 1; i <= 8; i++ {
+				t := float64(i) / 8
+				u := 1 - t
+				cur = append(cur, contracts.Point{
+					X: u*u*u*last.X + 3*u*u*t*c1.X + 3*u*t*t*c2.X + t*t*t*e.X,
+					Y: u*u*u*last.Y + 3*u*u*t*c1.Y + 3*u*t*t*c2.Y + t*t*t*e.Y,
+				})
+			}
+			last = e
+		}
+	}
+	if len(cur) > 2 {
+		cs = append(cs, cur)
+	}
+	minX, minY, maxX, maxY := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
+	for _, c := range cs {
+		for _, q := range c {
+			minX, minY = min(minX, q.X), min(minY, q.Y)
+			maxX, maxY = max(maxX, q.X), max(maxY, q.Y)
+		}
+	}
+	size := max(maxX-minX, maxY-minY)
+	for _, c := range cs {
+		for i, q := range c {
+			c[i] = contracts.Point{X: (q.X - minX) / size, Y: (q.Y - minY) / size}
+		}
+	}
+	return cs
+}()
+
+// cursor draws the logo arrow with its tip at at: a soft drop shadow, a
+// dark outline so it reads on light and dark content alike, then the fill.
+// Each contour fills on its own because the glyph's shaft and head overlap
+// and opposite windings would cancel.
+func cursor(dst *image.RGBA, at contracts.Point, k float64, c color.NRGBA) {
+	size := cursorSize * k
+	place := func(cont []contracts.Point, dx, dy float64) []contracts.Point {
+		pts := make([]contracts.Point, len(cont))
+		for i, q := range cont {
+			pts[i] = contracts.Point{X: at.X + q.X*size + dx, Y: at.Y + q.Y*size + dy}
 		}
 		return pts
 	}
-	p := newPainter(dst, image.Rect(int(at.X-4*k), int(at.Y-4*k), int(at.X+24*k), int(at.Y+30*k)))
-	for _, sh := range []struct{ dy, grow, a float64 }{{3, 1.08, 0.18}, {2, 1.0, 0.25}} {
-		p.color(color.NRGBA{A: uint8(sh.a * 255)})
-		p.polygon(place(-0.5, sh.dy, sh.grow))
-		p.fill()
+	pad := 4 * k
+	p := newPainter(dst, image.Rect(int(at.X-pad), int(at.Y-pad), int(at.X+size+pad), int(at.Y+size+2*pad)))
+	draw := func(dx, dy float64) {
+		for _, cont := range cursorContours {
+			p.polygon(place(cont, dx, dy))
+			p.fill()
+		}
 	}
-	outline := place(0, 0, 1)
+	p.color(color.NRGBA{A: 0x40})
+	draw(0, 2.5*k)
 	p.color(outlineColor)
-	polyline(p, append(outline, outline[0]), 3*k)
+	const ring = 8
+	for i := range ring {
+		a := 2 * math.Pi * float64(i) / ring
+		draw(1.5*k*math.Cos(a), 1.5*k*math.Sin(a))
+	}
 	p.color(c)
-	p.polygon(outline)
-	p.fill()
+	draw(0, 0)
 }
 
 const (
