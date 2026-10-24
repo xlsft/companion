@@ -190,6 +190,13 @@ func (c *Client) route(m *protocol.Message) {
 				s.deliverPartial(Partial{Seq: p.Seq, Text: p.Text, Stable: p.Stable})
 			}
 		}
+	case protocol.MethodSessionEndpoint:
+		var p protocol.EndpointParams
+		if m.DecodeParams(&p) == nil {
+			if s := c.session(p.SessionID); s != nil {
+				s.deliverEndpoint(EndpointEvent{Reason: p.Reason, At: time.Duration(p.AtMS) * time.Millisecond})
+			}
+		}
 	case protocol.MethodSessionVAD:
 		var p protocol.VADParams
 		if m.DecodeParams(&p) == nil {
@@ -316,6 +323,31 @@ func WithLanguage(code string) SessionOption {
 	return func(p *protocol.SessionStartParams) { p.Language = code }
 }
 
+// VADOptions are the endpointing parameters of WithVAD; zero fields use the
+// sidecar defaults (end silence 800 ms, leading silence 5 s, min speech
+// 120 ms, margin 12 dB, max duration = the sidecar's utterance limit).
+type VADOptions struct {
+	EndSilence        time.Duration
+	MaxLeadingSilence time.Duration
+	MinSpeech         time.Duration
+	MarginDB          float64
+	MaxDuration       time.Duration
+}
+
+// WithVAD turns on endpointing (hands-free): the sidecar then sends one
+// event on Session.Endpoint() when capture should stop.
+func WithVAD(o VADOptions) SessionOption {
+	return func(p *protocol.SessionStartParams) {
+		p.VAD = &protocol.VADOptions{
+			EndSilenceMS:        int(o.EndSilence / time.Millisecond),
+			MaxLeadingSilenceMS: int(o.MaxLeadingSilence / time.Millisecond),
+			MinSpeechMS:         int(o.MinSpeech / time.Millisecond),
+			MarginDB:            o.MarginDB,
+			MaxDurationMS:       int(o.MaxDuration / time.Millisecond),
+		}
+	}
+}
+
 // StartSession opens a streaming session. Each call uses a fresh id so
 // events of an earlier, cancelled session can never leak into it.
 func (c *Client) StartSession(ctx context.Context, opts ...SessionOption) (*Session, error) {
@@ -333,6 +365,7 @@ func (c *Client) StartSession(ctx context.Context, opts ...SessionOption) (*Sess
 		id:        p.SessionID,
 		partials:  make(chan Partial, 8),
 		speech:    make(chan bool, 16),
+		endpoint:  make(chan EndpointEvent, 1),
 		cancelled: make(chan struct{}),
 	}
 	// Register before the request so a VAD event racing the response is

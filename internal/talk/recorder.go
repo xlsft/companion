@@ -9,12 +9,35 @@ import (
 	"github.com/xlsft/openclick/internal/audio"
 	"github.com/xlsft/openclick/internal/session"
 	"github.com/xlsft/openclick/internal/stt"
+	"github.com/xlsft/openclick/internal/stt/supervisor"
 	"github.com/xlsft/openclick/pkg/contracts"
 )
 
-// STT starts recognition sessions; *stt.Client and the supervisor satisfy it.
-type STT interface {
-	StartSession(ctx context.Context, opts ...stt.SessionOption) (*stt.Session, error)
+// STTSession is one recognition session; *stt.Session and the
+// supervisor's session satisfy it.
+type STTSession interface {
+	Write(pcm []int16) error
+	Finish(ctx context.Context) (stt.Final, error)
+	Cancel()
+	Partials() <-chan stt.Partial
+	Endpoint() <-chan stt.EndpointEvent
+}
+
+// STT starts recognition sessions.
+type STT func(ctx context.Context, opts ...stt.SessionOption) (STTSession, error)
+
+// ClientSTT adapts a directly owned sidecar client.
+func ClientSTT(c *stt.Client) STT {
+	return func(ctx context.Context, opts ...stt.SessionOption) (STTSession, error) {
+		return c.StartSession(ctx, opts...)
+	}
+}
+
+// SupervisedSTT adapts the STT supervisor, the normal wiring in the app.
+func SupervisedSTT(s *supervisor.Supervisor) STT {
+	return func(ctx context.Context, opts ...stt.SessionOption) (STTSession, error) {
+		return s.StartSession(ctx, opts...)
+	}
 }
 
 // MicRecorder streams the microphone into the local STT sidecar (OC-58).
@@ -35,7 +58,7 @@ type MicRecorder struct {
 type recording struct {
 	ref    contracts.SessionRef
 	stream audio.Stream
-	sess   *stt.Session
+	sess   STTSession
 	pumped chan error // result of the mic → STT pump
 	cancel context.CancelFunc
 }
@@ -49,11 +72,13 @@ func (r *MicRecorder) Start(ctx context.Context, ref contracts.SessionRef, emit 
 	if r.Device != nil {
 		device = r.Device()
 	}
-	opts := []stt.SessionOption{stt.WithPartials(true)}
+	// The sidecar's endpointer decides when hands-free speech has ended;
+	// the session manager ignores UtteranceEnd in other modes.
+	opts := []stt.SessionOption{stt.WithPartials(true), stt.WithVAD(stt.VADOptions{})}
 	if r.Language != "" {
 		opts = append(opts, stt.WithLanguage(r.Language))
 	}
-	sess, err := r.STT.StartSession(ctx, opts...)
+	sess, err := r.STT(ctx, opts...)
 	if err != nil {
 		return fmt.Errorf("start stt session: %w", err)
 	}
@@ -105,10 +130,9 @@ func (r *MicRecorder) Start(ctx context.Context, ref contracts.SessionRef, emit 
 
 // relay forwards partial transcripts and the end of speech for hands-free
 // mode. Partials are display-only and never trigger actions (FR-STT-008).
-func relay(ctx context.Context, sess *stt.Session, emit session.Emitter) {
-	heard := false
-	partials, speech := sess.Partials(), sess.Speech()
-	for partials != nil || speech != nil {
+func relay(ctx context.Context, sess STTSession, emit session.Emitter) {
+	partials, endpoint := sess.Partials(), sess.Endpoint()
+	for partials != nil || endpoint != nil {
 		select {
 		case <-ctx.Done():
 			return
@@ -118,16 +142,12 @@ func relay(ctx context.Context, sess *stt.Session, emit session.Emitter) {
 				continue
 			}
 			emit(session.TranscriptPartial{Text: p.Text})
-		case on, ok := <-speech:
+		case _, ok := <-endpoint:
 			if !ok {
-				speech = nil
+				endpoint = nil
 				continue
 			}
-			if on {
-				heard = true
-			} else if heard {
-				emit(session.UtteranceEnd{})
-			}
+			emit(session.UtteranceEnd{})
 		}
 	}
 }

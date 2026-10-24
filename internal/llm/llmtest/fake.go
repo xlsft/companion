@@ -96,6 +96,7 @@ type Server struct {
 
 	mu       sync.Mutex
 	resp     Response
+	seq      []Response
 	requests []Recorded
 }
 
@@ -112,6 +113,15 @@ func (s *Server) Respond(r Response) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.resp = r
+}
+
+// RespondSeq scripts consecutive replies: the first request gets rs[0], the
+// second rs[1], and so on; the last reply repeats. Multi-step flows (tool
+// call, then the answer) need this.
+func (s *Server) RespondSeq(rs ...Response) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.seq = append([]Response(nil), rs...)
 }
 
 // Requests returns the requests received so far.
@@ -143,6 +153,12 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.requests = append(s.requests, rec)
 	resp := s.resp
+	if len(s.seq) > 0 {
+		resp = s.seq[0]
+		if len(s.seq) > 1 {
+			s.seq = s.seq[1:]
+		}
+	}
 	s.mu.Unlock()
 
 	if r.Method != http.MethodPost || r.URL.Path != s.path() {

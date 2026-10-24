@@ -31,8 +31,10 @@ type Config struct {
 	PartialWindow time.Duration
 	// MaxUtterance caps buffered audio per session.
 	MaxUtterance time.Duration
-	// NewVAD creates one detector per session.
-	NewVAD func() vad.VAD
+	// VAD configures the per-session detector; zero fields take defaults.
+	VAD vad.Config
+	// VADDisabled treats all audio as speech and never endpoints on silence.
+	VADDisabled bool
 	// Log receives technical codes only.
 	Log *slog.Logger
 }
@@ -46,9 +48,6 @@ func (c *Config) defaults() {
 	}
 	if c.MaxUtterance <= 0 {
 		c.MaxUtterance = 5 * time.Minute
-	}
-	if c.NewVAD == nil {
-		c.NewVAD = func() vad.VAD { return vad.NewEnergy(vad.DefaultConfig()) }
 	}
 	if c.Log == nil {
 		c.Log = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -83,6 +82,7 @@ type session struct {
 	language string
 	partials bool
 	vad      vad.VAD
+	ep       *vad.Endpointer // nil unless the session asked for endpointing
 	ctx      context.Context
 	cancel   context.CancelFunc
 
@@ -327,6 +327,13 @@ func (s *Server) start(m *protocol.Message) {
 		s.respondErr(m.ID, protocol.ErrAudioFormat)
 		return
 	}
+	if o := p.VAD; o != nil && (o.EndSilenceMS < 0 || o.EndSilenceMS > 60000 ||
+		o.MaxLeadingSilenceMS < 0 || o.MaxLeadingSilenceMS > 600000 ||
+		o.MinSpeechMS < 0 || o.MinSpeechMS > 5000 ||
+		o.MarginDB < 0 || o.MarginDB > 60 || o.MaxDurationMS < 0) {
+		s.respondErr(m.ID, protocol.ErrInvalidParams.WithDetail("vad"))
+		return
+	}
 	s.mu.Lock()
 	if !s.initialized {
 		s.mu.Unlock()
@@ -343,14 +350,16 @@ func (s *Server) start(m *protocol.Message) {
 		lang = s.language
 	}
 	ctx, cancel := context.WithCancel(s.ctx)
-	s.sessions[p.SessionID] = &session{
-		id:       p.SessionID,
-		language: lang,
-		partials: p.Partials,
-		vad:      s.cfg.NewVAD(),
-		ctx:      ctx,
-		cancel:   cancel,
+	sess := &session{id: p.SessionID, language: lang, partials: p.Partials, ctx: ctx, cancel: cancel}
+	switch {
+	case p.VAD != nil:
+		sess.ep = s.newEndpointer(*p.VAD)
+	case s.cfg.VADDisabled:
+		sess.vad = &vad.Always{}
+	default:
+		sess.vad = vad.NewEnergy(s.cfg.VAD)
 	}
+	s.sessions[p.SessionID] = sess
 	s.mu.Unlock()
 	s.respond(m.ID, struct{}{})
 }
@@ -393,12 +402,18 @@ func (s *Server) audio(m *protocol.Message) {
 	sess.pcm = append(sess.pcm, pcm...)
 	sess.sinceDecode += len(pcm)
 
-	for _, ev := range sess.vad.Process(pcm) {
+	events, ep := sess.process(pcm)
+	for _, ev := range events {
 		if ev.Speech {
 			sess.sawSpeech = true
 		}
 		s.notify(protocol.MethodSessionVAD, protocol.VADParams{
 			SessionID: sess.id, Speech: ev.Speech, AtMS: ev.At.Milliseconds(),
+		})
+	}
+	if ep != nil {
+		s.notify(protocol.MethodSessionEndpoint, protocol.EndpointParams{
+			SessionID: sess.id, Reason: string(ep.Reason), AtMS: ep.At.Milliseconds(),
 		})
 	}
 
@@ -407,6 +422,37 @@ func (s *Server) audio(m *protocol.Message) {
 	if sess.partials && sess.sawSpeech && sess.partialDone == nil && sess.sinceDecode >= samples(s.cfg.PartialInterval) {
 		s.startPartial(sess)
 	}
+}
+
+// process feeds the detector; only endpointing sessions can produce an
+// endpoint.
+func (sess *session) process(pcm []int16) ([]vad.Event, *vad.Endpoint) {
+	if sess.ep != nil {
+		return sess.ep.Process(pcm)
+	}
+	return sess.vad.Process(pcm), nil
+}
+
+// newEndpointer builds the session endpointer from client options on top of
+// the sidecar's VAD configuration. With VAD disabled only the max-duration
+// check can fire, since "speech" starts with the first sample.
+func (s *Server) newEndpointer(o protocol.VADOptions) *vad.Endpointer {
+	ec := vad.EndpointConfig{
+		EndSilence:        time.Duration(o.EndSilenceMS) * time.Millisecond,
+		MaxLeadingSilence: time.Duration(o.MaxLeadingSilenceMS) * time.Millisecond,
+		MinSpeech:         time.Duration(o.MinSpeechMS) * time.Millisecond,
+		MarginDB:          o.MarginDB,
+		MaxDuration:       time.Duration(o.MaxDurationMS) * time.Millisecond,
+	}
+	// Audio past MaxUtterance is dropped, so the limit is also the latest
+	// possible max_duration endpoint.
+	if ec.MaxDuration <= 0 || ec.MaxDuration > s.cfg.MaxUtterance {
+		ec.MaxDuration = s.cfg.MaxUtterance
+	}
+	if s.cfg.VADDisabled {
+		return vad.NewEndpointerWith(&vad.Always{}, protocol.SampleRate, ec)
+	}
+	return vad.NewEndpointer(s.cfg.VAD, ec)
 }
 
 // startPartial must be called with s.mu held.

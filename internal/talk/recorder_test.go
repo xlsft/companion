@@ -43,7 +43,7 @@ func inProcessSTT(t *testing.T) *stt.Client {
 
 func TestMicRecorderTranscribes(t *testing.T) {
 	src := &audio.FakeSource{Signal: audio.SignalSine, Amplitude: 0.5, Realtime: true}
-	rec := &MicRecorder{Mic: audio.NewCapturer(src), STT: inProcessSTT(t)}
+	rec := &MicRecorder{Mic: audio.NewCapturer(src), STT: ClientSTT(inProcessSTT(t))}
 	var mu sync.Mutex
 	var partials int
 	emit := func(ev session.Event) {
@@ -76,7 +76,7 @@ func TestMicRecorderTranscribes(t *testing.T) {
 
 func TestMicRecorderCancelReleasesMic(t *testing.T) {
 	src := &audio.FakeSource{Signal: audio.SignalSilence, Realtime: true}
-	rec := &MicRecorder{Mic: audio.NewCapturer(src), STT: inProcessSTT(t)}
+	rec := &MicRecorder{Mic: audio.NewCapturer(src), STT: ClientSTT(inProcessSTT(t))}
 	ctx, cancel := context.WithCancel(context.Background())
 	if err := rec.Start(ctx, contracts.SessionRef{ID: "x", Generation: 9}, func(session.Event) {}); err != nil {
 		t.Fatal(err)

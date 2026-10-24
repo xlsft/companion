@@ -74,3 +74,13 @@ SQLite (pure Go driver `modernc.org/sqlite`, no cgo) for metadata, files in the 
 - Each platform spike (OC-3…OC-6) validates its row of the table above before mass implementation; a failed spike changes this ADR, not the domain code.
 - A whisper.cpp crash costs one request, not the app.
 - Overlay drawing code is shared Go; only window creation and buffer presentation are per platform.
+
+## Amendment 1 (2026-10-24, OC-12): Gio UI needs cgo
+
+Gio's Linux (Wayland/X11/EGL) and macOS backends are cgo, so rule 6 cannot hold for the UI. Amended rule 6: cgo is allowed in `internal/platform/*`, `cmd/stt-sidecar`, the build-tagged `internal/stt/engine/whisper`, `internal/ui/...` (Gio) and therefore `cmd/companion`, which links the UI. Everything else stays pure Go.
+
+- `make cross` builds every package except `./cmd/companion` and `./internal/ui/...` with `CGO_ENABLED=0` for windows/darwin/linux; `make build` builds the whole tree natively with cgo. Release binaries of the core are built per OS on that OS (or with a cross C toolchain).
+- Business logic stays out of `internal/ui`, so it remains covered by the pure-Go cross build; the UI reads and writes through domain services such as `internal/settings.Service`.
+- The tray (`internal/platform/tray`, `fyne.io/systray`) is pure Go on Linux and Windows and cgo on macOS; a `CGO_ENABLED=0` darwin build gets a stub that returns `Unsupported(CapTray)`.
+- Gio's event loop must own the main goroutine (`app.Main()`); `cmd/companion` runs the `internal/app` lifecycle in a goroutine and exits the process when it returns.
+- Gio is built with `-tags novulkan` (set via `GOFLAGS` in the Makefile): its Vulkan backend needs vulkan-headers at build time, while the GL/EGL backend (Linux), Metal (macOS) and D3D11 (Windows) cover every target. Bare `go build/test` outside make needs the same tag unless vulkan-headers are installed.
