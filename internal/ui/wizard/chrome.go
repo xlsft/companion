@@ -379,11 +379,10 @@ func (w *Wizard) content(gtx layout.Context, th *theme.Theme, l i18n.Lang, s sna
 }
 
 // resultRows shows a failed check: the subsystem, the technical status and
-// how to fix it (FR-ONB-007). Success and progress are in the footer.
+// how to fix it (FR-ONB-007). Success and progress are in the footer. The
+// last failure stays up while the check runs again: a failing check is
+// repeated every few seconds, and hiding it for each run made it blink.
 func (w *Wizard) resultRows(th *theme.Theme, l i18n.Lang, s snapshot, st readiness.Step) []layout.Widget {
-	if s.running {
-		return nil
-	}
 	var rows []layout.Widget
 	if s.runErr != "" {
 		rows = append(rows, w.failure(th, l, st, s.runErr))

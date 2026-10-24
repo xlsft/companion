@@ -482,3 +482,27 @@ func TestPermissionsRetryWhileFailing(t *testing.T) {
 		t.Errorf("permissions ran %d times, want 2", c)
 	}
 }
+
+// A failing check is repeated every few seconds; its card must stay up
+// while the next run is in flight instead of blinking.
+func TestFailureStaysWhileRechecking(t *testing.T) {
+	for _, running := range []bool{false, true} {
+		h := newHarness(t)
+		h.eventually("permissions step", func() bool { return h.view() == readiness.StepPermissions })
+		h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Failed, Code: "denied"})
+		if _, err := h.gate.Run(t.Context(), readiness.StepPermissions); err != nil {
+			t.Fatal(err)
+		}
+		h.eventually("failure", func() bool { return h.shows(i18n.T(i18n.EN, "wiz.result.failed")) })
+		h.w.mu.Lock()
+		h.w.running = running
+		h.w.mu.Unlock()
+		h.frame()
+		if !h.shows(i18n.T(i18n.EN, "wiz.result.failed")) {
+			t.Errorf("running=%v: failure card hidden", running)
+		}
+		h.w.mu.Lock()
+		h.w.running = false
+		h.w.mu.Unlock()
+	}
+}
