@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/xlsft/companion/internal/audio"
@@ -31,6 +32,7 @@ import (
 	"github.com/xlsft/companion/internal/secrets"
 	"github.com/xlsft/companion/internal/session"
 	"github.com/xlsft/companion/internal/settings"
+	"github.com/xlsft/companion/internal/setupcheck"
 	"github.com/xlsft/companion/internal/store"
 	"github.com/xlsft/companion/internal/stt"
 	"github.com/xlsft/companion/internal/stt/protocol"
@@ -83,11 +85,17 @@ type core struct {
 
 	hotkeys    *hotkeys.Service
 	hotkeysErr error
+	// ctlSeen: a command arrived through the control socket, so the
+	// compositor binding the setup asks for exists (StepPermissions).
+	ctlSeen atomic.Bool
+
+	sttCheck *setupcheck.STT // keeps the last setup transcript in memory
 
 	talk *session.Manager
 	orch *talk.Orchestrator
 	chat *chat.Service
 
+	runCtx context.Context // lives from Start to Stop
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 }
@@ -178,6 +186,7 @@ func (c *core) Name() string { return "core" }
 // reaches the session once setup is Ready (FR-ONB-002).
 func (c *core) Start(ctx context.Context) error {
 	ctx, c.cancel = context.WithCancel(ctx)
+	c.runCtx = ctx
 	if _, err := c.activator.Active(); err == nil {
 		c.stt.Start(ctx)
 	}
@@ -270,6 +279,9 @@ func (c *core) startHotkeys(ctx context.Context) {
 	go func() {
 		defer c.wg.Done()
 		for ev := range hk.Events() {
+			if hk.Backend() == hotkeys.BackendIPC {
+				c.ctlSeen.Store(true)
+			}
 			if c.gate != nil && !c.gate.IsReady() {
 				continue // setup is not finished: Talk does not exist yet
 			}
@@ -299,10 +311,12 @@ func (c *core) launchSTT(ctx context.Context) (*stt.Client, error) {
 	})
 }
 
-// restartSTT relaunches recognition after a model change.
-func (c *core) restartSTT(ctx context.Context) {
+// restartSTT relaunches recognition after a model change or from
+// Degraded. The supervisor lives as long as the core, never as long as
+// the request that triggered the restart.
+func (c *core) restartSTT() {
 	if c.stt.State().Kind == supervisor.Stopped {
-		c.stt.Start(ctx)
+		c.stt.Start(c.runCtx)
 		return
 	}
 	c.stt.Reset()
@@ -410,6 +424,9 @@ func (s *speakerSwitch) get() *talk.TTSSpeaker {
 	defer s.mu.Unlock()
 	return s.cur
 }
+
+// configured reports whether speech output has a provider and key.
+func (s *speakerSwitch) configured() bool { return s.get() != nil }
 
 func (s *speakerSwitch) label() string {
 	s.mu.Lock()
