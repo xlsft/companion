@@ -114,10 +114,14 @@ func (v *vkbd) connectLocked(ctx context.Context) error {
 		c.Send(reg, opBind, wl.NewMsg().Uint(mgrG.name).String("zwp_virtual_keyboard_manager_v1").Uint(1).NewID(mgr)),
 		c.Send(mgr, opCreateVKbd, wl.NewMsg().Object(seat).NewID(kb)),
 	}
-	if err := errors.Join(errs...); err == nil {
+	err = errors.Join(errs...)
+	if err == nil {
 		err = c.Roundtrip(ctx)
 	}
-	if err := c.Err(); err != nil {
+	if err == nil {
+		err = c.Err()
+	}
+	if err != nil && ctx.Err() == nil {
 		c.Close()
 		// The manager's only error is "unauthorized": the compositor
 		// restricts virtual keyboards (e.g. to sandboxed clients' peers).
