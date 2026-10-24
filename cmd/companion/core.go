@@ -235,6 +235,11 @@ func (c *core) Start(ctx context.Context) error {
 		defer c.wg.Done()
 		c.ctl.Run(ctx)
 	}()
+	// The chat follows the session from here on; without this it showed
+	// no requests or replies in the real app.
+	if err := c.chat.Start(ctx); err != nil {
+		return fmt.Errorf("chat: %w", err)
+	}
 	ch, unsub := c.settings.Subscribe()
 	c.wg.Add(1)
 	go func() {
