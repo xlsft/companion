@@ -1,4 +1,4 @@
-# Builds the static, Latin+Cyrillic subset faces embedded by package theme
+# Builds the static, Latin+Cyrillic subset faces embedded by this package
 # from the upstream variable fonts (all SIL OFL 1.1, see OFL.txt). Gio
 # renders only the default instance of a variable font, hence the static cuts.
 #

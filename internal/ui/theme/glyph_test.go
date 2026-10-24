@@ -6,6 +6,8 @@ import (
 	"gioui.org/font"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/sfnt"
+
+	"github.com/xlsft/companion/internal/assets/fonts"
 )
 
 // Status symbols are the non-colour cue, so a missing glyph (tofu) would
@@ -26,18 +28,14 @@ func TestBundledFacesCoverUIText(t *testing.T) {
 	tests := []struct {
 		file, chars string
 	}{
-		{"fonts/GoogleSans-Regular.ttf", text},
-		{"fonts/GoogleSans-Medium.ttf", text},
-		{"fonts/GoogleSans-SemiBold.ttf", text},
-		{"fonts/Unbounded-SemiBold.ttf", text + "↖"},
-		{"fonts/GoogleSansCode-Regular.ttf", `binds { spawn "companion" } 0O1lI`},
+		{fonts.SansRegular, text},
+		{fonts.SansMedium, text},
+		{fonts.SansSemiBold, text},
+		{fonts.Display, text + "↖"},
+		{fonts.MonoRegular, `binds { spawn "companion" } 0O1lI`},
 	}
 	for _, tt := range tests {
-		b, err := fontFS.ReadFile(tt.file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		missing(t, tt.file, b, tt.chars)
+		missing(t, tt.file, fonts.Must(tt.file), tt.chars)
 	}
 }
 

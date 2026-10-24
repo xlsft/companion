@@ -1,16 +1,14 @@
 package theme
 
 import (
-	"embed"
 	"sync"
 
 	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/font/opentype"
-)
 
-//go:embed fonts/*.ttf
-var fontFS embed.FS
+	"github.com/xlsft/companion/internal/assets/fonts"
+)
 
 var (
 	collOnce sync.Once
@@ -23,16 +21,12 @@ var (
 // Parsed once; faces are read-only and safe to share between shapers.
 func Collection() []font.FontFace {
 	collOnce.Do(func() {
-		entries, err := fontFS.ReadDir("fonts")
+		entries, err := fonts.FS.ReadDir(".")
 		if err != nil {
 			panic(err)
 		}
 		for _, e := range entries {
-			b, err := fontFS.ReadFile("fonts/" + e.Name())
-			if err != nil {
-				panic(err)
-			}
-			faces, err := opentype.ParseCollection(b)
+			faces, err := opentype.ParseCollection(fonts.Must(e.Name()))
 			if err != nil {
 				panic("theme: bad embedded font " + e.Name() + ": " + err.Error())
 			}
