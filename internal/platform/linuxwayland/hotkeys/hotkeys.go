@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -37,7 +38,7 @@ type bus interface {
 	Version(iface string) uint32
 	CreateSession(ctx context.Context, iface string, extra map[string]dbus.Variant) (dbus.ObjectPath, error)
 	Request(ctx context.Context, method string, options map[string]dbus.Variant, args ...any) (map[string]dbus.Variant, error)
-	Subscribe(path dbus.ObjectPath, iface, member string) (<-chan *dbus.Signal, func(), error)
+	SubscribeMembers(path dbus.ObjectPath, iface string, members ...string) (<-chan *dbus.Signal, func(), error)
 	CloseSession(session dbus.ObjectPath) error
 	Close() error
 }
@@ -89,17 +90,14 @@ func newService(b bus) (*Service, error) {
 		stop:   make(chan struct{}),
 		done:   make(chan struct{}),
 	}
-	var chans [3]<-chan *dbus.Signal
-	for i, member := range []string{"Activated", "Deactivated", "ShortcutsChanged"} {
-		ch, cancel, err := b.Subscribe(desktopPath, portal.IfGlobalShortcuts, member)
-		if err != nil {
-			s.unsubscribe()
-			return nil, fmt.Errorf("global shortcuts: subscribe %s: %w", member, err)
-		}
-		chans[i] = ch
-		s.cancels = append(s.cancels, cancel)
+	// One channel for all members keeps Activated/Deactivated in bus order;
+	// with separate channels select could see a key-up before its key-down.
+	sigs, cancel, err := b.SubscribeMembers(desktopPath, portal.IfGlobalShortcuts, "Activated", "Deactivated", "ShortcutsChanged")
+	if err != nil {
+		return nil, fmt.Errorf("global shortcuts: subscribe: %w", err)
 	}
-	go s.loop(chans[0], chans[1], chans[2])
+	s.cancels = append(s.cancels, cancel)
+	go s.loop(sigs)
 	return s, nil
 }
 
@@ -110,21 +108,25 @@ func (s *Service) unsubscribe() {
 	s.cancels = nil
 }
 
-func (s *Service) loop(act, deact, changed <-chan *dbus.Signal) {
+func (s *Service) loop(sigs <-chan *dbus.Signal) {
 	defer close(s.done)
 	defer close(s.events)
 	for {
+		var sig *dbus.Signal
 		select {
 		case <-s.stop:
 			return
-		case sig := <-act:
+		case sig = <-sigs:
+		}
+		switch sig.Name[strings.LastIndex(sig.Name, ".")+1:] {
+		case "Activated":
 			if id, ok := s.ours(sig); ok {
 				s.mu.Lock()
 				s.active[id] = true
 				s.mu.Unlock()
 				s.emit(contracts.HotkeyEvent{ID: contracts.HotkeyID(id), Kind: contracts.HotkeyPressed})
 			}
-		case sig := <-deact:
+		case "Deactivated":
 			if id, ok := s.ours(sig); ok {
 				s.mu.Lock()
 				wasActive := s.active[id]
@@ -135,7 +137,7 @@ func (s *Service) loop(act, deact, changed <-chan *dbus.Signal) {
 					s.emit(contracts.HotkeyEvent{ID: contracts.HotkeyID(id), Kind: contracts.HotkeyReleased})
 				}
 			}
-		case sig := <-changed:
+		case "ShortcutsChanged":
 			sess, infos, ok := shortcutsChanged(sig.Body)
 			s.mu.Lock()
 			if ok && sess == s.session && sess != "" {

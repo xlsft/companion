@@ -25,14 +25,14 @@ type fakeBus struct {
 	listRes map[string]dbus.Variant
 
 	mu      sync.Mutex
-	subs    map[string]chan *dbus.Signal
+	sigs    chan *dbus.Signal
 	calls   []string
 	closed  []dbus.ObjectPath
 	nextSes int
 }
 
 func newFakeBus() *fakeBus {
-	return &fakeBus{version: 2, subs: map[string]chan *dbus.Signal{}}
+	return &fakeBus{version: 2}
 }
 
 func (f *fakeBus) Version(string) uint32 { return f.version }
@@ -61,12 +61,11 @@ func (f *fakeBus) Request(_ context.Context, method string, _ map[string]dbus.Va
 	return nil, errors.New("unexpected method " + method)
 }
 
-func (f *fakeBus) Subscribe(_ dbus.ObjectPath, _, member string) (<-chan *dbus.Signal, func(), error) {
+func (f *fakeBus) SubscribeMembers(dbus.ObjectPath, string, ...string) (<-chan *dbus.Signal, func(), error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	ch := make(chan *dbus.Signal, 8)
-	f.subs[member] = ch
-	return ch, func() {}, nil
+	f.sigs = make(chan *dbus.Signal, 16)
+	return f.sigs, func() {}, nil
 }
 
 func (f *fakeBus) CloseSession(s dbus.ObjectPath) error {
@@ -80,7 +79,7 @@ func (f *fakeBus) Close() error { return nil }
 
 func (f *fakeBus) fire(member string, body ...any) {
 	f.mu.Lock()
-	ch := f.subs[member]
+	ch := f.sigs
 	f.mu.Unlock()
 	ch <- &dbus.Signal{Name: portal.IfGlobalShortcuts + "." + member, Body: body}
 }

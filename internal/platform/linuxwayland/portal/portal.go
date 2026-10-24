@@ -88,6 +88,50 @@ func (c *Conn) dispatch() {
 	}
 }
 
+// SubscribeMembers delivers signals of several members of iface on one
+// channel, in the order the bus delivered them. Separate Subscribe channels
+// lose the relative order of different members, which matters for pairs
+// like Activated/Deactivated.
+func (c *Conn) SubscribeMembers(path dbus.ObjectPath, iface string, members ...string) (<-chan *dbus.Signal, func(), error) {
+	ch := make(chan *dbus.Signal, 32)
+	var matches [][]dbus.MatchOption
+	cancel := func() {
+		for _, opts := range matches {
+			_ = c.bus.RemoveMatchSignal(opts...)
+		}
+		c.mu.Lock()
+		for _, m := range members {
+			key := string(path) + "\x00" + m
+			ws := c.waiters[key]
+			for i, w := range ws {
+				if w == ch {
+					c.waiters[key] = append(ws[:i], ws[i+1:]...)
+					break
+				}
+			}
+		}
+		c.mu.Unlock()
+	}
+	for _, m := range members {
+		opts := []dbus.MatchOption{dbus.WithMatchInterface(iface), dbus.WithMatchMember(m)}
+		if path != "" {
+			opts = append(opts, dbus.WithMatchObjectPath(path))
+		}
+		if err := c.bus.AddMatchSignal(opts...); err != nil {
+			cancel()
+			return nil, nil, err
+		}
+		matches = append(matches, opts)
+	}
+	c.mu.Lock()
+	for _, m := range members {
+		key := string(path) + "\x00" + m
+		c.waiters[key] = append(c.waiters[key], ch)
+	}
+	c.mu.Unlock()
+	return ch, cancel, nil
+}
+
 // Subscribe delivers signals named iface.member on path ("" = any path)
 // until cancel is called.
 func (c *Conn) Subscribe(path dbus.ObjectPath, iface, member string) (<-chan *dbus.Signal, func(), error) {
