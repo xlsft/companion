@@ -7,7 +7,7 @@ LDFLAGS := -X github.com/xlsft/companion/internal/buildinfo.Version=$(VERSION) \
 # covers every target, so build without it (ADR-0001 amendment 1).
 export GOFLAGS := $(strip $(GOFLAGS) -tags=novulkan)
 
-.PHONY: build test vet cross whisper build-whisper test-whisper whisper-clean dist-linux
+.PHONY: build test vet cross whisper build-whisper test-whisper whisper-clean build-sherpa test-sherpa build-stt dist-linux
 
 # Native build with cgo: covers the Gio UI and cmd/companion, which the
 # CGO_ENABLED=0 cross build below skips.
@@ -104,6 +104,36 @@ test-whisper:
 
 whisper-clean:
 	rm -rf $(WHISPER_BUILD) $(WHISPER_PREFIX)
+
+# --- sherpa-onnx (OC-29) -------------------------------------------------------
+# The primary engine: github.com/k2-fsa/sherpa-onnx-go ships prebuilt
+# libsherpa-onnx-c-api and libonnxruntime per platform inside the Go module,
+# see docs/stt-protocol.md#sherpa-onnx-build. The sidecar links them
+# dynamically with an $ORIGIN runpath, so they are copied next to it.
+
+sherpa_triple = $(shell uname -m | sed 's/^arm64$$/aarch64/')-unknown-linux-gnu
+SHERPA_LIB    = $(shell go list -m -f '{{.Dir}}' github.com/k2-fsa/sherpa-onnx-go-linux)/lib/$(sherpa_triple)
+SHERPA_LIBS   = libsherpa-onnx-c-api.so libonnxruntime.so
+# \$$ORIGIN reaches the linker literally through make and sh.
+SHERPA_RPATH  = -Wl,-rpath,\$$ORIGIN
+
+build-sherpa:
+	CGO_ENABLED=1 CGO_LDFLAGS="$(SHERPA_RPATH)" go build -tags sherpa -ldflags "$(LDFLAGS)" -o bin/ ./cmd/stt-sidecar
+	cd "$(SHERPA_LIB)" && install -m 644 $(SHERPA_LIBS) "$(CURDIR)/bin/"
+
+# Model-dependent tests skip unless OPENCLICK_SHERPA_MODEL points at a model
+# directory (e.g. one unpacked from a sherpa-onnx asr-models archive).
+test-sherpa:
+	CGO_ENABLED=1 go test -tags sherpa -v ./internal/stt/engine/sherpa/ ./internal/stt/server/
+
+# The release sidecar: sherpa-onnx primary, whisper.cpp as the fallback for
+# languages no sherpa model covers; -engine auto picks per model.
+build-stt:
+	@test -f $(WHISPER_PREFIX)/lib/libwhisper.a || { echo "run 'make whisper' first" >&2; exit 1; }
+	CGO_ENABLED=1 CGO_LDFLAGS="$$(x=$$(cat $(WHISPER_PREFIX)/cgo_ldflags 2>/dev/null); \
+		if [ -n "$$x" ]; then echo "-L$(CURDIR)/$(WHISPER_PREFIX)/lib -Wl,--start-group -lwhisper -lggml -lggml-base -lggml-cpu $$x -Wl,--end-group"; fi) $(SHERPA_RPATH)" \
+		go build -tags "whisper sherpa" -ldflags "$(LDFLAGS)" -o bin/ ./cmd/stt-sidecar
+	cd "$(SHERPA_LIB)" && install -m 644 $(SHERPA_LIBS) "$(CURDIR)/bin/"
 
 # --- Linux packaging (OC-75) ---------------------------------------------------
 # dist/companion-VERSION-linux-ARCH.tar.gz and an AppImage. The sidecar must be

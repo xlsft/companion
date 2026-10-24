@@ -50,6 +50,9 @@ type Config struct {
 
 // Info describes the runtime an engine actually started with.
 type Info struct {
+	// Engine names the engine that loaded the model when a dispatcher
+	// (the sidecar's "auto") chose it; empty means the registered name.
+	Engine         string
 	RuntimeVersion string
 	BackendInUse   string
 	// FallbackReason is non-empty when Backend "auto" fell back to CPU.
@@ -65,6 +68,29 @@ var (
 )
 
 type Factory func(Config) (Engine, Info, error)
+
+// Streamer is implemented by engines whose model decodes incrementally
+// (streaming transducers). The sidecar then feeds every chunk to a Stream
+// and reports its hypothesis as the partial, instead of re-decoding a
+// trailing window. NewStream returns ErrNotStreaming when the loaded model
+// is offline, so one engine can serve both kinds.
+type Streamer interface {
+	NewStream(opts Options) (Stream, error)
+}
+
+// Stream is one utterance of a streaming model. It is used from a single
+// goroutine.
+type Stream interface {
+	// Accept appends audio, decodes what is ready and returns the current
+	// hypothesis (the whole utterance so far, not a delta).
+	Accept(ctx context.Context, pcm []float32) (string, error)
+	// Finish flushes the decoder and returns the final result.
+	Finish(ctx context.Context) (Result, error)
+	Close() error
+}
+
+// ErrNotStreaming is returned by Streamer.NewStream for an offline model.
+var ErrNotStreaming = errors.New("model is not streaming")
 
 var (
 	mu        sync.RWMutex

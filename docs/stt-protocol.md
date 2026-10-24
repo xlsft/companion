@@ -1,6 +1,6 @@
 # STT sidecar protocol
 
-- Tickets: OC-28 (protocol), OC-29 (whisper.cpp runtime), OC-35 (VAD and endpointing)
+- Tickets: OC-28 (protocol), OC-29 (whisper.cpp and sherpa-onnx runtimes), OC-35 (VAD and endpointing)
 - Code: `internal/stt/protocol` (wire types, codec), `internal/stt` (core client), `internal/stt/server` + `cmd/stt-sidecar` (sidecar)
 - Protocol version: `1` (returned by `initialize`; bump on incompatible change)
 
@@ -41,8 +41,8 @@ Must be the first request; any session method before it fails with `-32006`. A s
 
 | Param | Type | Notes |
 |---|---|---|
-| `model_path` | string | ggml model file. Required by the whisper engine; ignored by `fake`. |
-| `model_sha256` | string, optional | Hex SHA-256; verified before load. |
+| `model_path` | string | ggml model file (whisper) or model directory with `model.json` (sherpa, see [sherpa-onnx](#sherpa-onnx-build)). Required by both; ignored by `fake`. |
+| `model_sha256` | string, optional | Hex SHA-256 of a single-file model; verified before load. Ignored for a directory, whose files the core checks against its install record. |
 | `language` | string | `"auto"` or an ISO 639-1 code (`"en"`, `"ru"`, …). Default for all sessions. |
 | `backend` | string | `"cpu"` or `"auto"` (use a GPU backend when the build has one and a device exists). |
 | `threads` | int, optional | Decode threads; `0` = engine default (min(NumCPU, 8)). |
@@ -52,8 +52,8 @@ Result:
 | Field | Type | Notes |
 |---|---|---|
 | `protocol_version` | string | `"1"` |
-| `engine` | string | `"whisper"` or `"fake"` |
-| `runtime_version` | string | e.g. whisper.cpp version |
+| `engine` | string | `"sherpa"`, `"whisper"` or `"fake"`; with `-engine auto` the one that loaded the model |
+| `runtime_version` | string | e.g. `sherpa-onnx 1.13.8`, whisper.cpp version |
 | `backend_in_use` | string | `"cpu"` or the ggml device name |
 | `fallback_reason` | string, optional | Set when `auto` could not start a GPU backend and CPU was used instead (`"backend_init_failed"`). Initialization still succeeds; a `log{warn, backend_fallback_cpu}` is also emitted. |
 | `languages` | string[] | Languages the model supports (`["en"]` for `.en` models). |
@@ -109,6 +109,8 @@ The session is removed when the response is sent. If `session.cancel` arrives du
 
 `{session_id, seq, text, stable}`. Produced by the rolling decoder: every `partial-interval` (default 700 ms) of new audio, once VAD has heard speech, the last `partial-window` (default 10 s) of audio is decoded with a cheaper single-segment setting. At most one partial decode runs per session; while one runs, new audio keeps accumulating and the next decode starts with the first chunk after it completes, so a slow engine lowers the partial rate instead of queueing work. `stable` is reserved for a future agreement-based stabiliser and is currently always `false`; every partial replaces the previous one. No partials are sent after `session.finish` or `session.cancel` was received.
 
+With a streaming model (engine implements `engine.Streamer`, e.g. a sherpa zipformer transducer) there is no rolling window: every chunk is decoded incrementally on a per-session goroutine (pending audio is coalesced, so a slow decoder sees bigger chunks rather than a queue) and the hypothesis of the whole utterance so far is the partial, sent whenever it changes once VAD has heard speech. `session.finish` flushes the stream and returns its result instead of re-decoding the buffer. `-partial-interval` and `-partial-window` then have no effect. If the stream cannot be created the session falls back to the rolling window (`log{warn, stream_failed}`).
+
 ### `session.vad` (notification, sidecar → core)
 
 `{session_id, speech, at_ms}` on every speech/silence transition of the sidecar VAD (energy-based, `internal/stt/vad`).
@@ -131,6 +133,7 @@ Endpointing details (`internal/stt/vad`): the energy VAD tracks the background l
 | `audio_seq_gap` | warn | `seq` skipped ahead |
 | `audio_overflow` | warn | per-session audio limit reached |
 | `partial_failed` | warn | a partial decode failed (session continues) |
+| `stream_failed` | warn | a streaming model could not open a stream; rolling partials are used |
 
 ### `health` (request)
 
@@ -175,7 +178,7 @@ Endpointing details (`internal/stt/vad`): the energy VAD tracks the background l
 
 | Flag | Default | |
 |---|---|---|
-| `-engine` | `whisper` if built with `-tags whisper`, else `fake` | `fake` is deterministic, for tests |
+| `-engine` | `auto` with both `whisper` and `sherpa` tags, else the one compiled in, else `fake` | `auto`: sherpa for a model directory, whisper for a file. `fake` is deterministic, for tests (`-fake-streaming` makes it a streaming engine) |
 | `-partial-interval` | `700ms` | new audio between partial decodes |
 | `-partial-window` | `10s` | audio decoded per partial |
 | `-max-utterance` | `5m` | per-session audio limit |
@@ -198,6 +201,28 @@ CMake flags always set: `-DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DWH
 
 Override detection with `WHISPER_CMAKE_EXTRA=...` and `WHISPER_CGO_LDFLAGS=...`. Silero VAD (whisper.cpp `whisper_vad_*`) is not used yet; `internal/stt/vad.VAD` is the hook for it.
 
-The cgo code lives in `internal/stt/engine/whisper` (build tag `whisper && cgo`) and is imported only by `cmd/stt-sidecar/engine_whisper.go`, so no core binary links it. ADR-0001 rule 6 names only `internal/platform/*` and `cmd/stt-sidecar` as cgo locations; this package is the sidecar's private runtime and should be added to that rule.
+The cgo code lives in `internal/stt/engine/whisper` (build tag `whisper && cgo`) and is imported only by `cmd/stt-sidecar/engine_whisper.go`, so no core binary links it (ADR-0001 rule 6 as amended).
 
 Tests: `make test-whisper` runs the tagged tests; the model-dependent ones run only when `OPENCLICK_WHISPER_MODEL` points at a ggml model (for example `ggml-tiny.bin` from the `ggerganov/whisper.cpp` Hugging Face repo) and use the submodule's `samples/jfk.wav`. Models and audio are never committed.
+
+## sherpa-onnx build
+
+sherpa-onnx (ADR-0001 amendment 2) is the primary engine; whisper.cpp is the fallback for languages no sherpa model covers. The engine is `internal/stt/engine/sherpa` (build tag `sherpa && cgo`), registered as `sherpa` and imported only by `cmd/stt-sidecar/engine_sherpa.go`.
+
+Linking: `github.com/k2-fsa/sherpa-onnx-go` (pinned in `go.mod`, currently v1.13.8, onnxruntime 1.28.2) pulls a per-OS module (`sherpa-onnx-go-linux`, `-macos`, `-windows`) that ships prebuilt `libsherpa-onnx-c-api` and `libonnxruntime` shared libraries (CPU provider) for each arch, plus cgo `LDFLAGS` with an rpath into the module cache. Nothing is compiled from C++ sources. The sidecar is linked with an extra `-Wl,-rpath,$ORIGIN` (put first) and the two libraries are copied next to it:
+
+- `make build-sherpa`: `bin/stt-sidecar` with `-tags sherpa` plus `bin/libsherpa-onnx-c-api.so` and `bin/libonnxruntime.so`.
+- `make build-stt`: the release sidecar with `-tags "whisper sherpa"` (needs `make whisper` once), same libraries.
+- `make test-sherpa`: tagged tests; the model-dependent ones run when `OPENCLICK_SHERPA_MODEL` points at a model directory (they use its `test_wavs/`, or `OPENCLICK_SHERPA_WAV`) with two threads.
+
+The second runpath entry (the build host's module cache) is harmless on other machines; `packaging/dist-linux.sh` strips it with `patchelf` when available. macOS (`.dylib`, `@loader_path`) and Windows (`.dll` beside the `.exe`) work the same way but are untested.
+
+Model directories: the installer (`internal/models`) unpacks only the files the engine needs from the release archive and writes `model.json` (`engine.Descriptor`): `engine`, `type`, `kind`, `files` (role → bare file name: `encoder`, `decoder`, `joiner`, `model`, `tokens`) and `languages`. A directory unpacked by hand without it is recognised from its file names (`sherpa.Detect`).
+
+| `type` | Kind | Models | Language |
+|---|---|---|---|
+| `nemo_transducer` | offline | Parakeet TDT 0.6B v2 (en), v3 (25 European languages) | detected by the model, not reported; a requested language is echoed |
+| `sense_voice` | offline | SenseVoice small (zh, en, ja, ko, yue) | `language` is passed as a hint (else `auto`); the detected language is reported |
+| `zipformer_transducer` | streaming | zipformer EN, bilingual zh-en | fixed by the model |
+
+Offline models get partials from the rolling window like whisper; streaming ones decode natively (see `session.partial`). Upper-case-only hypotheses (zipformer) are turned into sentence case. Decodes use `min(NumCPU, 4)` threads by default: the int8 kernels gain little beyond four and more threads only make the machine louder. sherpa-onnx has no abort hook, so a cancelled decode returns `ctx.Err()` at once while the native call finishes in the background (bounded by one window, a few hundred ms) and the next decode queues behind it. Endpointing always uses the sidecar VAD; sherpa's own endpoint rules and Silero VAD are off.
