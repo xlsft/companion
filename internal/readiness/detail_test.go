@@ -33,3 +33,9 @@ func TestMicPhrase(t *testing.T) {
 		}
 	}
 }
+
+func TestTTSSentence(t *testing.T) {
+	if TTSSentence("en") == TTSSentence("ru") || TTSSentence("de") != TTSSentence("ru") {
+		t.Errorf("sentences: en=%q ru=%q de=%q", TTSSentence("en"), TTSSentence("ru"), TTSSentence("de"))
+	}
+}

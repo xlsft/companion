@@ -52,6 +52,21 @@ func MicPhrase(lang string) string {
 	return micPhrases["ru"]
 }
 
+// ttsSentences is the fixed sentence the TTS check plays.
+var ttsSentences = map[string]string{
+	"ru": "Привет! Так звучит мой голос.",
+	"en": "Hello! This is how my voice sounds.",
+}
+
+// TTSSentence returns the fixed sentence the TTS step plays for a UI
+// language; Russian is the default.
+func TTSSentence(lang string) string {
+	if s, ok := ttsSentences[lang]; ok {
+		return s
+	}
+	return ttsSentences["ru"]
+}
+
 // PhraseMatches compares a transcript with the expected phrase loosely:
 // case, punctuation and ё/е are ignored and at least 60% of the expected
 // words must appear, since small models misspell short words.
