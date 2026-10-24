@@ -123,7 +123,10 @@ func (w *Wizard) aside(gtx layout.Context, th *theme.Theme, l i18n.Lang, s snaps
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Min.X = gtx.Constraints.Max.X
 			return layout.Inset{Left: th.Dp(20), Right: th.Dp(20)}.Layout(gtx, kit.FixedH(th, 54, func(gtx layout.Context) layout.Dimensions {
-				return kit.Logo(gtx, th, 15)
+				if w.cfg.Version != "" {
+					w.frame.texts = append(w.frame.texts, "v"+w.cfg.Version)
+				}
+				return kit.LogoVersion(gtx, th, 15, w.cfg.Version)
 			}))
 		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.Divider(gtx, th) }),
@@ -150,7 +153,7 @@ func (w *Wizard) aside(gtx layout.Context, th *theme.Theme, l i18n.Lang, s snaps
 	)
 }
 
-// asideFoot is Diagnostics plus the version and the language picker.
+// asideFoot is Diagnostics plus the language picker.
 func (w *Wizard) asideFoot(gtx layout.Context, th *theme.Theme, l i18n.Lang) layout.Dimensions {
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
 	diag := func(gtx layout.Context) layout.Dimensions {
@@ -160,16 +163,11 @@ func (w *Wizard) asideFoot(gtx layout.Context, th *theme.Theme, l i18n.Lang) lay
 		return kit.NavItem(gtx, th, w.clickable(ActDiagnostics), icon.Heartbeat, txt, false)
 	}
 	var meta layout.Widget
-	if w.cfg.Version != "" || w.cfg.SetLanguage != nil {
-		var ver, lang layout.Widget
-		if w.cfg.Version != "" {
-			ver = w.text(kit.Small(th, "v"+w.cfg.Version))
-		}
-		if w.cfg.SetLanguage != nil {
-			lang = func(gtx layout.Context) layout.Dimensions { return w.langPicker(gtx, th, l) }
-		}
+	if w.cfg.SetLanguage != nil {
 		meta = func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Top: th.Dp(8), Left: th.Dp(6)}.Layout(gtx, kit.Spread(ver, lang))
+			return layout.Inset{Top: th.Dp(8), Left: th.Dp(6)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return w.langPicker(gtx, th, l)
+			})
 		}
 	}
 	return kit.VStack(th, 2, diag, meta)(gtx)
@@ -311,7 +309,7 @@ func (w *Wizard) header(gtx layout.Context, th *theme.Theme, l i18n.Lang, s snap
 	i := slices.Index(readiness.Steps, s.view())
 	n := len(readiness.Steps)
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
-	return layout.Inset{Left: th.Dp(32), Right: th.Dp(32)}.Layout(gtx, kit.FixedH(th, 54, func(gtx layout.Context) layout.Dimensions {
+	return layout.Inset{Left: th.Dp(32), Right: th.Dp(11)}.Layout(gtx, kit.FixedH(th, 54, func(gtx layout.Context) layout.Dimensions {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 			// Half a step for the one on screen, as in the prototypes.

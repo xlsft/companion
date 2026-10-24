@@ -186,7 +186,7 @@ func (m *mainUI) logoRow(gtx layout.Context, th *theme.Theme, l Lang) layout.Dim
 	return layout.Inset{Left: th.Dp(20), Right: th.Dp(12)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-				d := kit.VCenter(gtx, h, func(gtx layout.Context) layout.Dimensions { return kit.Logo(gtx, th, 15) })
+				d := kit.VCenter(gtx, h, func(gtx layout.Context) layout.Dimensions { return kit.LogoVersion(gtx, th, 15, m.sh.opts.Version) })
 				d.Size.X = gtx.Constraints.Max.X
 				return d
 			}),

@@ -29,6 +29,7 @@ import (
 	gioapp "gioui.org/app"
 
 	"github.com/xlsft/companion/internal/app"
+	"github.com/xlsft/companion/internal/buildinfo"
 	"github.com/xlsft/companion/internal/chat"
 	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/settings"
@@ -82,7 +83,7 @@ func main() {
 		be = newDemo(chat.View{})
 	}
 	diagnose := func(ctx context.Context) (contracts.CapabilityReport, error) { return detect.New().Detect(ctx) }
-	shell := ui.New(ui.Options{Mode: ui.ModeMain, Settings: svc, Chat: be, Diagnose: diagnose, Quit: stop, Log: log, Dark: *dark, Version: "spike"})
+	shell := ui.New(ui.Options{Mode: ui.ModeMain, Settings: svc, Chat: be, Diagnose: diagnose, Quit: stop, Log: log, Dark: *dark, Version: buildinfo.Version})
 	go func() {
 		// The main window exists once the app has started the shell.
 		time.Sleep(300 * time.Millisecond)

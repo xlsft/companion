@@ -126,6 +126,19 @@ func Logo(gtx layout.Context, th *theme.Theme, size float32) layout.Dimensions {
 	)
 }
 
+// LogoVersion is the logo with the app version beside it, e.g. "v0.0.1";
+// an empty version shows the logo alone.
+func LogoVersion(gtx layout.Context, th *theme.Theme, size float32, version string) layout.Dimensions {
+	if version == "" {
+		return Logo(gtx, th, size)
+	}
+	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return Logo(gtx, th, size) }),
+		HSpace(th.Dp(8)),
+		layout.Rigid(Small(th, "v"+version).Layout),
+	)
+}
+
 // Icon draws a MingCute icon at a prototype pixel size.
 func Icon(gtx layout.Context, th *theme.Theme, n icon.Name, size float32, col color.NRGBA) layout.Dimensions {
 	return icon.Layout(gtx, n, th.Dp(size), col)
@@ -225,9 +238,15 @@ type ButtonStyle struct {
 	Icon  icon.Name // "" for none
 	// Small is the 30px in-row size; the default is the 36px footer size.
 	Small bool
+	// Wide stretches the button to the width it is given; otherwise it
+	// fits its label, so its hover and focus outline the button only.
+	Wide bool
 }
 
 func (b ButtonStyle) Layout(gtx layout.Context, th *theme.Theme, c *widget.Clickable) layout.Dimensions {
+	if !b.Wide {
+		gtx.Constraints.Min.X = 0
+	}
 	disabled := !gtx.Enabled()
 	h, pad, size := float32(36), float32(14), float32(14)
 	if b.Small {
@@ -372,9 +391,14 @@ func Rows(gtx layout.Context, th *theme.Theme, rows ...layout.Widget) layout.Dim
 
 // IconTile is the 40px rounded square holding a row's icon.
 func IconTile(gtx layout.Context, th *theme.Theme, n icon.Name, col color.NRGBA) layout.Dimensions {
+	return IconTileOn(gtx, th, n, col, th.Pal.Raised)
+}
+
+// IconTileOn is IconTile on a given fill, e.g. a status's badge tint.
+func IconTileOn(gtx layout.Context, th *theme.Theme, n icon.Name, col, bg color.NRGBA) layout.Dimensions {
 	s := gtx.Dp(th.Dp(40))
 	gtx.Constraints = layout.Exact(image.Pt(s, s))
-	rrect(gtx, gtx.Dp(th.Dp(6)), th.Pal.Raised)
+	rrect(gtx, gtx.Dp(th.Dp(6)), bg)
 	return layout.Center.Layout(gtx, IconW(th, n, 18, col))
 }
 

@@ -1,4 +1,4 @@
-VERSION ?= dev
+VERSION ?= 0.0.1
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 LDFLAGS := -X github.com/xlsft/companion/internal/buildinfo.Version=$(VERSION) \
            -X github.com/xlsft/companion/internal/buildinfo.Commit=$(COMMIT)

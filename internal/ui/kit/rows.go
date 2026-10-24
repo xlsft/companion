@@ -35,10 +35,16 @@ type StatusRow struct {
 func (r StatusRow) Layout(gtx layout.Context, th *theme.Theme) layout.Dimensions {
 	bg := th.Pal.Surface
 	ic := r.IconColor
+	tile := th.Pal.Raised
 	if r.Tint {
 		bg = tintOf(th.Pal, r.Status)
-		if ic.A == 0 && (r.Status == theme.StatusWarn || r.Status == theme.StatusError) {
-			ic = th.Pal.Color(r.Status)
+		if r.Status == theme.StatusWarn || r.Status == theme.StatusError {
+			// The tile wears the badge's colours, so the row reads as one
+			// status at a glance.
+			tile = softOf(th.Pal, r.Status)
+			if ic.A == 0 {
+				ic = th.Pal.Color(r.Status)
+			}
 		}
 	}
 	if ic.A == 0 {
@@ -53,7 +59,7 @@ func (r StatusRow) Layout(gtx layout.Context, th *theme.Theme) layout.Dimensions
 	}
 	head := func(gtx layout.Context) layout.Dimensions {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions { return IconTile(gtx, th, r.Icon, ic) }),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions { return IconTileOn(gtx, th, r.Icon, ic, tile) }),
 			HSpace(th.Dp(16)),
 			layout.Flexed(1, VStack(th, 2, Medium(label(th, 14, r.Title, th.Pal.Fg)).Layout, cap, detail)),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {

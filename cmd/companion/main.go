@@ -102,7 +102,7 @@ func main() {
 		Quit:     stop,
 		Log:      log,
 		Dark:     *dark,
-		Version:  buildinfo.String(),
+		Version:  buildinfo.Version,
 	})
 
 	// Gio must own the main goroutine (macOS requires the main thread), so

@@ -5,7 +5,7 @@ import "runtime"
 
 // Set with -ldflags "-X github.com/xlsft/companion/internal/buildinfo.Version=...".
 var (
-	Version = "dev"
+	Version = "0.0.1"
 	Commit  = "unknown"
 )
 

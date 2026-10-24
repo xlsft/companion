@@ -27,6 +27,7 @@ import (
 	gioapp "gioui.org/app"
 
 	"github.com/xlsft/companion/internal/app"
+	"github.com/xlsft/companion/internal/buildinfo"
 	"github.com/xlsft/companion/internal/audio"
 	"github.com/xlsft/companion/internal/llm"
 	"github.com/xlsft/companion/internal/models"
@@ -116,7 +117,7 @@ func run(step int, failed, dark bool, lang string, log *slog.Logger) error {
 	}
 	diagnose := func(ctx context.Context) (contracts.CapabilityReport, error) { return detect.New().Detect(ctx) }
 	shell := ui.New(ui.Options{Mode: ui.ModeSetup, Settings: svc, Gate: gate, Setup: backends,
-		Diagnose: diagnose, Quit: stop, Log: log, Dark: dark, Version: "0.1.0-dev"})
+		Diagnose: diagnose, Quit: stop, Log: log, Dark: dark, Version: buildinfo.Version})
 	go func() {
 		if err := app.New(log, shell).Run(ctx); err != nil {
 			log.Error("spike exited with error", "err", err)
