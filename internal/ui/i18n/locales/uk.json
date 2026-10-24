@@ -463,5 +463,16 @@
   "update.status.rate_limited": "GitHub попросив зачекати; повторимо пізніше",
   "update.status.unsupported": "Ця збірка не має номера версії для порівняння",
   "update.status.error": "Не вдалося перевірити оновлення",
-  "update.status.at": "перевірено %s"
+  "update.status.at": "перевірено %s",
+  "guide.step": "Крок %d з %d",
+  "guide.prevDone": "Крок %d: %s — зроблено",
+  "guide.prev": "Попередній крок",
+  "guide.repeat": "Повторити",
+  "guide.pause": "Пауза",
+  "guide.resume": "Продовжити",
+  "guide.next": "Далі",
+  "guide.finish": "Готово",
+  "guide.stop": "Завершити",
+  "guide.preparing": "Дивлюся на екран…",
+  "guide.error": "Не вийшло. Спробуйте ще раз."
 }

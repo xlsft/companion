@@ -463,5 +463,16 @@
   "update.status.rate_limited": "GitHub bittet um eine Pause; später erneuter Versuch",
   "update.status.unsupported": "Dieser Build hat keine vergleichbare Versionsnummer",
   "update.status.error": "Suche nach Updates fehlgeschlagen",
-  "update.status.at": "geprüft %s"
+  "update.status.at": "geprüft %s",
+  "guide.step": "Schritt %d von %d",
+  "guide.prevDone": "Schritt %d: %s — erledigt",
+  "guide.prev": "Vorheriger Schritt",
+  "guide.repeat": "Wiederholen",
+  "guide.pause": "Pause",
+  "guide.resume": "Fortsetzen",
+  "guide.next": "Weiter",
+  "guide.finish": "Fertig",
+  "guide.stop": "Anleitung beenden",
+  "guide.preparing": "Ich sehe mir den Bildschirm an…",
+  "guide.error": "Das hat nicht geklappt. Versuchen Sie es erneut."
 }

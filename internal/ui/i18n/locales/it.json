@@ -463,5 +463,16 @@
   "update.status.rate_limited": "GitHub chiede di attendere; si riproverà più tardi",
   "update.status.unsupported": "Questa build non ha un numero di versione confrontabile",
   "update.status.error": "Impossibile cercare aggiornamenti",
-  "update.status.at": "controllato %s"
+  "update.status.at": "controllato %s",
+  "guide.step": "Passo %d di %d",
+  "guide.prevDone": "Passo %d: %s — fatto",
+  "guide.prev": "Passo precedente",
+  "guide.repeat": "Ripeti",
+  "guide.pause": "Pausa",
+  "guide.resume": "Riprendi",
+  "guide.next": "Avanti",
+  "guide.finish": "Fine",
+  "guide.stop": "Termina la guida",
+  "guide.preparing": "Guardo lo schermo…",
+  "guide.error": "Non è riuscito. Riprova."
 }

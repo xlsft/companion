@@ -74,6 +74,18 @@ var catalog = map[string][2]string{
 	"chat.error.stop":          {"Couldn't stop the request.", "Не удалось остановить запрос."},
 	"chat.error.newChat":       {"Couldn't start a new chat.", "Не удалось начать новый чат."},
 
+	"guide.step":      {"Step %d of %d", "Шаг %d из %d"},
+	"guide.prevDone":  {"Step %d: %s — done", "Шаг %d: %s — сделано"},
+	"guide.prev":      {"Previous step", "Предыдущий шаг"},
+	"guide.repeat":    {"Repeat", "Повторить"},
+	"guide.pause":     {"Pause", "Пауза"},
+	"guide.resume":    {"Resume", "Продолжить"},
+	"guide.next":      {"Next", "Дальше"},
+	"guide.finish":    {"Finish", "Готово"},
+	"guide.stop":      {"End walkthrough", "Завершить"},
+	"guide.preparing": {"Looking at the screen…", "Смотрю на экран…"},
+	"guide.error":     {"Couldn't do that. Try again.", "Не получилось. Попробуйте ещё раз."},
+
 	"about.title":  {"About Companion", "О Companion"},
 	"about.body":   {"Version %s. All data stays on this device.", "Версия %s. Все данные остаются на этом устройстве."},
 	"dialog.close": {"Close (Esc)", "Закрыть (Esc)"},

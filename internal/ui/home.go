@@ -32,6 +32,7 @@ const (
 type homePage struct {
 	m    *mainUI
 	chat *chatModel
+	card guideCard
 
 	list    widget.List
 	editor  widget.Editor
@@ -46,7 +47,7 @@ type homePage struct {
 }
 
 func newHomePage(m *mainUI) *homePage {
-	p := &homePage{m: m, chat: m.chat}
+	p := &homePage{m: m, chat: m.chat, card: guideCard{g: m.guide}}
 	p.list.Axis = layout.Vertical
 	p.editor.Submit = true
 	return p
@@ -108,6 +109,16 @@ func (p *homePage) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Di
 				return p.emptyState(gtx, th, icon.Chat1, T(l, "chat.empty.title"), body)
 			}
 			return p.thread(gtx, th, l, view)
+		}),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			// The walkthrough in progress stays in view above the composer
+			// however far the conversation scrolls.
+			if !p.card.active() {
+				return layout.Dimensions{}
+			}
+			return layout.Inset{Top: th.Dp(12)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return column(gtx, th, func(gtx layout.Context) layout.Dimensions { return p.card.Layout(gtx, th, l) })
+			})
 		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return p.composer(gtx, th, l, view, caps, connected, failKey)

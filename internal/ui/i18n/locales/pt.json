@@ -463,5 +463,16 @@
   "update.status.rate_limited": "O GitHub pediu para aguardar; nova tentativa mais tarde",
   "update.status.unsupported": "Esta compilação não tem número de versão para comparar",
   "update.status.error": "Não foi possível procurar atualizações",
-  "update.status.at": "verificado %s"
+  "update.status.at": "verificado %s",
+  "guide.step": "Passo %d de %d",
+  "guide.prevDone": "Passo %d: %s — feito",
+  "guide.prev": "Passo anterior",
+  "guide.repeat": "Repetir",
+  "guide.pause": "Pausar",
+  "guide.resume": "Retomar",
+  "guide.next": "Próximo",
+  "guide.finish": "Concluir",
+  "guide.stop": "Encerrar o guia",
+  "guide.preparing": "Olhando a tela…",
+  "guide.error": "Não foi possível. Tente de novo."
 }

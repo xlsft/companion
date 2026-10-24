@@ -463,5 +463,16 @@
   "updates.checkNow": "今すぐ確認",
   "updates.pre": "プレリリースを含める",
   "updates.pre.d": "一般公開前のテスト版を提供します",
-  "updates.version": "Companion %s"
+  "updates.version": "Companion %s",
+  "guide.step": "ステップ %d / %d",
+  "guide.prevDone": "ステップ %d：%s — 完了",
+  "guide.prev": "前のステップ",
+  "guide.repeat": "もう一度",
+  "guide.pause": "一時停止",
+  "guide.resume": "再開",
+  "guide.next": "次へ",
+  "guide.finish": "完了",
+  "guide.stop": "ガイドを終了",
+  "guide.preparing": "画面を確認しています…",
+  "guide.error": "できませんでした。もう一度お試しください。"
 }

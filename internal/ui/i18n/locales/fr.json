@@ -463,5 +463,16 @@
   "update.status.rate_limited": "GitHub demande de patienter ; nouvel essai plus tard",
   "update.status.unsupported": "Cette version n’a pas de numéro comparable",
   "update.status.error": "Impossible de rechercher les mises à jour",
-  "update.status.at": "vérifié %s"
+  "update.status.at": "vérifié %s",
+  "guide.step": "Étape %d sur %d",
+  "guide.prevDone": "Étape %d : %s — fait",
+  "guide.prev": "Étape précédente",
+  "guide.repeat": "Répéter",
+  "guide.pause": "Pause",
+  "guide.resume": "Reprendre",
+  "guide.next": "Suivant",
+  "guide.finish": "Terminer",
+  "guide.stop": "Arrêter le guide",
+  "guide.preparing": "Je regarde l’écran…",
+  "guide.error": "Impossible. Réessayez."
 }

@@ -463,5 +463,16 @@
   "update.status.rate_limited": "GitHub beklemeyi istedi; daha sonra yeniden denenecek",
   "update.status.unsupported": "Bu derlemenin karşılaştırılacak sürüm numarası yok",
   "update.status.error": "Güncellemeler denetlenemedi",
-  "update.status.at": "denetlendi: %s"
+  "update.status.at": "denetlendi: %s",
+  "guide.step": "Adım %d / %d",
+  "guide.prevDone": "Adım %d: %s — tamam",
+  "guide.prev": "Önceki adım",
+  "guide.repeat": "Tekrarla",
+  "guide.pause": "Duraklat",
+  "guide.resume": "Devam et",
+  "guide.next": "İleri",
+  "guide.finish": "Bitir",
+  "guide.stop": "Rehberi bitir",
+  "guide.preparing": "Ekrana bakıyorum…",
+  "guide.error": "Yapılamadı. Tekrar deneyin."
 }

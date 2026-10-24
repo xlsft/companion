@@ -33,6 +33,7 @@ type mainUI struct {
 	section settingsSection
 
 	chat   *chatModel
+	guide  *guideModel
 	update *updateBanner
 
 	newChatBtn widget.Clickable
@@ -46,6 +47,7 @@ func newMainUI(sh *Shell) *mainUI {
 		sh:      sh,
 		pages:   map[Route]page{},
 		chat:    newChatModel(sh.opts.Chat, sh.log, sh.invalidateAll),
+		guide:   newGuideModel(sh.opts.Guide, sh.log, sh.invalidateAll),
 		update:  newUpdateBanner(sh.opts.Updates),
 		navBtns: map[Route]*widget.Clickable{},
 		section: -1,
@@ -92,7 +94,10 @@ func (m *mainUI) newChat() {
 	m.navigate(RouteHome)
 }
 
-func (m *mainUI) close() { m.chat.close() }
+func (m *mainUI) close() {
+	m.chat.close()
+	m.guide.close()
+}
 
 // page builds a section on first visit, so unvisited sections cost nothing.
 func (m *mainUI) page(r Route) page {

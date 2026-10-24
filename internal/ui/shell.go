@@ -90,6 +90,8 @@ type Options struct {
 	Tray contracts.Tray
 	// Chat is the Home chat's backend; nil shows the chat as not connected.
 	Chat ChatBackend
+	// Guide runs walkthroughs; nil shows no walkthrough card.
+	Guide GuideBackend
 	// Updates is the in-app updater; nil shows no update banner and leaves
 	// the update settings without a status.
 	Updates UpdateBackend

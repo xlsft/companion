@@ -463,5 +463,16 @@
   "updates.checkNow": "立即检查",
   "updates.pre": "包含预发布版本",
   "updates.pre.d": "在正式发布前提供测试版本",
-  "updates.version": "Companion %s"
+  "updates.version": "Companion %s",
+  "guide.step": "第 %d 步，共 %d 步",
+  "guide.prevDone": "第 %d 步：%s — 已完成",
+  "guide.prev": "上一步",
+  "guide.repeat": "重复",
+  "guide.pause": "暂停",
+  "guide.resume": "继续",
+  "guide.next": "下一步",
+  "guide.finish": "完成",
+  "guide.stop": "结束引导",
+  "guide.preparing": "正在查看屏幕…",
+  "guide.error": "操作失败，请重试。"
 }

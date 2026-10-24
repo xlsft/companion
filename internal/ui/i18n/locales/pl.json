@@ -463,5 +463,16 @@
   "update.status.rate_limited": "GitHub prosi o przerwę; ponowimy później",
   "update.status.unsupported": "Ta kompilacja nie ma numeru wersji do porównania",
   "update.status.error": "Nie udało się sprawdzić aktualizacji",
-  "update.status.at": "sprawdzono %s"
+  "update.status.at": "sprawdzono %s",
+  "guide.step": "Krok %d z %d",
+  "guide.prevDone": "Krok %d: %s — gotowe",
+  "guide.prev": "Poprzedni krok",
+  "guide.repeat": "Powtórz",
+  "guide.pause": "Pauza",
+  "guide.resume": "Wznów",
+  "guide.next": "Dalej",
+  "guide.finish": "Zakończ",
+  "guide.stop": "Zakończ przewodnik",
+  "guide.preparing": "Patrzę na ekran…",
+  "guide.error": "Nie udało się. Spróbuj ponownie."
 }

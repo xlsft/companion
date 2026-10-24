@@ -116,6 +116,7 @@ func main() {
 		Gate:       gate,
 		Setup:      c.setupBackends(),
 		Chat:       c.chat,
+		Guide:      c.guide,
 		Tray:       tr,
 		Diagnose:   detect.New().Detect,
 		Updates:    upd,
