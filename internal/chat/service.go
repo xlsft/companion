@@ -27,6 +27,9 @@ type Store interface {
 	Get(ctx context.Context, id string) (*history.Conversation, error)
 	CreateConversation(ctx context.Context, title, agentID string) (*history.Conversation, error)
 	AppendMessage(ctx context.Context, convID string, m history.Message, captures []contracts.CaptureMetadata, imgs map[contracts.CaptureID]*image.RGBA) (string, error)
+	// SetKeepScreenshots is the per-conversation opt-in that lets
+	// AppendMessage write images.
+	SetKeepScreenshots(ctx context.Context, id string, keep bool) error
 }
 
 // Config wires a Service. Only Talk is required.
@@ -83,7 +86,22 @@ type Service struct {
 	// ignore is the generation a new chat left behind: its late snapshots
 	// still move the phase but add nothing to the new conversation.
 	ignore contracts.SessionRef
+	// held is the user turn of heldRef that is not stored yet, because its
+	// screenshots are only known once the request reaches the model; -1 if
+	// none. heldShots are the metadata and, only when kept, the pictures.
+	held      int
+	heldRef   contracts.SessionRef
+	heldShots []contracts.ScreenAttachment
+	// early keeps screenshots reported before the user turn was seen.
+	early *early
 }
+
+type early struct {
+	ref   contracts.SessionRef
+	shots []contracts.ScreenAttachment
+}
+
+var _ contracts.AttachmentSink = (*Service)(nil)
 
 // New returns a Service; Start begins following the session.
 func New(cfg Config) *Service {
@@ -93,7 +111,7 @@ func New(cfg Config) *Service {
 	if cfg.Log == nil {
 		cfg.Log = slog.New(slog.DiscardHandler)
 	}
-	return &Service{cfg: cfg, jobs: make(chan job, queueLen), subs: map[chan View]struct{}{}, reply: -1}
+	return &Service{cfg: cfg, jobs: make(chan job, queueLen), subs: map[chan View]struct{}{}, reply: -1, held: -1}
 }
 
 // Start loads the most recent stored conversation and follows the session
@@ -214,6 +232,8 @@ func (s *Service) NewChat(ctx context.Context) error {
 		return err
 	}
 	s.mu.Lock()
+	s.flushHeldLocked()
+	s.early = nil
 	s.ignore = s.ref
 	s.title, s.msgs, s.reply, s.pendingQ, s.partial = "", nil, -1, false, ""
 	s.publishLocked()
@@ -270,6 +290,7 @@ func (s *Service) apply(snap session.Snapshot) {
 		// Terminal snapshots normally close a reply; this covers a
 		// generation that vanished without one.
 		s.endReplyLocked(func(m *Message) { m.Interrupted = true })
+		s.flushHeldLocked()
 		s.ref, s.reply, s.pendingQ = snap.Ref, -1, false
 	}
 	s.phase, s.since = phaseOf(snap.State), snap.Since
@@ -298,9 +319,22 @@ func (s *Service) apply(snap session.Snapshot) {
 		if s.title == "" {
 			s.title = titleOf(m.Text)
 		}
+		s.flushHeldLocked()
 		s.msgs = append(s.msgs, m)
 		s.pendingQ = true
-		s.persistLocked(m)
+		s.held, s.heldRef, s.heldShots = len(s.msgs)-1, snap.Ref, nil
+		if e := s.early; e != nil && e.ref == snap.Ref {
+			s.attachHeldLocked(e.shots)
+			s.flushHeldLocked()
+		}
+		s.early = nil
+	}
+	switch snap.State {
+	case session.StateResponding, session.StateSpeaking, session.StateCancelled, session.StateInterrupted,
+		session.StateFailed, session.StateIdle, session.StateAwaitingInput:
+		// The request has passed the model call, so a screenshot would
+		// have been reported by now.
+		s.flushHeldLocked()
 	}
 	switch snap.State {
 	case session.StateResponding, session.StateSpeaking:
@@ -327,6 +361,45 @@ func (s *Service) apply(snap session.Snapshot) {
 	s.publishLocked()
 }
 
+// ScreenAttached records which screenshots the request of ref carried. The
+// user turn is stored once they are known, so the stored message and its
+// image blob are written together.
+func (s *Service) ScreenAttached(ref contracts.SessionRef, shots []contracts.ScreenAttachment) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || (ref == s.ignore && ref != (contracts.SessionRef{})) {
+		return
+	}
+	if s.held >= 0 && s.heldRef == ref {
+		s.attachHeldLocked(shots)
+		s.flushHeldLocked()
+		s.publishLocked()
+		return
+	}
+	s.early = &early{ref: ref, shots: shots}
+}
+
+// attachHeldLocked shows shots on the held user turn. Only the small
+// thumbnail stays in the chat; the full picture goes to the store job.
+func (s *Service) attachHeldLocked(shots []contracts.ScreenAttachment) {
+	screens := make([]Screenshot, 0, len(shots))
+	for _, sh := range shots {
+		screens = append(screens, Screenshot{Meta: sh.Meta, Thumb: thumbOf(sh.Image)})
+	}
+	s.msgs[s.held].Screens = screens
+	s.heldShots = shots
+}
+
+// flushHeldLocked stores the held user turn.
+func (s *Service) flushHeldLocked() {
+	if s.held < 0 {
+		return
+	}
+	m, shots := s.msgs[s.held], s.heldShots
+	s.held, s.heldShots = -1, nil
+	s.persistLocked(m, shots)
+}
+
 // endReplyLocked closes the reply of the current generation if it is still
 // open, and stores it. mark records how it ended.
 func (s *Service) endReplyLocked(mark func(*Message)) {
@@ -337,7 +410,7 @@ func (s *Service) endReplyLocked(mark func(*Message)) {
 		}
 		m.Streaming = false
 		if m.Text != "" {
-			s.persistLocked(*m)
+			s.persistLocked(*m, nil)
 		}
 	}
 	s.reply, s.pendingQ = -1, false

@@ -2,8 +2,10 @@ package chat
 
 import (
 	"context"
+	"image"
 
 	"github.com/xlsft/companion/internal/history"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 // job runs on the persist goroutine, which owns the stored conversation id
@@ -34,6 +36,9 @@ func (s *Service) load(ctx context.Context) string {
 	var msgs []Message
 	for _, hm := range conv.Messages {
 		m := Message{Text: hm.Text, At: hm.CreatedAt}
+		for _, c := range hm.Captures {
+			m.Screens = append(m.Screens, Screenshot{Meta: metaOf(c), Thumb: thumbFromFile(c.BlobPath)})
+		}
 		switch hm.Role {
 		case history.RoleUser:
 			m.Role = RoleUser
@@ -60,7 +65,11 @@ func (s *Service) load(ctx context.Context) string {
 // persistLocked queues m for the history store when saving is allowed.
 // The write happens off the session loop so a slow disk never delays the
 // transcript.
-func (s *Service) persistLocked(m Message) {
+//
+// shots are the screenshots of a user turn: their metadata is stored with
+// the message, and pixels only where the capture carries an image, which the
+// pipeline hands over solely when the user opted in to keeping screenshots.
+func (s *Service) persistLocked(m Message, shots []contracts.ScreenAttachment) {
 	if s.cfg.History == nil || s.cfg.Save == nil || !s.cfg.Save() {
 		return
 	}
@@ -78,6 +87,14 @@ func (s *Service) persistLocked(m Message) {
 	case RoleAssistant:
 		hm.Role = history.RoleAssistant
 	}
+	var metas []contracts.CaptureMetadata
+	imgs := map[contracts.CaptureID]*image.RGBA{}
+	for _, sh := range shots {
+		metas = append(metas, sh.Meta)
+		if sh.Image != nil {
+			imgs[sh.Meta.ID] = sh.Image
+		}
+	}
 	s.enqueueLocked(func(ctx context.Context, conv *string) {
 		ctx, cancel := context.WithTimeout(ctx, opTimeout)
 		defer cancel()
@@ -89,7 +106,13 @@ func (s *Service) persistLocked(m Message) {
 			}
 			*conv = c.ID
 		}
-		if _, err := s.cfg.History.AppendMessage(ctx, *conv, hm, nil, nil); err != nil {
+		if len(imgs) > 0 {
+			if err := s.cfg.History.SetKeepScreenshots(ctx, *conv, true); err != nil {
+				s.cfg.Log.Warn("chat: enable screenshots failed", "err", err)
+				imgs = nil // no opt-in on the conversation: store no pixels
+			}
+		}
+		if _, err := s.cfg.History.AppendMessage(ctx, *conv, hm, metas, imgs); err != nil {
 			s.cfg.Log.Warn("chat: store message failed", "err", err)
 		}
 	})

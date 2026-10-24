@@ -95,6 +95,8 @@ func (f *fakeStore) AppendMessage(_ context.Context, id string, m history.Messag
 	return "", history.ErrNotFound
 }
 
+func (f *fakeStore) SetKeepScreenshots(context.Context, string, bool) error { return nil }
+
 func (f *fakeStore) messages() []history.Message {
 	f.mu.Lock()
 	defer f.mu.Unlock()

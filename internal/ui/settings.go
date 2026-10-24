@@ -352,15 +352,21 @@ func (p *settingsPage) sectionRows(th *theme.Theme, l Lang, cur settings.Setting
 			}),
 		)}
 	case secScreen:
-		return []layout.Widget{panelOf(th,
+		rows := []layout.Widget{panelOf(th,
 			setting(th, l, "screen.target", "screen.target.d", false, func(gtx layout.Context) layout.Dimensions {
 				return kit.Segmented(gtx, th, &p.screenTarget, []kit.Option{
 					{Key: string(settings.ScreenActive), Label: T(l, "screen.active")},
 					{Key: string(settings.ScreenAll), Label: T(l, "screen.all")},
 				})
 			}),
-			setting(th, l, "screen.keepShots", "screen.keepShots.d", false, toggle(&p.keepShots, "screen.keepShots")),
+			setting(th, l, "screen.keepShots", "screen.keepShots.d", true, toggle(&p.keepShots, "screen.keepShots")),
 		)}
+		if cur.Screen.KeepScreenshots && !cur.Privacy.SaveTranscripts {
+			// Kept pictures hang off stored messages, so without saved
+			// conversations the switch does nothing.
+			rows = append(rows, kit.Small(th, T(l, "screen.keepShots.needsSave")).Layout)
+		}
+		return rows
 	case secPrivacy:
 		return []layout.Widget{panelOf(th,
 			setting(th, l, "privacy.saveText", "privacy.saveText.d", true, toggle(&p.saveText, "privacy.saveText")),

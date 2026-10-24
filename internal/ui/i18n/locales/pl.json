@@ -382,5 +382,8 @@
   "wiz.fix.overlay_failed": "Nie udało się wyświetlić wskazówek nad oknami. Sprawdź ponownie; szczegóły w Diagnostyce.",
   "wiz.fix.stale": "Ekrany zmieniły się podczas sprawdzania. Uruchom je ponownie.",
   "wiz.fix.hotkey_conflict": "Inna aplikacja używa już tego skrótu. Zwolnij go lub ustaw inny.",
-  "wiz.fix.detect_failed": "Sprawdzanie systemu nie zakończyło się. Uruchom je ponownie."
+  "wiz.fix.detect_failed": "Sprawdzanie systemu nie zakończyło się. Uruchom je ponownie.",
+  "chat.shot.attached": "Dołączono zrzut ekranu",
+  "chat.shot.kept": "Zrzut ekranu zapisany z tą wiadomością",
+  "screen.keepShots.needsSave": "Zrzuty ekranu są zachowywane tylko wtedy, gdy w Prywatności włączono „Zapisuj rozmowy”."
 }

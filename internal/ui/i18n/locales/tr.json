@@ -382,5 +382,8 @@
   "wiz.fix.overlay_failed": "Pencerelerin üzerinde ipucu gösterilemedi. Yeniden kontrol edin; ayrıntılar Tanılama'da.",
   "wiz.fix.stale": "Kontrol sırasında ekranlar değişti. Yeniden çalıştırın.",
   "wiz.fix.hotkey_conflict": "Bu kısayolu başka bir uygulama kullanıyor. Serbest bırakın veya başka bir tane atayın.",
-  "wiz.fix.detect_failed": "Sistem kontrolü tamamlanmadı. Yeniden çalıştırın."
+  "wiz.fix.detect_failed": "Sistem kontrolü tamamlanmadı. Yeniden çalıştırın.",
+  "chat.shot.attached": "Ekran görüntüsü eklendi",
+  "chat.shot.kept": "Ekran görüntüsü bu iletiyle kaydedildi",
+  "screen.keepShots.needsSave": "Ekran görüntüleri yalnızca Gizlilik’te “Konuşmaları kaydet” açıksa saklanır."
 }

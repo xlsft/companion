@@ -382,5 +382,8 @@
   "wiz.fix.overlay_failed": "Impossible d’afficher des indications au-dessus des fenêtres. Vérifiez à nouveau ; le Diagnostic donne les détails.",
   "wiz.fix.stale": "Les écrans ont changé pendant la vérification. Relancez-la.",
   "wiz.fix.hotkey_conflict": "Une autre app utilise déjà ce raccourci. Libérez-le ou choisissez-en un autre.",
-  "wiz.fix.detect_failed": "La vérification du système n’a pas abouti. Relancez-la."
+  "wiz.fix.detect_failed": "La vérification du système n’a pas abouti. Relancez-la.",
+  "chat.shot.attached": "Capture d'écran jointe",
+  "chat.shot.kept": "Capture enregistrée avec ce message",
+  "screen.keepShots.needsSave": "Les captures ne sont conservées que si « Enregistrer les conversations » est activé dans Confidentialité."
 }

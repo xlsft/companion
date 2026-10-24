@@ -1,11 +1,13 @@
 package ui
 
 import (
+	"image"
 	"image/color"
 	"strings"
 
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -38,6 +40,9 @@ type homePage struct {
 	stopBtn widget.Clickable
 	// sels keeps message text selectable, one per message.
 	sels []widget.Selectable
+	// thumbs caches the texture of each kept screenshot by its (immutable)
+	// pixel buffer; entries die with the next conversation.
+	thumbs map[*image.RGBA]paint.ImageOp
 }
 
 func newHomePage(m *mainUI) *homePage {
@@ -227,9 +232,53 @@ func (p *homePage) userMessage(gtx layout.Context, th *theme.Theme, l Lang, m ch
 					return b.Layout(gtx)
 				})
 			}),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return p.screens(gtx, th, l, m.Screens)
+			}),
 			kit.VSpace(th.Dp(6)),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				return metaRow(gtx, th, metaIcon, strings.Join(meta, " · "), th.Pal.Muted)
+			}),
+		)
+	})
+}
+
+// screens shows that the request carried a screenshot: a chip, and the
+// thumbnail only if the user chose to keep screenshots. Without the opt-in
+// there are no pixels left to show once the request is over.
+func (p *homePage) screens(gtx layout.Context, th *theme.Theme, l Lang, shots []chat.Screenshot) layout.Dimensions {
+	if len(shots) == 0 {
+		return layout.Dimensions{}
+	}
+	kept := shots[0].Thumb
+	key := "chat.shot.attached"
+	if kept != nil {
+		key = "chat.shot.kept"
+	}
+	return layout.Inset{Top: th.Dp(6)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return layout.Flex{Axis: layout.Vertical, Alignment: layout.End}.Layout(gtx,
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				if kept == nil {
+					return layout.Dimensions{}
+				}
+				op, ok := p.thumbs[kept]
+				if !ok {
+					if p.thumbs == nil || len(p.thumbs) > 64 {
+						p.thumbs = map[*image.RGBA]paint.ImageOp{}
+					}
+					op = paint.NewImageOp(kept)
+					p.thumbs[kept] = op
+				}
+				return layout.Inset{Bottom: th.Dp(6)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					return kit.Box(gtx, th, color.NRGBA{}, th.Pal.Divider, 6, func(gtx layout.Context) layout.Dimensions {
+						gtx.Constraints.Max.Y = min(gtx.Constraints.Max.Y, gtx.Dp(th.Dp(120)))
+						gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(th.Dp(220)))
+						return widget.Image{Src: op, Fit: widget.ScaleDown}.Layout(gtx)
+					})
+				})
+			}),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return kit.Chip(gtx, th, icon.Attachment, T(l, key))
 			}),
 		)
 	})

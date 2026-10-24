@@ -382,5 +382,8 @@
   "wiz.fix.overlay_failed": "No se pudieron dibujar pistas sobre las ventanas. Vuelve a comprobar; Diagnóstico muestra los detalles.",
   "wiz.fix.stale": "Las pantallas cambiaron durante la comprobación. Ejecútala de nuevo.",
   "wiz.fix.hotkey_conflict": "Otra app ya usa este atajo. Libéralo o asigna otro.",
-  "wiz.fix.detect_failed": "La comprobación del sistema no terminó. Ejecútala de nuevo."
+  "wiz.fix.detect_failed": "La comprobación del sistema no terminó. Ejecútala de nuevo.",
+  "chat.shot.attached": "Captura de pantalla adjunta",
+  "chat.shot.kept": "Captura guardada con este mensaje",
+  "screen.keepShots.needsSave": "Las capturas solo se guardan si «Guardar conversaciones» está activado en Privacidad."
 }

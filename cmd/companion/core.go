@@ -166,6 +166,14 @@ func newCore(ctx context.Context, log *slog.Logger, dataDir string, db *store.DB
 		STTModel: c.sttModelName,
 		Log:      log,
 	})
+	// Pixels reach the chat only when both opt-ins are on: kept screenshots
+	// live with a stored message, so there is nothing to attach them to
+	// when transcripts are not saved.
+	c.orch.Attachments = c.chat
+	c.orch.KeepScreenshots = func() bool {
+		s := c.settings.Get()
+		return s.Screen.KeepScreenshots && s.Privacy.SaveTranscripts
+	}
 	return c, nil
 }
 
