@@ -75,6 +75,16 @@ func TestPaletteContrast(t *testing.T) {
 	}
 }
 
+// The selection must stand out from the field it is drawn on, or Ctrl+A
+// looks like it did nothing.
+func TestSelectionVisibleOnFields(t *testing.T) {
+	for name, p := range map[string]Palette{"light": Light, "dark": Dark} {
+		if r := contrast(rgb3(p.Selected), rgb3(p.Raised)); r < 1.5 {
+			t.Errorf("%s: selection on a field contrast %.2f < 1.5", name, r)
+		}
+	}
+}
+
 // Gio blends translucent fills in linear light, so every tint must be a
 // pre-mixed opaque colour; only the dialog scrim is translucent.
 func TestTintsOpaque(t *testing.T) {

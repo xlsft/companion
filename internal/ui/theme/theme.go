@@ -67,8 +67,11 @@ type Palette struct {
 // tokens of a palette.
 type tints struct {
 	accentSoft, accentTint, accentStrong float32
-	ok, warn, err                        float32
-	warnRow, errRow                      float32
+	// selected is the text selection: strong enough to read on a field,
+	// which AccentSoft (a hover-grade tint) is not.
+	selected        float32
+	ok, warn, err   float32
+	warnRow, errRow float32
 }
 
 // withTints fills in p's tint tokens, mixed into the backgrounds they are
@@ -77,7 +80,7 @@ func withTints(p Palette, t tints) Palette {
 	p.AccentSoft = mix(p.Bg, p.AccentLine, t.accentSoft)
 	p.AccentTint = mix(p.Bg, p.AccentLine, t.accentTint)
 	p.AccentStrong = mix(p.Bg, p.AccentLine, t.accentStrong)
-	p.Selected = p.AccentSoft
+	p.Selected = mix(p.Bg, p.AccentLine, t.selected)
 	p.OKSoft = mix(p.Surface, rgb(0x10b981), t.ok)
 	p.WarnSoft = mix(p.Surface, rgb(0xf97316), t.warn)
 	p.ErrSoft = mix(p.Surface, rgb(0xef4444), t.err)
@@ -116,7 +119,7 @@ var Dark = withTints(Palette{
 	OK:             rgb(0x34d399),
 	Warn:           rgb(0xfb923c),
 	Error:          rgb(0xf87171),
-}, tints{accentSoft: 0.12, accentTint: 0.08, accentStrong: 0.18, ok: 0.12, warn: 0.14, err: 0.14, warnRow: 0.05, errRow: 0.06})
+}, tints{accentSoft: 0.12, accentTint: 0.08, accentStrong: 0.18, selected: 0.40, ok: 0.12, warn: 0.14, err: 0.14, warnRow: 0.05, errRow: 0.06})
 
 var Light = withTints(Palette{
 	Bg:             hsl(240, 5, 98),
@@ -141,7 +144,7 @@ var Light = withTints(Palette{
 	OK:             rgb(0x047857),
 	Warn:           rgb(0xc2410c),
 	Error:          rgb(0xb91c1c),
-}, tints{accentSoft: 0.10, accentTint: 0.06, accentStrong: 0.16, ok: 0.12, warn: 0.12, err: 0.10, warnRow: 0.05, errRow: 0.05})
+}, tints{accentSoft: 0.10, accentTint: 0.06, accentStrong: 0.16, selected: 0.38, ok: 0.12, warn: 0.12, err: 0.10, warnRow: 0.05, errRow: 0.05})
 
 // Typefaces of the bundled fonts (see fonts/).
 const (
