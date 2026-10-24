@@ -41,6 +41,9 @@ type FakeSource struct {
 	// HangAfter > 0 stops delivering without closing, like a backend that
 	// silently stops calling back.
 	HangAfter time.Duration
+	// BlockClose, if set, makes raw Close wait until it is closed, like a
+	// backend that wedges while releasing the device.
+	BlockClose chan struct{}
 	// Devices overrides the device list; default is [FakeDevice].
 	DeviceList []Device
 
@@ -126,6 +129,9 @@ func (r *fakeRaw) Err() error {
 func (r *fakeRaw) Close() error {
 	r.stopOnce.Do(func() { close(r.stop) })
 	<-r.done
+	if r.src.BlockClose != nil {
+		<-r.src.BlockClose
+	}
 	return nil
 }
 

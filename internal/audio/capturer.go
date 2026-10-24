@@ -11,6 +11,10 @@ import (
 // stop calling back without reporting an error; this keeps Read from hanging.
 const DefaultStallTimeout = 2 * time.Second
 
+// releaseTimeout bounds how long ending a stream waits for the backend to
+// release the device.
+const releaseTimeout = time.Second
+
 // frameBuffer is how many frames may queue for a slow reader (1 s) before the
 // pipeline applies backpressure to the raw stream.
 const frameBuffer = 50
@@ -109,15 +113,28 @@ func (s *stream) Close() error {
 }
 
 // run owns the raw stream: it is the only goroutine that reads it and the one
-// that releases it, so the device is always freed before Frames is closed.
+// that releases it, so the device is normally freed before Frames is closed.
 func (s *stream) run(ctx context.Context) {
 	defer close(s.done)
 	defer close(s.out)
 	err := s.pump(ctx)
-	s.raw.Close()
 	s.mu.Lock()
 	s.err = err
 	s.mu.Unlock()
+	// A native backend that wedges in release must not wedge the session
+	// too: after releaseTimeout we give up waiting and leave the release
+	// goroutine behind, which beats a hung voice session.
+	released := make(chan struct{})
+	go func() {
+		defer close(released)
+		s.raw.Close()
+	}()
+	t := time.NewTimer(releaseTimeout)
+	defer t.Stop()
+	select {
+	case <-released:
+	case <-t.C:
+	}
 }
 
 func (s *stream) pump(ctx context.Context) error {

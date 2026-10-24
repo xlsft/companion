@@ -238,3 +238,21 @@ func TestStreamResamplesToTone(t *testing.T) {
 		t.Fatalf("1 kHz amplitude %.4f of total %.4f", got, rms(x)*math.Sqrt2)
 	}
 }
+
+func TestWedgedBackendReleaseDoesNotHang(t *testing.T) {
+	checkNoLeak(t)
+	block := make(chan struct{})
+	src := &FakeSource{BlockClose: block}
+	s, err := NewCapturer(src).Open(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-s.Frames()
+	start := time.Now()
+	s.Close()
+	if d := time.Since(start); d > releaseTimeout+200*time.Millisecond {
+		t.Fatalf("Close took %v with a wedged backend", d)
+	}
+	drain(t, s, time.Second) // Frames is closed
+	close(block)             // the backend recovers; its release goroutine exits
+}
