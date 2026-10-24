@@ -1,0 +1,69 @@
+[
+ {
+  "id": 50,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "running",
+   "props": {
+    "media.class": "Audio/Sink",
+    "node.name": "alsa_output"
+   }
+  }
+ },
+ {
+  "id": 57,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "running",
+   "props": {
+    "media.class": "Audio/Source",
+    "node.name": "alsa_input.usb"
+   }
+  }
+ },
+ {
+  "id": 89,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "running",
+   "props": {
+    "media.class": "Stream/Input/Audio",
+    "node.name": "cava",
+    "media.role": "Music",
+    "stream.capture.sink": true,
+    "application.process.id": 4000
+   }
+  }
+ },
+ {
+  "id": 1,
+  "type": "PipeWire:Interface:Link",
+  "info": {
+   "output-node-id": 50,
+   "input-node-id": 89,
+   "state": "active"
+  }
+ },
+ {
+  "id": 91,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "running",
+   "props": {
+    "media.class": "Stream/Input/Audio",
+    "node.name": "recorder",
+    "application.name": "arecord-gui",
+    "application.process.id": 5200
+   }
+  }
+ },
+ {
+  "id": 3,
+  "type": "PipeWire:Interface:Link",
+  "info": {
+   "output-node-id": 57,
+   "input-node-id": 91,
+   "state": "active"
+  }
+ }
+]

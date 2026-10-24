@@ -49,7 +49,7 @@ Rules:
 3. Platform selection happens in `internal/platform` via build tags (`linux`, `windows`, `darwin`) and runtime detection (X11 vs Wayland, compositor, portals).
 4. Every platform operation that may be missing returns `contracts.ErrUnsupported` wrapped with the capability name; callers consult the capability report first and present a fallback (PRD §4.2).
 5. All long operations take `context.Context` and honour cancellation.
-6. cgo is allowed only inside `internal/platform/*` and `cmd/stt-sidecar`. The rest of the core stays pure Go so it cross-compiles.
+6. cgo is allowed only inside `internal/platform/*`, `cmd/stt-sidecar` and the build-tagged `internal/stt/engine/whisper` (imported only by the sidecar). The rest of the core stays pure Go so it cross-compiles.
 
 ### Platform boundaries
 
