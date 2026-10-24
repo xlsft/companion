@@ -112,7 +112,9 @@ whisper-clean:
 # dynamically with an $ORIGIN runpath, so they are copied next to it.
 
 sherpa_triple = $(shell uname -m | sed 's/^arm64$$/aarch64/')-unknown-linux-gnu
-SHERPA_LIB    = $(shell go list -m -f '{{.Dir}}' github.com/k2-fsa/sherpa-onnx-go-linux)/lib/$(sherpa_triple)
+# The module is indirect, so a clean cache (CI) has no Dir for it until it is
+# downloaded; go list alone then yields an empty path.
+SHERPA_LIB    = $(shell go mod download github.com/k2-fsa/sherpa-onnx-go-linux && go list -m -f '{{.Dir}}' github.com/k2-fsa/sherpa-onnx-go-linux)/lib/$(sherpa_triple)
 SHERPA_LIBS   = libsherpa-onnx-c-api.so libonnxruntime.so
 # \$$ORIGIN reaches the linker literally through make and sh.
 SHERPA_RPATH  = -Wl,-rpath,\$$ORIGIN
