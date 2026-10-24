@@ -20,7 +20,7 @@ import (
 // Look of the hints, from the design prototypes. Sizes are logical pixels
 // and are multiplied by the display scale.
 var (
-	defaultColor = color.NRGBA{R: 0xFF, G: 0x8A, B: 0x00, A: 0xFF}
+	defaultColor = color.NRGBA{R: 0x8B, G: 0x5C, B: 0xF6, A: 0xFF} // brand violet, as the logo
 	labelBg      = color.NRGBA{R: 0x11, G: 0x11, B: 0x11, A: 0xEB}
 	labelFg      = color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
 )

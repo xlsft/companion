@@ -83,7 +83,7 @@ func TestRenderShapes(t *testing.T) {
 				case "clear":
 					ok = c.A == 0
 				case "accent":
-					ok = c.A > 200 && c.R > 200 && c.G > 100 && c.B < 60
+					ok = c.A > 200 && c.B > 200 && c.R > 100 && c.G < 120
 				case "faint":
 					ok = c.A > 0 && c.A < 200
 				case "dark":
