@@ -3,6 +3,10 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 LDFLAGS := -X github.com/xlsft/openclick/internal/buildinfo.Version=$(VERSION) \
            -X github.com/xlsft/openclick/internal/buildinfo.Commit=$(COMMIT)
 
+# Gio's Vulkan backend needs vulkan-headers at build time; the GL/EGL backend
+# covers every target, so build without it (ADR-0001 amendment 1).
+export GOFLAGS := $(strip $(GOFLAGS) -tags=novulkan)
+
 .PHONY: build test vet cross
 
 # Native build with cgo: covers the Gio UI and cmd/companion, which the

@@ -83,3 +83,4 @@ Gio's Linux (Wayland/X11/EGL) and macOS backends are cgo, so rule 6 cannot hold 
 - Business logic stays out of `internal/ui`, so it remains covered by the pure-Go cross build; the UI reads and writes through domain services such as `internal/settings.Service`.
 - The tray (`internal/platform/tray`, `fyne.io/systray`) is pure Go on Linux and Windows and cgo on macOS; a `CGO_ENABLED=0` darwin build gets a stub that returns `Unsupported(CapTray)`.
 - Gio's event loop must own the main goroutine (`app.Main()`); `cmd/companion` runs the `internal/app` lifecycle in a goroutine and exits the process when it returns.
+- Gio is built with `-tags novulkan` (set via `GOFLAGS` in the Makefile): its Vulkan backend needs vulkan-headers at build time, while the GL/EGL backend (Linux), Metal (macOS) and D3D11 (Windows) cover every target. Bare `go build/test` outside make needs the same tag unless vulkan-headers are installed.
