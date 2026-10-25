@@ -55,3 +55,21 @@ func TestPresetFor(t *testing.T) {
 		})
 	}
 }
+
+func TestNeedsKey(t *testing.T) {
+	tests := []struct {
+		kind llm.Kind
+		url  string
+		want bool
+	}{
+		{llm.KindOpenAI, "https://api.openai.com/v1", true},
+		{llm.KindAnthropic, "https://api.anthropic.com", true},
+		{llm.KindOpenAI, "http://localhost:11434/v1", false},
+		{llm.KindOpenAI, "http://192.168.1.20:8000/v1", false},
+	}
+	for _, tt := range tests {
+		if got := NeedsKey(tt.kind, tt.url); got != tt.want {
+			t.Errorf("NeedsKey(%s, %q) = %v, want %v", tt.kind, tt.url, got, tt.want)
+		}
+	}
+}

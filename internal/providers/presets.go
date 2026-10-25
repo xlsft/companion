@@ -44,3 +44,12 @@ func PresetFor(kind llm.Kind, baseURL string) (Preset, bool) {
 	}
 	return Preset{}, false
 }
+
+// NeedsKey reports whether the endpoint takes an API key: the hosted
+// presets do; a local preset and a server of the user's own may not.
+func NeedsKey(kind llm.Kind, baseURL string) bool {
+	if p, ok := PresetFor(kind, baseURL); ok {
+		return !p.Local
+	}
+	return false
+}
