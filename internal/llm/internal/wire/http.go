@@ -129,11 +129,15 @@ func (b *Body) release() {
 	b.cancel(nil)
 }
 
-func (b *Body) normalize(err error) error {
-	if errors.Is(context.Cause(b.ctx), errIdle) {
+func (b *Body) normalize(err error) error { return normalize(b.parent, b.ctx, err) }
+
+// normalize maps a transport error of a request run under ctx, derived
+// from parent, to a normalized one.
+func normalize(parent, ctx context.Context, err error) error {
+	if errors.Is(context.Cause(ctx), errIdle) {
 		return llm.ErrTimeout
 	}
-	if perr := b.parent.Err(); perr != nil {
+	if perr := parent.Err(); perr != nil {
 		return perr
 	}
 	var ue *url.Error
