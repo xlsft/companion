@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -103,6 +104,14 @@ func main() {
 	relaunch := exe
 	if img := update.AppImageFromEnv(exe, os.Getenv); img != "" {
 		relaunch = img
+	} else if exeErr == nil && runtime.GOOS == "linux" {
+		// Older installers wrote a menu entry the launcher cannot start;
+		// an update replaces only the binaries, so fix it here.
+		if changed, err := desktop.RepairEntry(desktop.DataHome(), exe); err != nil {
+			log.Warn("desktop entry repair failed", "err", err)
+		} else if changed {
+			log.Info("desktop entry now starts companion by its full path")
+		}
 	}
 	var onInstalled func()
 	if exeErr == nil {
