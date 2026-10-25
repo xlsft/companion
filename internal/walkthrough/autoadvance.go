@@ -77,6 +77,11 @@ func (s *Service) watch(ctx context.Context, wgen uint64, at int, area contracts
 			return
 		case <-tick.C:
 		}
+		// select picks at random when the tick and a pause land together;
+		// a paused walkthrough must not look at the screen once more.
+		if ctx.Err() != nil {
+			return
+		}
 		caps, err := s.cfg.Watch.Capturer.Capture(ctx, req)
 		if ctx.Err() != nil {
 			releaseCaps(caps)
