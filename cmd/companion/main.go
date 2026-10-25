@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -43,7 +44,7 @@ func main() {
 	}
 	showVersion := flag.Bool("version", false, "print version and exit")
 	diagnose := flag.Bool("diagnose", false, "print the platform capability report as JSON and exit")
-	dataDir := flag.String("data", "", "data directory (default: user config dir/openclick)")
+	dataDir := flag.String("data", "", "data directory (default: user config dir/companion)")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(buildinfo.String())
@@ -168,16 +169,37 @@ func main() {
 	gioapp.Main()
 }
 
-// resolveDataDir is dir, or the user config dir's openclick folder.
+// resolveDataDir is dir, or the user config dir's companion folder.
 func resolveDataDir(dir string) (string, error) {
 	if dir == "" {
 		base, err := os.UserConfigDir()
 		if err != nil {
 			return "", err
 		}
-		dir = filepath.Join(base, "openclick")
+		if dir, err = adoptLegacyDir(base); err != nil {
+			return "", err
+		}
 	}
 	return dir, os.MkdirAll(dir, 0o700)
+}
+
+// adoptLegacyDir returns base/companion, first renaming base/openclick to
+// it: versions before 0.1.0 kept the data under the project's old name,
+// and their users keep their setup. A companion folder that already exists
+// wins and the old one is left alone.
+func adoptLegacyDir(base string) (string, error) {
+	dir := filepath.Join(base, "companion")
+	old := filepath.Join(base, "openclick")
+	if _, err := os.Stat(dir); !errors.Is(err, fs.ErrNotExist) {
+		return dir, nil
+	}
+	if fi, err := os.Stat(old); err != nil || !fi.IsDir() {
+		return dir, nil
+	}
+	if err := os.Rename(old, dir); err != nil {
+		return "", fmt.Errorf("move %s to %s: %w", old, dir, err)
+	}
+	return dir, nil
 }
 
 func openSettings(ctx context.Context, dir string) (*store.DB, *settings.Service, error) {
@@ -213,7 +235,7 @@ func runDiagnose() {
 // runCtl sends one command to the running core's control socket.
 func runCtl(args []string) int {
 	fs := flag.NewFlagSet("ctl", flag.ContinueOnError)
-	socket := fs.String("socket", "", "control socket path (default $XDG_RUNTIME_DIR/openclick/control.sock)")
+	socket := fs.String("socket", "", "control socket path (default $XDG_RUNTIME_DIR/companion/control.sock)")
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(), "usage: companion ctl [-socket path] <%s>\n", strings.Join(control.CtlCommands(), "|"))
 		fs.PrintDefaults()
