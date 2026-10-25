@@ -22,6 +22,9 @@ type harness struct {
 	msgs   chan *protocol.Message
 	done   chan error
 	nextID uint64
+	// early holds responses that arrived before their request was awaited:
+	// a cancel may answer the request it cancels before its own reply.
+	early map[string]*protocol.Message
 }
 
 func newHarness(t *testing.T, opts fake.Options) *harness {
@@ -91,6 +94,10 @@ func (h *harness) notify(method string, params any) {
 // await returns the response for id, collecting notifications seen before it.
 func (h *harness) await(id json.RawMessage) (*protocol.Message, []*protocol.Message) {
 	h.t.Helper()
+	if m, ok := h.early[string(id)]; ok {
+		delete(h.early, string(id))
+		return m, nil
+	}
 	var notes []*protocol.Message
 	timeout := time.After(5 * time.Second)
 	for {
@@ -106,11 +113,28 @@ func (h *harness) await(id json.RawMessage) (*protocol.Message, []*protocol.Mess
 			if string(m.ID) == string(id) {
 				return m, notes
 			}
+			if uid := string(m.ID); uid != "" && h.knownID(uid) {
+				if h.early == nil {
+					h.early = map[string]*protocol.Message{}
+				}
+				h.early[uid] = m
+				continue
+			}
 			h.t.Fatalf("unexpected response %s", m.ID)
 		case <-timeout:
 			h.t.Fatalf("no response for %s", id)
 		}
 	}
+}
+
+// knownID reports whether id is one of the requests this harness sent.
+func (h *harness) knownID(id string) bool {
+	for i := uint64(1); i <= h.nextID; i++ {
+		if string(protocol.IntID(i)) == id {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *harness) call(method string, params, result any) error {
