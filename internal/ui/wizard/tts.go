@@ -3,6 +3,7 @@ package wizard
 import (
 	"context"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -19,6 +20,10 @@ import (
 // async fields are guarded by Wizard.mu.
 type ttsState struct {
 	provider  widget.Enum
+	preset    kit.Dropdown
+	custom    bool // "Other endpoint" picked: no preset matches on purpose
+	baseURL   widget.Editor
+	model     widget.Editor
 	key       widget.Editor
 	speed     kit.Slider
 	voiceEnum widget.Enum
@@ -41,6 +46,7 @@ type ttsState struct {
 func (t *ttsState) init() {
 	t.provider.Value = TTSOpenAI
 	t.key.SingleLine, t.key.Mask = true, '•'
+	t.baseURL.SingleLine, t.model.SingleLine = true, true
 	t.speed.Float.Value = speedToSlider(tts.DefaultSpeed)
 }
 
@@ -105,16 +111,28 @@ func (t *ttsState) update(w *Wizard, gtx layout.Context, s snapshot) {
 	w.mu.Unlock()
 	if prefill {
 		t.provider.Value = cfg.Provider
+		t.baseURL.SetText(cfg.BaseURL)
+		t.model.SetText(cfg.Model)
+		changed(gtx, &t.baseURL)
+		changed(gtx, &t.model)
 		if cfg.Speed > 0 {
 			t.speed.Float.Value = speedToSlider(cfg.Speed)
 		}
 		t.dirty = false
+	}
+	if i := t.preset.Update(gtx, len(tts.Presets)+1); i >= 0 {
+		t.pickPreset(w, gtx, i)
 	}
 	if t.provider.Update(gtx) {
 		t.dirty = true
 		w.mu.Lock()
 		t.voices, t.voice = nil, ""
 		w.mu.Unlock()
+	}
+	for _, e := range []*widget.Editor{&t.baseURL, &t.model} {
+		if changed(gtx, e) {
+			t.dirty = true
+		}
 	}
 	if changed(gtx, &t.key) {
 		t.dirty = true
@@ -148,6 +166,64 @@ func (t *ttsState) update(w *Wizard, gtx layout.Context, s snapshot) {
 	}
 }
 
+// endpoint is the form's Base URL, only for an OpenAI-compatible provider:
+// ElevenLabs is its own service.
+func (t *ttsState) endpoint() string {
+	if t.provider.Value != TTSOpenAI {
+		return ""
+	}
+	return strings.TrimSpace(t.baseURL.Text())
+}
+
+// presetIndex is the dropdown's selection: the matching preset, the
+// "Other endpoint" row (len(tts.Presets)) for an address of the user's own,
+// or -1.
+func (t *ttsState) presetIndex() int {
+	if p, ok := tts.PresetFor(t.provider.Value, t.endpoint()); ok && !t.custom {
+		return slices.IndexFunc(tts.Presets, func(x tts.Preset) bool { return x.ID == p.ID })
+	}
+	if t.custom || t.endpoint() != "" {
+		return len(tts.Presets)
+	}
+	return -1
+}
+
+// pickPreset fills the form from preset i; len(tts.Presets) is "Other
+// endpoint". A model the user typed is kept. Voices belong to a server, so
+// they are reloaded after the next Save.
+func (t *ttsState) pickPreset(w *Wizard, gtx layout.Context, i int) {
+	t.dirty = true
+	w.mu.Lock()
+	t.voices, t.voice = nil, ""
+	w.mu.Unlock()
+	if i >= len(tts.Presets) {
+		t.custom = true
+		t.provider.Value = TTSOpenAI
+		if _, ok := tts.PresetFor(TTSOpenAI, t.endpoint()); ok {
+			t.baseURL.SetText("")
+			changed(gtx, &t.baseURL)
+		}
+		gtx.Execute(key.FocusCmd{Tag: &t.baseURL})
+		return
+	}
+	p := tts.Presets[i]
+	t.custom = false
+	t.provider.Value = p.Provider
+	t.baseURL.SetText(p.BaseURL)
+	changed(gtx, &t.baseURL)
+	if m := strings.TrimSpace(t.model.Text()); m == "" || slices.ContainsFunc(tts.Presets, func(x tts.Preset) bool { return x.Model == m }) {
+		t.model.SetText(p.Model)
+		changed(gtx, &t.model)
+	}
+	if !p.Local {
+		gtx.Execute(key.FocusCmd{Tag: &t.key})
+	}
+}
+
+// keyless reports a saved endpoint of the user's own, which may take no
+// key; voices can be listed without one.
+func keyless(cfg TTSConfig) bool { return cfg.Provider == TTSOpenAI && cfg.BaseURL != "" }
+
 // save stores the form; the key leaves the editor at once.
 func (t *ttsState) save(w *Wizard, gtx layout.Context) {
 	b := w.cfg.Backends.TTS
@@ -156,8 +232,12 @@ func (t *ttsState) save(w *Wizard, gtx layout.Context) {
 		w.mu.Unlock()
 		return
 	}
-	providerChanged := t.cfg.Provider != t.provider.Value
-	cfg := TTSConfig{Provider: t.provider.Value, Voice: t.voice, Speed: sliderToSpeed(t.speed.Float.Value)}
+	model := ""
+	if t.provider.Value == TTSOpenAI {
+		model = strings.TrimSpace(t.model.Text())
+	}
+	providerChanged := t.cfg.Provider != t.provider.Value || t.cfg.BaseURL != t.endpoint() || t.cfg.Model != model
+	cfg := TTSConfig{Provider: t.provider.Value, BaseURL: t.endpoint(), Model: model, Voice: t.voice, Speed: sliderToSpeed(t.speed.Float.Value)}
 	t.saving, t.err = true, ""
 	w.mu.Unlock()
 	apiKey := strings.TrimSpace(t.key.Text())

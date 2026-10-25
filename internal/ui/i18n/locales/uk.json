@@ -191,6 +191,7 @@
   "wiz.byok.provider.local": "На цьому комп’ютері",
   "wiz.byok.provider.custom": "Інша адреса",
   "wiz.byok.provider.custom.d": "Будь-який API, сумісний з Anthropic або OpenAI",
+  "wiz.tts.provider.custom.d": "Будь-який сервер мовлення, сумісний з OpenAI",
   "wiz.byok.key.local": "не потрібен для локального сервера",
   "wiz.byok.kind": "Тип API",
   "wiz.byok.kind.anthropic": "Сумісний з Anthropic",

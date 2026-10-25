@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/xlsft/companion/internal/audio"
 	"github.com/xlsft/companion/internal/models"
@@ -97,7 +98,7 @@ func (t setupTTS) Config(ctx context.Context) (wizard.TTSConfig, error) {
 }
 
 func ttsConfig(ctx context.Context, sec contracts.SecretStore, s settings.Settings) wizard.TTSConfig {
-	cfg := wizard.TTSConfig{Provider: s.TTS.ProviderID, Voice: s.TTS.Voice, Speed: s.Voice.TTSSpeed}
+	cfg := wizard.TTSConfig{Provider: s.TTS.ProviderID, BaseURL: s.TTS.BaseURL, Model: s.TTS.Model, Voice: s.TTS.Voice, Speed: s.Voice.TTSSpeed}
 	if cfg.Provider != "" {
 		key, err := sec.Get(ctx, ttsSecret(cfg.Provider))
 		cfg.HasKey = err == nil && len(key) > 0
@@ -137,6 +138,7 @@ func saveTTS(ctx context.Context, sec contracts.SecretStore, svc *settings.Servi
 	speed = math.Min(tts.MaxSpeed, math.Max(tts.MinSpeed, speed))
 	return svc.Update(ctx, func(s *settings.Settings) {
 		s.TTS.ProviderID, s.TTS.Voice, s.TTS.APIKeyRef = cfg.Provider, cfg.Voice, ref
+		s.TTS.BaseURL, s.TTS.Model = strings.TrimSpace(cfg.BaseURL), strings.TrimSpace(cfg.Model)
 		s.Voice.TTSSpeed = speed
 	})
 }

@@ -191,6 +191,7 @@
   "wiz.byok.provider.local": "このコンピューター上",
   "wiz.byok.provider.custom": "その他のアドレス",
   "wiz.byok.provider.custom.d": "Anthropic または OpenAI 互換の任意の API",
+  "wiz.tts.provider.custom.d": "OpenAI 互換の任意の音声サーバー",
   "wiz.byok.key.local": "ローカルサーバーでは不要",
   "wiz.byok.kind": "API の種類",
   "wiz.byok.kind.anthropic": "Anthropic 互換",

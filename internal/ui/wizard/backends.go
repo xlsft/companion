@@ -119,8 +119,11 @@ const (
 // TTSConfig is the speech-output configuration shown in the wizard.
 type TTSConfig struct {
 	Provider string // TTSOpenAI or TTSElevenLabs
-	Voice    string
-	Speed    float64 // tts.MinSpeed…tts.MaxSpeed
+	// BaseURL and Model point an OpenAI-compatible provider at another
+	// server, e.g. a local one; "" keeps the provider's defaults.
+	BaseURL, Model string
+	Voice          string
+	Speed          float64 // tts.MinSpeed…tts.MaxSpeed
 	// HasKey is read-only: whether a key is stored. The key itself never
 	// comes back to the UI.
 	HasKey bool

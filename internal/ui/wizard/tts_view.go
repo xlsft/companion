@@ -32,7 +32,11 @@ func (t *ttsState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) ste
 			return kit.RadioCard(gtx, th, &t.provider, id, title, sub)
 		}
 	}
-	keyField := field(w, th, i18n.T(l, "wiz.tts.key"), i18n.T(l, "wiz.byok.key.hint"), &t.key, enabled)
+	keyHint := i18n.T(l, "wiz.byok.key.hint")
+	if p, ok := tts.PresetFor(t.provider.Value, t.endpoint()); ok && p.Local {
+		keyHint = i18n.T(l, "wiz.byok.key.local")
+	}
+	keyField := field(w, th, i18n.T(l, "wiz.tts.key"), keyHint, &t.key, enabled)
 	if cfg.HasKey && !t.replacing {
 		keyField = storedKey(w, th, l, i18n.T(l, "wiz.tts.key"), enabled)
 	}
@@ -56,10 +60,20 @@ func (t *ttsState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) ste
 		status = w.text(kit.Muted(th, i18n.T(l, "wiz.loading")))
 	}
 
-	return stepBody{rows: []layout.Widget{
+	rows := []layout.Widget{
+		providerPicker(w, th, l, &t.preset, ttsPresetOptions(l), t.presetIndex(), enabled),
 		kit.Flow(th, 220, 8, prov(TTSElevenLabs), prov(TTSOpenAI)),
+	}
+	// A compatible server is reached at its own address and model. Step
+	// rows must not be nil, so the row is added only when shown.
+	if t.provider.Value == TTSOpenAI {
+		rows = append(rows, kit.Flow(th, 200, 12,
+			field(w, th, i18n.T(l, "wiz.byok.baseURL"), "https://api.openai.com/v1", &t.baseURL, enabled),
+			field(w, th, i18n.T(l, "wiz.byok.model"), "gpt-4o-mini-tts", &t.model, enabled)))
+	}
+	return stepBody{rows: append(rows,
 		kit.VStack(th, 8, keyRow, status),
-		t.voicesBlock(w, th, l, voices, voice, loadingV, enabled && cfg.HasKey && !loadingV),
+		t.voicesBlock(w, th, l, voices, voice, loadingV, enabled && (cfg.HasKey || keyless(cfg)) && !loadingV),
 		func(gtx layout.Context) layout.Dimensions {
 			sp, ph := t.speedCard(w, th, l, enabled), t.phraseCard(w, th, l, s)
 			if gtx.Constraints.Max.X < gtx.Dp(th.Dp(560)) {
@@ -67,7 +81,24 @@ func (t *ttsState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) ste
 			}
 			return kit.Grid(th, 2, 16, sp, ph)(gtx)
 		},
-	}}
+	)}
+}
+
+// ttsPresetOptions are the voice step's dropdown rows: every speech
+// preset, then "Other endpoint" for any OpenAI-compatible speech server.
+func ttsPresetOptions(l i18n.Lang) []kit.RichOption {
+	opts := make([]kit.RichOption, 0, len(tts.Presets)+1)
+	for _, p := range tts.Presets {
+		o := kit.RichOption{Title: p.Name, Desc: i18n.T(l, "wiz.tts.provider."+p.Provider+".d")}
+		if p.BaseURL != "" {
+			o.Desc = hostOf(p.BaseURL)
+		}
+		if p.Local {
+			o.Tags = []kit.RichTag{{Text: i18n.T(l, "wiz.byok.provider.local"), Kind: kit.TagNeutral}}
+		}
+		opts = append(opts, o)
+	}
+	return append(opts, kit.RichOption{Title: i18n.T(l, "wiz.byok.provider.custom"), Desc: i18n.T(l, "wiz.tts.provider.custom.d")})
 }
 
 // storedKey stands in for a key field once a key is stored: the key never

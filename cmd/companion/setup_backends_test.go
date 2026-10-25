@@ -45,6 +45,9 @@ func TestSaveTTS(t *testing.T) {
 		{name: "unset speed is the default",
 			steps: []step{{wizard.TTSConfig{Provider: wizard.TTSElevenLabs}, "k"}},
 			want:  wizard.TTSConfig{Provider: wizard.TTSElevenLabs, Speed: tts.DefaultSpeed, HasKey: true}},
+		{name: "own server keeps its address and model",
+			steps: []step{{wizard.TTSConfig{Provider: wizard.TTSOpenAI, BaseURL: " http://localhost:8880/v1 ", Model: "kokoro", Voice: "af_heart", Speed: 1}, ""}},
+			want:  wizard.TTSConfig{Provider: wizard.TTSOpenAI, BaseURL: "http://localhost:8880/v1", Model: "kokoro", Voice: "af_heart", Speed: 1}},
 		{name: "unknown provider",
 			steps:   []step{{wizard.TTSConfig{Provider: "acme", Speed: 1}, "k"}},
 			wantErr: errUnknownTTS},
@@ -91,6 +94,33 @@ func TestTTSConfigNoKey(t *testing.T) {
 	s.TTS.ProviderID = wizard.TTSOpenAI
 	if got := ttsConfig(context.Background(), secrets.NewMemory(), s); got.HasKey {
 		t.Errorf("HasKey without a stored key")
+	}
+}
+
+// A server of the user's own speaks without a key; OpenAI and ElevenLabs
+// do not.
+func TestTTSProviderKeyless(t *testing.T) {
+	c := &core{secrets: secrets.NewMemory()}
+	tests := []struct {
+		name string
+		tts  settings.TTS
+		want bool
+	}{
+		{"local Kokoro", settings.TTS{ProviderID: wizard.TTSOpenAI, BaseURL: "http://localhost:8880/v1", Model: "kokoro"}, true},
+		{"OpenAI needs a key", settings.TTS{ProviderID: wizard.TTSOpenAI}, false},
+		{"ElevenLabs needs a key", settings.TTS{ProviderID: wizard.TTSElevenLabs, BaseURL: "http://localhost:1/v1"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := settings.Settings{TTS: tt.tts}
+			p, label := c.ttsProvider(context.Background(), s)
+			if (p != nil) != tt.want {
+				t.Fatalf("provider = %v, want built %v", p, tt.want)
+			}
+			if tt.want && label != "Kokoro" {
+				t.Errorf("label = %q", label)
+			}
+		})
 	}
 }
 

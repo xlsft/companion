@@ -191,6 +191,7 @@
   "wiz.byok.provider.local": "Sur cet ordinateur",
   "wiz.byok.provider.custom": "Autre adresse",
   "wiz.byok.provider.custom.d": "Toute API compatible Anthropic ou OpenAI",
+  "wiz.tts.provider.custom.d": "Tout serveur vocal compatible OpenAI",
   "wiz.byok.key.local": "inutile pour un serveur local",
   "wiz.byok.kind": "Type d’API",
   "wiz.byok.kind.anthropic": "Compatible Anthropic",

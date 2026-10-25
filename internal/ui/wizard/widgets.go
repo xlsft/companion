@@ -5,6 +5,7 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
+	"github.com/xlsft/companion/internal/ui/i18n"
 	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
 )
@@ -108,4 +109,26 @@ func rows(th *theme.Theme, rs ...layout.Widget) layout.Widget {
 // card is a kit.Card.
 func card(th *theme.Theme, w layout.Widget) layout.Widget {
 	return func(gtx layout.Context) layout.Dimensions { return kit.Card(gtx, th, w) }
+}
+
+// providerPicker is the labelled "Provider" dropdown of the model and voice
+// steps: presets that fill the fields under it, then "Other endpoint".
+func providerPicker(w *Wizard, th *theme.Theme, l i18n.Lang, d *kit.Dropdown, opts []kit.RichOption, sel int, enabled bool) layout.Widget {
+	label := i18n.T(l, "wiz.byok.provider")
+	w.frame.actions = append(w.frame.actions, ActChoose)
+	w.frame.texts = append(w.frame.texts, label)
+	if sel >= 0 && sel < len(opts) {
+		w.frame.texts = append(w.frame.texts, opts[sel].Texts()...)
+	}
+	if d.Opened() {
+		for _, o := range opts {
+			w.frame.texts = append(w.frame.texts, o.Texts()...)
+		}
+	}
+	return kit.Labeled(th, label, func(gtx layout.Context) layout.Dimensions {
+		if !enabled {
+			gtx = gtx.Disabled()
+		}
+		return d.LayoutRich(gtx, th, opts, sel, i18n.T(l, "wiz.byok.provider.pick"))
+	})
 }

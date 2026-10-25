@@ -191,6 +191,7 @@
   "wiz.byok.provider.local": "이 컴퓨터에서",
   "wiz.byok.provider.custom": "다른 주소",
   "wiz.byok.provider.custom.d": "Anthropic 또는 OpenAI 호환 API",
+  "wiz.tts.provider.custom.d": "OpenAI 호환 음성 서버",
   "wiz.byok.key.local": "로컬 서버에는 필요 없음",
   "wiz.byok.kind": "API 종류",
   "wiz.byok.kind.anthropic": "Anthropic 호환",

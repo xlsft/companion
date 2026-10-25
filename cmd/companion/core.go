@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -544,7 +545,9 @@ func (c *core) ttsProvider(ctx context.Context, s settings.Settings) (tts.Provid
 		return nil, ""
 	}
 	key, err := c.secrets.Get(ctx, ttsSecret(s.TTS.ProviderID))
-	if err != nil || len(key) == 0 {
+	// A server of the user's own (local Kokoro, Speaches) needs no key;
+	// the hosted services do.
+	if (err != nil || len(key) == 0) && !ttsKeyless(s.TTS) {
 		return nil, ""
 	}
 	cfg := tts.Config{APIKey: string(key), BaseURL: s.TTS.BaseURL}
@@ -553,15 +556,36 @@ func (c *core) ttsProvider(ctx context.Context, s settings.Settings) (tts.Provid
 	case ttsElevenLabs:
 		return tts.NewElevenLabs(tts.ElevenLabsConfig{Config: cfg, HTTPClient: c.http}), joinLabel("ElevenLabs", label)
 	case ttsOpenAI:
-		return tts.NewOpenAI(tts.OpenAIConfig{Config: cfg, HTTPClient: c.http}), joinLabel("OpenAI", label)
+		oc := tts.OpenAIConfig{Config: cfg, Model: s.TTS.Model, HTTPClient: c.http}
+		name := "OpenAI"
+		if p, ok := tts.PresetFor(s.TTS.ProviderID, s.TTS.BaseURL); ok {
+			oc.Voices, name = p.Voices, p.Name
+		} else if s.TTS.BaseURL != "" {
+			name = hostOf(s.TTS.BaseURL)
+		}
+		return tts.NewOpenAI(oc), joinLabel(name, label)
 	}
 	return nil, ""
+}
+
+// ttsKeyless reports an OpenAI-compatible endpoint other than OpenAI's:
+// a local or self-hosted server, which often takes no key.
+func ttsKeyless(t settings.TTS) bool {
+	return t.ProviderID == ttsOpenAI && t.BaseURL != ""
 }
 
 const (
 	ttsOpenAI     = wizard.TTSOpenAI
 	ttsElevenLabs = wizard.TTSElevenLabs
 )
+
+// hostOf names an endpoint by its host for the header label.
+func hostOf(base string) string {
+	if u, err := url.Parse(base); err == nil && u.Host != "" {
+		return u.Host
+	}
+	return base
+}
 
 func joinLabel(a, b string) string {
 	if b == "" {

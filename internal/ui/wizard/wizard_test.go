@@ -10,6 +10,7 @@ import (
 	"github.com/xlsft/companion/internal/llm/probe"
 	"github.com/xlsft/companion/internal/providers"
 	"github.com/xlsft/companion/internal/readiness"
+	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui/i18n"
 	"github.com/xlsft/companion/internal/ui/theme"
 )
@@ -557,5 +558,46 @@ func TestProviderPresetFillsForm(t *testing.T) {
 		if got := b.presetIndex(); got != tt.pick {
 			t.Errorf("%s: selection = %d, want %d", tt.name, got, tt.pick)
 		}
+	}
+}
+
+// Picking a local speech server fills its address and model, which Save
+// hands to the backend; ElevenLabs drops them again.
+func TestTTSPresetSavesEndpoint(t *testing.T) {
+	h := newHarness(t)
+	for _, st := range []readiness.Step{readiness.StepPermissions, readiness.StepBYOK, readiness.StepSTT} {
+		h.eventually(string(st), func() bool { return h.view() == st })
+		h.pass(st)
+	}
+	h.eventually("tts", func() bool { return h.view() == readiness.StepTTS })
+	idx := slices.IndexFunc(tts.Presets, func(p tts.Preset) bool { return p.ID == "kokoro" })
+	ts := &h.w.tts
+	pick := func(i int) {
+		ts.preset.SetOpen(true)
+		h.frame()
+		ts.preset.Pick(i)
+		h.frame()
+		h.frame()
+	}
+	pick(idx)
+	if !h.shows(i18n.T(h.lang, "wiz.byok.baseURL")) || ts.presetIndex() != idx {
+		t.Fatalf("endpoint fields not shown or preset not selected (%d)", ts.presetIndex())
+	}
+	h.click(ActSave)
+	h.eventually("saved", func() bool {
+		h.tts.mu.Lock()
+		defer h.tts.mu.Unlock()
+		return h.tts.cfg.BaseURL != ""
+	})
+	h.tts.mu.Lock()
+	got := h.tts.cfg
+	h.tts.mu.Unlock()
+	if got.Provider != TTSOpenAI || got.BaseURL != "http://localhost:8880/v1" || got.Model != "kokoro" {
+		t.Errorf("saved %+v", got)
+	}
+
+	pick(slices.IndexFunc(tts.Presets, func(p tts.Preset) bool { return p.ID == "elevenlabs" }))
+	if ts.endpoint() != "" || h.shows(i18n.T(h.lang, "wiz.byok.baseURL")) {
+		t.Errorf("ElevenLabs keeps an endpoint: %q", ts.endpoint())
 	}
 }
