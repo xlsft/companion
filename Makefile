@@ -18,7 +18,9 @@ build:
 test:
 	go test ./...
 
+# gofmt as CI checks it, so an unformatted file fails here, not after a push.
 vet:
+	@out=$$(gofmt -l cmd internal pkg packaging); if [ -n "$$out" ]; then echo "gofmt:"; echo "$$out"; exit 1; fi
 	go vet ./...
 
 # Gio needs cgo on Linux (Wayland/X11/EGL) and macOS, so the UI and the
