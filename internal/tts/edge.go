@@ -405,7 +405,9 @@ func (e *Edge) SynthesizeStream(ctx context.Context, req SynthesisRequest) (Stre
 	conn, err := e.dial(sctx)
 	if err == nil {
 		if err = e.request(sctx, conn, edgeSSML(req.VoiceID, rate, pieces[0])); err != nil {
-			conn.CloseNow()
+			// The request already failed; closing an aborted socket can
+			// only fail the same way.
+			_ = conn.CloseNow()
 		}
 	}
 	if err != nil {
@@ -440,12 +442,12 @@ func (e *Edge) pump(ctx context.Context, conn *websocket.Conn, w io.Writer, voic
 				return err
 			}
 			if err := e.request(ctx, conn, edgeSSML(voice, rate, p)); err != nil {
-				conn.CloseNow()
+				_ = conn.CloseNow()
 				return err
 			}
 		}
 		err := e.readTurn(ctx, conn, w)
-		conn.CloseNow()
+		_ = conn.CloseNow() // the turn is over either way
 		if err != nil {
 			return err
 		}
