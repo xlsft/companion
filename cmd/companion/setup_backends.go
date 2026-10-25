@@ -1,15 +1,19 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/xlsft/companion/internal/audio"
 	"github.com/xlsft/companion/internal/models"
 	"github.com/xlsft/companion/internal/models/hw"
+	"github.com/xlsft/companion/internal/providers"
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui/wizard"
@@ -26,6 +30,9 @@ func (c *core) setupBackends() wizard.Backends {
 		TTS:         setupTTS{c},
 	}
 }
+
+// The model step lists models with the stored key (providers.ModelQuery).
+var _ wizard.ProviderModels = (*providers.Service)(nil)
 
 type setupPermissions struct{ c *core }
 
@@ -141,6 +148,36 @@ func saveTTS(ctx context.Context, sec contracts.SecretStore, svc *settings.Servi
 		s.TTS.BaseURL, s.TTS.Model = strings.TrimSpace(cfg.BaseURL), strings.TrimSpace(cfg.Model)
 		s.Voice.TTSSpeed = speed
 	})
+}
+
+var _ wizard.TTSModels = setupTTS{}
+
+// openAISpeechURL is where an OpenAI speech setup without an address goes.
+const openAISpeechURL = "https://api.openai.com/v1"
+
+// ListModels lists the models of the OpenAI-compatible speech server in
+// q. Without a typed key the stored one is used, but only for the server
+// it was saved with: a key never goes to an address it was not meant for.
+func (t setupTTS) ListModels(ctx context.Context, q wizard.TTSModelQuery) ([]string, error) {
+	base := cmp.Or(strings.TrimSpace(q.BaseURL), openAISpeechURL)
+	key := q.APIKey
+	if s := t.c.settings.Get().TTS; key == "" && s.ProviderID == ttsOpenAI && sameServer(cmp.Or(s.BaseURL, openAISpeechURL), base) {
+		if k, err := t.c.secrets.Get(ctx, ttsSecret(ttsOpenAI)); err == nil {
+			key = string(k)
+		}
+	}
+	return tts.NewOpenAI(tts.OpenAIConfig{Config: tts.Config{BaseURL: base, APIKey: key, Timeout: 15 * time.Second},
+		HTTPClient: t.c.http}).ListModels(ctx)
+}
+
+// sameServer reports whether two addresses share scheme and host.
+func sameServer(a, b string) bool {
+	ua, err := url.Parse(a)
+	if err != nil || ua.Host == "" {
+		return false
+	}
+	ub, err := url.Parse(b)
+	return err == nil && strings.EqualFold(ua.Scheme, ub.Scheme) && strings.EqualFold(ua.Host, ub.Host)
 }
 
 // Voices lists the saved provider's voices with the stored key.

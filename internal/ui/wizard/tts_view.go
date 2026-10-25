@@ -69,7 +69,7 @@ func (t *ttsState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) ste
 	if t.provider.Value == TTSOpenAI {
 		rows = append(rows, kit.Flow(th, 200, 12,
 			field(w, th, i18n.T(l, "wiz.byok.baseURL"), "https://api.openai.com/v1", &t.baseURL, enabled),
-			field(w, th, i18n.T(l, "wiz.byok.model"), "gpt-4o-mini-tts", &t.model, enabled)))
+			t.models.field(w, th, l, "gpt-4o-mini-tts", &t.model, enabled)))
 	}
 	return stepBody{rows: append(rows,
 		kit.VStack(th, 8, keyRow, status),

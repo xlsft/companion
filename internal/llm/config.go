@@ -122,6 +122,16 @@ func (c ProviderConfig) Validate() error {
 	if strings.TrimSpace(c.Model) == "" {
 		return cfgErr("Model", "required")
 	}
+	return c.validateConnection()
+}
+
+// validateConnection is Validate without the fields a request to the
+// endpoint does not need (name and model), so the models of an endpoint
+// can be listed before one is picked.
+func (c ProviderConfig) validateConnection() error {
+	if c.Kind != KindOpenAI && c.Kind != KindAnthropic {
+		return cfgErr("Kind", "unknown provider kind")
+	}
 	if _, err := c.Endpoint(); err != nil {
 		return err
 	}

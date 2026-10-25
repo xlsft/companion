@@ -3,7 +3,12 @@ package main
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/xlsft/companion/internal/secrets"
@@ -137,4 +142,58 @@ func newSettings(t *testing.T) *settings.Service {
 		t.Fatal(err)
 	}
 	return svc
+}
+
+// The voice step lists a speech server's models; the stored key goes only
+// to the server it was saved with.
+func TestTTSListModels(t *testing.T) {
+	const stored = "sk-stored-speech"
+	var mu sync.Mutex
+	var sent []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		sent = append(sent, r.Header.Get("Authorization"))
+		mu.Unlock()
+		if r.URL.Path != "/v1/models" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Write([]byte(`{"data":[{"id":"tts-b"},{"id":"tts-a"}]}`))
+	}))
+	defer srv.Close()
+	saved := srv.URL + "/v1"
+	// Same server under another name: a different host to the backend.
+	other := strings.Replace(saved, "127.0.0.1", "localhost", 1)
+	tests := []struct {
+		name     string
+		provider string
+		q        wizard.TTSModelQuery
+		wantAuth string
+	}{
+		{"stored key for the saved server", wizard.TTSOpenAI, wizard.TTSModelQuery{BaseURL: saved + "/"}, "Bearer " + stored},
+		{"typed key", wizard.TTSOpenAI, wizard.TTSModelQuery{BaseURL: other, APIKey: "sk-typed"}, "Bearer sk-typed"},
+		{"no stored key for another server", wizard.TTSOpenAI, wizard.TTSModelQuery{BaseURL: other}, ""},
+		{"no stored key of another provider", wizard.TTSElevenLabs, wizard.TTSModelQuery{BaseURL: saved}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			c := &core{secrets: secrets.NewMemory(), settings: newSettings(t), http: srv.Client()}
+			if err := saveTTS(ctx, c.secrets, c.settings, wizard.TTSConfig{Provider: tt.provider, BaseURL: saved, Speed: 1}, stored); err != nil {
+				t.Fatal(err)
+			}
+			mu.Lock()
+			sent = nil
+			mu.Unlock()
+			got, err := setupTTS{c}.ListModels(ctx, tt.q)
+			if err != nil || !slices.Equal(got, []string{"tts-a", "tts-b"}) {
+				t.Fatalf("got %q, %v", got, err)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if len(sent) != 1 || sent[0] != tt.wantAuth {
+				t.Errorf("auth = %q, want %q", sent, tt.wantAuth)
+			}
+		})
+	}
 }

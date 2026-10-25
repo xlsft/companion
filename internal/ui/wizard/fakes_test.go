@@ -128,9 +128,12 @@ func (f *fakePerm) ApplyHotkeys(_ context.Context, talk, cancel string) HotkeySt
 }
 
 type fakeProvider struct {
-	mu   sync.Mutex
-	info *providers.Info
-	keys []string
+	mu      sync.Mutex
+	info    *providers.Info
+	keys    []string
+	models  []string // ListModels answer
+	listErr error
+	queries []providers.ModelQuery
 }
 
 func (f *fakeProvider) List(context.Context) ([]*providers.Info, error) {
@@ -164,6 +167,20 @@ func (f *fakeProvider) Create(_ context.Context, in providers.Input) (*providers
 
 func (f *fakeProvider) Update(_ context.Context, id string, in providers.Input) (*providers.Info, error) {
 	return f.save(id, in)
+}
+
+// ListModels answers with models or listErr and records the queries.
+func (f *fakeProvider) ListModels(_ context.Context, q providers.ModelQuery) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.queries = append(f.queries, q)
+	return f.models, f.listErr
+}
+
+func (f *fakeProvider) listQueries() []providers.ModelQuery {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]providers.ModelQuery(nil), f.queries...)
 }
 
 func (f *fakeProvider) savedKeys() []string {
@@ -229,9 +246,18 @@ func (f *fakeSTT) LastTranscript() string {
 }
 
 type fakeTTS struct {
-	mu   sync.Mutex
-	cfg  TTSConfig
-	keys []string
+	mu      sync.Mutex
+	cfg     TTSConfig
+	keys    []string
+	models  []string // ListModels answer
+	queries []TTSModelQuery
+}
+
+func (f *fakeTTS) ListModels(_ context.Context, q TTSModelQuery) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.queries = append(f.queries, q)
+	return f.models, nil
 }
 
 func (f *fakeTTS) Config(context.Context) (TTSConfig, error) {

@@ -66,7 +66,7 @@ func (b *byokState) form(w *Wizard, th *theme.Theme, l i18n.Lang, info *provider
 		kit.VStack(th, 14,
 			field(w, th, i18n.T(l, "wiz.byok.baseURL"), "https://api.example.com/v1", &b.baseURL, enabled),
 			kit.Flow(th, 200, 12,
-				field(w, th, i18n.T(l, "wiz.byok.model"), i18n.T(l, "wiz.byok.model.hint"), &b.model, enabled),
+				b.models.field(w, th, l, i18n.T(l, "wiz.byok.model.hint"), &b.model, enabled),
 				keyField),
 			headers,
 		),

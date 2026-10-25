@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/xlsft/companion/internal/llm"
@@ -41,18 +42,12 @@ type Provider struct {
 // New builds the adapter. Prefer llm.New, which also validates the config,
 // hardens the client and adds retries.
 func New(cfg llm.ProviderConfig, apiKey string, client *http.Client) (*Provider, error) {
-	u, err := cfg.Endpoint()
+	u, err := apiURL(cfg, "messages")
 	if err != nil {
 		return nil, err
 	}
 	if client == nil {
 		client = &http.Client{}
-	}
-	// The official base URL has no /v1, but users often paste one with it.
-	if strings.HasSuffix(u.Path, "/v1") {
-		u = u.JoinPath("messages")
-	} else {
-		u = u.JoinPath("v1", "messages")
 	}
 	return &Provider{
 		cfg:    cfg,
@@ -63,20 +58,39 @@ func New(cfg llm.ProviderConfig, apiKey string, client *http.Client) (*Provider,
 	}, nil
 }
 
+// apiURL is {BaseURL}/v1/{path}. The official base URL has no /v1, but
+// users often paste one with it.
+func apiURL(cfg llm.ProviderConfig, path string) (*url.URL, error) {
+	u, err := cfg.Endpoint()
+	if err != nil {
+		return nil, err
+	}
+	if strings.HasSuffix(u.Path, "/v1") {
+		return u.JoinPath(path), nil
+	}
+	return u.JoinPath("v1", path), nil
+}
+
+// headers are the request headers every call sends.
+func headers(cfg llm.ProviderConfig, apiKey string) http.Header {
+	h := http.Header{}
+	for k, v := range cfg.Headers {
+		h.Set(k, v)
+	}
+	h.Set("anthropic-version", APIVersion)
+	if apiKey != "" {
+		h.Set("x-api-key", apiKey)
+	}
+	return h
+}
+
 func (p *Provider) Capabilities() llm.Capabilities { return p.caps }
 
 func (p *Provider) Stream(ctx context.Context, req llm.ChatRequest) (llm.EventStream, error) {
 	if err := llm.CheckRequest(p.caps, req); err != nil {
 		return nil, err
 	}
-	h := http.Header{}
-	for k, v := range p.cfg.Headers {
-		h.Set(k, v)
-	}
-	h.Set("anthropic-version", APIVersion)
-	if p.apiKey != "" {
-		h.Set("x-api-key", p.apiKey)
-	}
+	h := headers(p.cfg, p.apiKey)
 	body, err := wire.Open(ctx, wire.Request{
 		Client:     p.client,
 		URL:        p.url,

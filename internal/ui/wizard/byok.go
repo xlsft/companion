@@ -28,6 +28,7 @@ type byokState struct {
 	dirty                    bool // edited since the last save
 	replacing                bool // the key editor is shown over a stored key
 	showHeaders              bool
+	models                   modelList
 
 	// async
 	loaded  bool
@@ -49,6 +50,7 @@ func (b *byokState) load(w *Wizard, _ context.Context) {
 	if w.cfg.Backends.Provider == nil {
 		return
 	}
+	b.models.reset(w)
 	w.goStep(func(ctx context.Context) {
 		list, err := w.cfg.Backends.Provider.List(ctx)
 		w.mu.Lock()
@@ -115,6 +117,7 @@ func (b *byokState) update(w *Wizard, gtx layout.Context, s snapshot) {
 		}
 		b.dirty = false
 		b.showHeaders = b.showHeaders || len(info.Input.Headers) > 0
+		b.models.soon = true
 	}
 	if i := b.preset.Update(gtx, len(providers.Presets)+1); i >= 0 {
 		b.pickPreset(gtx, i)
@@ -122,6 +125,7 @@ func (b *byokState) update(w *Wizard, gtx layout.Context, s snapshot) {
 	if b.kind.Update(gtx) {
 		b.dirty = true
 	}
+	b.models.pick(w, gtx, &b.model)
 	for _, e := range []*widget.Editor{&b.baseURL, &b.model, &b.key, &b.hdr} {
 		if changed(gtx, e) {
 			b.dirty = true
@@ -140,6 +144,39 @@ func (b *byokState) update(w *Wizard, gtx layout.Context, s snapshot) {
 	if w.clicked(gtx, ActTest) {
 		w.runCheck(readiness.StepBYOK, nil, nil)
 	}
+	b.models.follow(w, gtx, b.modelQuery(w))
+}
+
+// modelQuery asks for the models of the endpoint as typed, once that is
+// worth asking: a service needs its key first (typed, or stored for this
+// host), a server of the user's own may take none.
+func (b *byokState) modelQuery(w *Wizard) modelQuery {
+	lister, ok := w.cfg.Backends.Provider.(ProviderModels)
+	base := strings.TrimSpace(b.baseURL.Text())
+	if !ok || !hasHost(base) {
+		return modelQuery{}
+	}
+	hdr, err := parseHeaders(b.hdr.Text())
+	if err != nil {
+		return modelQuery{}
+	}
+	kind := llm.Kind(b.kind.Value)
+	key := strings.TrimSpace(b.key.Text())
+	w.mu.Lock()
+	info, keyGen := b.info, b.keyGen
+	w.mu.Unlock()
+	id, stored := "", false
+	if info != nil {
+		id = info.ID
+		stored = info.HasKey && info.Input.Kind == kind && sameHost(info.Input.BaseURL, base)
+	}
+	_, service := providers.PresetFor(kind, base)
+	if key == "" && !stored && service && !localAddr(base) {
+		return modelQuery{}
+	}
+	q := providers.ModelQuery{Kind: kind, BaseURL: base, Headers: hdr, APIKey: key, ProviderID: id}
+	sig := strings.Join([]string{string(kind), base, formatHeaders(hdr), key, id, strconv.FormatBool(stored), keyGen}, "\x00")
+	return modelQuery{sig: sig, fetch: func(ctx context.Context) ([]string, error) { return lister.ListModels(ctx, q) }}
 }
 
 // presetIndex is the dropdown's selection: the preset the endpoint matches,
@@ -170,6 +207,7 @@ func (b *byokState) pickPreset(gtx layout.Context, i int) {
 		return
 	}
 	p := providers.Presets[i]
+	b.models.soon = true
 	b.custom = false
 	b.kind.Value = string(p.Kind)
 	b.baseURL.SetText(p.BaseURL)
@@ -232,6 +270,7 @@ func (b *byokState) save(w *Wizard, gtx layout.Context) {
 			return
 		}
 		b.info = info
+		b.models.refresh()
 		if in.APIKey != "" {
 			b.keyN++
 			b.keyGen = strconv.Itoa(b.keyN)
