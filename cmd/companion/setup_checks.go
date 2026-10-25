@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/xlsft/companion/internal/platform/detect"
 	"github.com/xlsft/companion/internal/platform/hotkeys"
@@ -20,7 +21,7 @@ import (
 func (c *core) setupChecks() map[readiness.Step]readiness.Check {
 	lang := func() string { return c.settings.Get().UI.Language }
 	listener := c.setupListener()
-	c.sttCheck = &setupcheck.STT{Listener: listener, Lang: lang}
+	c.sttCheck = &setupcheck.STT{Listener: listener, Lang: lang, Key: c.voiceCheckKey}
 
 	perms := setupcheck.Permissions{
 		Mic:           c.mic,
@@ -30,14 +31,15 @@ func (c *core) setupChecks() map[readiness.Step]readiness.Check {
 		OverlayErr:    c.overlayErr,
 		PanelFallback: c.report.State(contracts.CapOverlayFallbackPanel).Status == contracts.StatusAvailable,
 	}
+	// The voice check on the voice screen proved microphone and voice, so
+	// the full test runs silently (OC-133).
 	e2e := setupcheck.EndToEnd{
-		Listener:   listener,
-		Lang:       lang,
-		Heard:      func(t string) { c.e2eHeard.Store(t) },
-		Target:     captureRequest(c.settings.Get()),
-		Provider:   c.talkProvider,
-		Speaker:    c.speaker,
-		Configured: c.speaker.configured,
+		Silent:   true,
+		Passed:   c.stepPassed,
+		Lang:     lang,
+		Reply:    func(t string) { c.e2eReply.Store(t) },
+		Target:   captureRequest(c.settings.Get()),
+		Provider: c.talkProvider,
 	}
 	// Typed nils must not reach the interfaces: the checks test for nil.
 	if c.capturer != nil {
@@ -53,8 +55,9 @@ func (c *core) setupChecks() map[readiness.Step]readiness.Check {
 		readiness.StepPermissions: perms.Run,
 		readiness.StepBYOK:        setupcheck.BYOK{Providers: c.providers}.Run,
 		readiness.StepSTT:         c.sttCheck.Run,
-		readiness.StepTTS: setupcheck.Speak{
-			Speaker: c.speaker, Configured: c.speaker.configured, Lang: lang,
+		readiness.StepTTS: setupcheck.Loopback{
+			Listener: listener, Speaker: c.speaker, Configured: c.speaker.configured,
+			Lang: lang, STT: c.sttCheck,
 		}.Run,
 		readiness.StepPlatform: setupcheck.Platform{Detect: detect.New().Detect}.Run,
 		readiness.StepEndToEnd: func(ctx context.Context) readiness.Result {
@@ -64,6 +67,25 @@ func (c *core) setupChecks() map[readiness.Step]readiness.Check {
 			return e.Run(ctx)
 		},
 	}
+}
+
+// stepPassed reads the gate at run time: the checks exist before it.
+func (c *core) stepPassed(s readiness.Step) bool {
+	return c.gate != nil && c.gate.Progress().Results[s].Status == readiness.Passed
+}
+
+// voiceCheckKey names what a voice check's match proves: the microphone,
+// the model, the voice and the phrase's language. Changing any of them
+// asks for a new recording.
+func (c *core) voiceCheckKey() string {
+	s := c.settings.Get()
+	model := ""
+	if m, err := c.activator.Active(); err == nil {
+		model = m.ID
+	}
+	// No provider speaks with Edge (tts_edge.go), the same voice as a saved Edge.
+	return strings.Join([]string{micDevice(s), model, ttsProviderOrEdge(s.TTS.ProviderID), s.TTS.Voice, s.TTS.BaseURL, s.TTS.Model,
+		readiness.PhraseLanguage(s.UI.Language)}, "\x00")
 }
 
 // setupListener records through the supervised sidecar like Talk does.

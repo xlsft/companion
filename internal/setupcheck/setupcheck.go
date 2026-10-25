@@ -28,8 +28,8 @@ const (
 	CodeNoModel        = "no_model"
 	CodeSTTUnavailable = "stt_unavailable"
 	CodeSTTFailed      = "stt_failed"
-	CodeNoSpeech       = "no_speech"
-	CodeMismatch       = "mismatch"
+	CodeNoSpeech       = readiness.HeardNoSpeech
+	CodeMismatch       = readiness.HeardMismatch
 	CodeMicNotFound    = "mic_not_found"
 	CodeMicOpenFailed  = "mic_open_failed"
 	CodeMicLost        = "mic_lost"

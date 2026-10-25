@@ -61,13 +61,84 @@ func TestFreshInstallIsSetupOnly(t *testing.T) {
 	}
 }
 
-func TestStepsUnlockInOrder(t *testing.T) {
-	g, _ := Open(context.Background(), &memStore{}, allChecks(pass))
-	if _, err := g.Run(context.Background(), StepSTT); !errors.Is(err, ErrStepLocked) {
-		t.Fatalf("running STT before BYOK: %v", err)
+func TestOnlyEndToEndIsLocked(t *testing.T) {
+	ctx := context.Background()
+	others := []Step{StepPlatform, StepTTS, StepSTT, StepPermissions, StepBYOK} // any order
+	tests := []struct {
+		name    string
+		run     []Step
+		e2eLock bool
+	}{
+		{name: "fresh", e2eLock: true},
+		{name: "voice before permissions", run: others[1:3], e2eLock: true},
+		{name: "all but byok", run: others[:4], e2eLock: true},
+		{name: "all, out of order", run: others},
 	}
-	if _, err := g.Run(context.Background(), StepEndToEnd); !errors.Is(err, ErrStepLocked) {
-		t.Fatalf("end-to-end before everything: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g, _ := Open(ctx, &memStore{}, allChecks(pass))
+			for _, s := range tt.run {
+				if _, err := g.Run(ctx, s); err != nil {
+					t.Fatalf("run %s: %v", s, err)
+				}
+			}
+			_, err := g.Run(ctx, StepEndToEnd)
+			if locked := errors.Is(err, ErrStepLocked); locked != tt.e2eLock {
+				t.Fatalf("end-to-end locked=%v err=%v", locked, err)
+			}
+			if g.IsReady() == tt.e2eLock {
+				t.Fatalf("ready=%v", g.IsReady())
+			}
+		})
+	}
+}
+
+func TestStepChangedDuringEndToEnd(t *testing.T) {
+	ctx := context.Background()
+	checks := allChecks(pass)
+	var g *Gate
+	checks[StepEndToEnd] = func(context.Context) Result {
+		// The user switches provider while the full test runs.
+		if _, err := g.Run(ctx, StepBYOK); err != nil {
+			t.Error(err)
+		}
+		return Result{Status: Passed}
+	}
+	g, _ = Open(ctx, &memStore{}, checks)
+	for _, s := range Steps[:len(Steps)-1] {
+		_, _ = g.Run(ctx, s)
+	}
+	res, err := g.Run(ctx, StepEndToEnd)
+	if err != nil || res.Status != Pending || g.IsReady() {
+		t.Fatalf("res %+v err %v ready %v", res, err, g.IsReady())
+	}
+}
+
+func TestValidatingWhileAnyCheckRuns(t *testing.T) {
+	ctx := context.Background()
+	release := make(chan struct{})
+	started := make(chan struct{})
+	checks := allChecks(pass)
+	checks[StepPermissions] = func(context.Context) Result {
+		close(started)
+		<-release
+		return Result{Status: Passed}
+	}
+	g, _ := Open(ctx, &memStore{}, checks)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = g.Run(ctx, StepPermissions)
+	}()
+	<-started
+	_, _ = g.Run(ctx, StepBYOK)
+	if st := g.Progress().State; st != Validating {
+		t.Fatalf("state %s while permissions still run", st)
+	}
+	close(release)
+	<-done
+	if p := g.Progress(); p.State != Configuring || p.Results[StepPermissions].Status != Passed {
+		t.Fatalf("after both: %+v", p)
 	}
 }
 
@@ -106,12 +177,15 @@ func TestFailureStaysOnStep(t *testing.T) {
 	checks[StepTTS] = fail("tts.auth")
 	st := &memStore{}
 	g, _ := Open(context.Background(), st, checks)
-	for _, s := range []Step{StepPermissions, StepBYOK, StepSTT} {
+	for _, s := range []Step{StepPermissions, StepBYOK, StepSTT, StepPlatform} {
 		_, _ = g.Run(context.Background(), s)
 	}
 	res, err := g.Run(context.Background(), StepTTS)
 	if err != nil || res.Status != Failed || res.Code != "tts.auth" {
 		t.Fatalf("res %+v err %v", res, err)
+	}
+	if _, err := g.Run(context.Background(), StepEndToEnd); !errors.Is(err, ErrStepLocked) {
+		t.Fatalf("end-to-end with a failed step: %v", err)
 	}
 	if p := g.Progress(); p.Current != StepTTS || p.State != Configuring {
 		t.Fatalf("progress %+v", p)

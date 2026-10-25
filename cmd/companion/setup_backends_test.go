@@ -94,6 +94,27 @@ func TestSaveTTS(t *testing.T) {
 	}
 }
 
+// With nothing saved the voice screen opens on Edge, which speaks then.
+func TestTTSConfigDefaultsToEdge(t *testing.T) {
+	tests := []struct {
+		name, saved, want string
+	}{
+		{"nothing saved", "", ttsEdge},
+		{"edge saved", ttsEdge, ttsEdge},
+		{"openai saved", wizard.TTSOpenAI, wizard.TTSOpenAI},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := settings.Settings{}
+			s.TTS.ProviderID = tt.saved
+			got := ttsConfig(context.Background(), secrets.NewMemory(), s)
+			if got.Provider != tt.want || got.HasKey {
+				t.Errorf("config = %+v, want provider %q without a key", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTTSConfigNoKey(t *testing.T) {
 	s := settings.Settings{}
 	s.TTS.ProviderID = wizard.TTSOpenAI

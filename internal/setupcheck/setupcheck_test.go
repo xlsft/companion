@@ -182,8 +182,13 @@ func TestSTT(t *testing.T) {
 			if c.LastTranscript() != tt.heard {
 				t.Errorf("transcript %q, want %q", c.LastTranscript(), tt.heard)
 			}
-			if got.Detail != nil {
-				t.Errorf("detail %v: the transcript must not reach the result", got.Detail)
+			// The transcript never reaches the result.
+			wantDetail := map[string]string(nil)
+			if want == readiness.Passed {
+				wantDetail = map[string]string{readiness.DetailSource: readiness.SourceUser}
+			}
+			if !maps.Equal(got.Detail, wantDetail) {
+				t.Errorf("detail %v, want %v", got.Detail, wantDetail)
 			}
 		})
 	}
@@ -438,5 +443,66 @@ func checkRequest(t *testing.T, req llm.ChatRequest) {
 	c := req.Messages[0].Content
 	if !strings.Contains(c[0].Text, "setup self-test") || c[1].Kind != llm.PartImage || len(c[1].Image.Data) == 0 {
 		t.Errorf("request content %+v", c)
+	}
+}
+
+// The silent full test records nothing, plays nothing and takes the voice
+// stages from the voice check's steps.
+func TestEndToEndSilent(t *testing.T) {
+	ok, skip := readiness.DetailOK, readiness.DetailSkipped
+	tests := []struct {
+		name   string
+		passed []readiness.Step
+		edit   func(*EndToEnd, *fakeLLM)
+		code   string
+		detail map[string]string
+	}{
+		{name: "voice check passed", passed: []readiness.Step{readiness.StepSTT, readiness.StepTTS},
+			detail: map[string]string{"speech": ok, "stt": ok, "capture": ok, "llm": ok, "tts": ok, "pointing": ok}},
+		{name: "voice only, user not heard", passed: []readiness.Step{readiness.StepTTS},
+			detail: map[string]string{"speech": skip, "stt": skip, "capture": ok, "llm": ok, "tts": ok, "pointing": ok}},
+		{name: "nothing known", edit: func(e *EndToEnd, _ *fakeLLM) { e.Passed = nil },
+			detail: map[string]string{"speech": skip, "stt": skip, "capture": ok, "llm": ok, "tts": skip, "pointing": ok}},
+		{name: "model fails", passed: []readiness.Step{readiness.StepSTT, readiness.StepTTS},
+			edit: func(_ *EndToEnd, p *fakeLLM) { p.err = llm.ErrAuth }, code: "auth",
+			detail: map[string]string{"speech": ok, "stt": ok, "capture": ok, "llm": "auth", "tts": skip, "pointing": skip}},
+		{name: "no capture", passed: []readiness.Step{readiness.StepSTT, readiness.StepTTS},
+			edit: func(e *EndToEnd, _ *fakeLLM) { e.Capturer = nil }, code: readiness.PermUnavailable,
+			detail: map[string]string{"speech": ok, "stt": ok, "capture": readiness.PermUnavailable, "llm": skip, "tts": skip, "pointing": skip}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mic := &fakeMic{frames: 20, hold: true}
+			p, sp, h := &fakeLLM{reply: "I can see your screen."}, &fakeSpeaker{}, &fakeHints{}
+			var replies []string
+			e := EndToEnd{
+				Silent:   true,
+				Passed:   func(s readiness.Step) bool { return slices.Contains(tt.passed, s) },
+				Listener: listener(mic, &fakeSTT{final: speech("hi")}), Lang: func() string { return "en" },
+				Capturer: &fakeCapturer{},
+				Provider: func(context.Context) (llm.Provider, error) { return p, nil },
+				Speaker:  sp, Configured: yes, Hints: h, HintTime: time.Millisecond,
+				Reply: func(s string) { replies = append(replies, s) },
+			}
+			if tt.edit != nil {
+				tt.edit(&e, p)
+			}
+			got := e.Run(context.Background())
+			if got.Code != tt.code || (got.Status == readiness.Passed) != (tt.code == "") {
+				t.Fatalf("got %s/%q, want %q (detail %v)", got.Status, got.Code, tt.code, got.Detail)
+			}
+			if !maps.Equal(got.Detail, tt.detail) {
+				t.Errorf("detail = %v, want %v", got.Detail, tt.detail)
+			}
+			if mic.openCount() != 0 || len(sp.said) != 0 {
+				t.Errorf("silent run opened the mic %d times, spoke %q", mic.openCount(), sp.said)
+			}
+			if tt.detail["llm"] == ok {
+				checkRequest(t, p.req)
+				if !slices.Equal(replies, []string{"", "I can see your screen."}) {
+					t.Errorf("replies %q", replies)
+				}
+			}
+		})
 	}
 }

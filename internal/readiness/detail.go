@@ -33,6 +33,29 @@ func PermissionOK(v string) bool {
 	return v == PermGranted || v == PermFallback || v == DetailOK
 }
 
+// Voice check (StepTTS, OC-133): Companion speaks MicPhrase through the
+// configured voice while the microphone records, so one check covers the
+// voice, the microphone and recognition.
+const (
+	// DetailSpoke is DetailOK once the phrase played to the end, else the
+	// speech failure code (also the Result's Code; the step then fails).
+	DetailSpoke = "spoke"
+	// DetailHeard is DetailOK when the recording matched the phrase,
+	// HeardNoSpeech or HeardMismatch otherwise, DetailSkipped when nothing
+	// played, or a microphone or recogniser failure code. Only DetailSpoke
+	// decides StepTTS: headphones keep a working setup from hearing itself.
+	DetailHeard   = "heard"
+	HeardNoSpeech = "no_speech"
+	HeardMismatch = "mismatch"
+)
+
+// DetailSource on a passed StepSTT tells where the proof came from.
+const (
+	DetailSource   = "source"
+	SourceLoopback = "loopback" // the voice check's recording matched
+	SourceUser     = "user"     // the user read MicPhrase aloud
+)
+
 // End-to-end stages, in order (FR-ONB-009). Each is a Detail key whose
 // value is DetailOK, DetailSkipped or a failure code.
 var EndToEndStages = []string{"speech", "stt", "capture", "llm", "tts", "pointing"}

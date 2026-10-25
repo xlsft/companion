@@ -37,7 +37,10 @@ const (
 	StepEndToEnd    Step = "end_to_end"
 )
 
-// Steps is the fixed wizard order. There is no skip (FR-ONB-004).
+// Steps is the wizard's display order. There is no skip (FR-ONB-004),
+// but only StepEndToEnd waits for the others: permissions and platform
+// are checked in the background while the user sets up the agent and the
+// voice (OC-133).
 var Steps = []Step{StepPermissions, StepBYOK, StepSTT, StepTTS, StepPlatform, StepEndToEnd}
 
 // CheckStatus is the result of one step's check.
@@ -79,7 +82,8 @@ type Store interface {
 type Check func(ctx context.Context) Result
 
 var (
-	ErrNotReady   = errors.New("readiness: app is not ready")
+	ErrNotReady = errors.New("readiness: app is not ready")
+	// ErrStepLocked: StepEndToEnd ran before every other step passed.
 	ErrStepLocked = errors.New("readiness: previous steps have not passed")
 	ErrUnknown    = errors.New("readiness: unknown step")
 )
@@ -90,10 +94,12 @@ type Gate struct {
 	checks map[Step]Check
 	now    func() time.Time
 
-	mu    sync.Mutex
-	p     Progress
-	subs  map[chan Progress]struct{}
-	ready chan struct{} // closed on the transition to Ready
+	mu      sync.Mutex
+	p       Progress
+	running int    // checks in flight; State stays Validating meanwhile
+	gen     uint64 // bumped by every other step's result, see Run
+	subs    map[chan Progress]struct{}
+	ready   chan struct{} // closed on the transition to Ready
 }
 
 // Open loads persisted progress. A Ready app stays Ready across restarts
@@ -179,10 +185,11 @@ func (g *Gate) Subscribe() (<-chan Progress, func()) {
 	}
 }
 
-// Run executes the check of step. Steps unlock in order: a later step can
-// only run once all earlier ones passed. A failure keeps the wizard on that
-// step (FR-ONB-007). Running the end-to-end step successfully, with all
-// other steps passed, is the only way to reach Ready.
+// Run executes the check of step. Steps other than StepEndToEnd run in any
+// order and concurrently; StepEndToEnd needs all of them passed. A failure
+// keeps the wizard on that step (FR-ONB-007). Running the end-to-end step
+// successfully, with all other steps passed, is the only way to reach
+// Ready.
 func (g *Gate) Run(ctx context.Context, step Step) (Result, error) {
 	check, ok := g.checks[step]
 	if !ok {
@@ -193,13 +200,16 @@ func (g *Gate) Run(ctx context.Context, step Step) (Result, error) {
 		g.mu.Unlock()
 		return g.p.Results[step], nil
 	}
-	idx := slices.Index(Steps, step)
-	for _, prev := range Steps[:idx] {
-		if g.p.Results[prev].Status != Passed {
-			g.mu.Unlock()
-			return Result{}, fmt.Errorf("%w: %s", ErrStepLocked, prev)
+	if step == StepEndToEnd {
+		for _, prev := range Steps {
+			if prev != StepEndToEnd && g.p.Results[prev].Status != Passed {
+				g.mu.Unlock()
+				return Result{}, fmt.Errorf("%w: %s", ErrStepLocked, prev)
+			}
 		}
 	}
+	gen := g.gen
+	g.running++
 	g.p.State = Validating
 	g.p.Current = step
 	g.publishLocked()
@@ -218,15 +228,30 @@ func (g *Gate) Run(ctx context.Context, step Step) (Result, error) {
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	g.running--
+	if g.p.State == Ready {
+		// A background check that outlived the end-to-end pass changes
+		// nothing, like a Run that starts after Ready.
+		return g.p.Results[step], nil
+	}
+	if step == StepEndToEnd && res.Status == Passed && gen != g.gen {
+		// Another step re-ran while this one was in flight: the proof
+		// may predate the change, so it does not count.
+		res = Result{Status: Pending, At: res.At}
+	}
 	g.p.Results[step] = res
-	if res.Status == Passed {
-		// Any earlier step re-run invalidates the end-to-end proof.
-		if step != StepEndToEnd {
+	if step != StepEndToEnd {
+		g.gen++
+		if res.Status == Passed {
+			// Any other step re-run invalidates the end-to-end proof.
 			delete(g.p.Results, StepEndToEnd)
 		}
 	}
 	g.p.Current = g.firstUnpassed()
 	g.p.State = Configuring
+	if g.running > 0 {
+		g.p.State = Validating
+	}
 	if step == StepEndToEnd && res.Status == Passed && g.allPassed() {
 		g.p.State = Ready
 		g.p.ReadyAt = g.now()
