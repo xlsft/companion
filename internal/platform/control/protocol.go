@@ -9,6 +9,11 @@
 //
 //	ping                              -> ok
 //	hotkey <id> press|release|toggle  -> ok | err <code>
+//	tap ctrl|shift|alt|super          -> ok | err <code>
+//
+// "tap" is one clean tap of a lone modifier, sent by a compositor release
+// bind; two of them in quick succession toggle the double-tap binding
+// (OC-133).
 //
 // Error codes are fixed technical strings (see the Code* constants), never
 // echoes of the input.
@@ -19,6 +24,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/xlsft/companion/internal/doubletap"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -35,6 +41,7 @@ const (
 	CodeBadCommand     = "bad-command"
 	CodeBadID          = "bad-id"
 	CodeBadAction      = "bad-action"
+	CodeBadKey         = "bad-key"
 	CodeUnknownBinding = "unknown-binding"
 	CodeBusy           = "busy"
 	CodeForbidden      = "forbidden"
@@ -49,6 +56,7 @@ type Verb int
 const (
 	VerbPing Verb = iota + 1
 	VerbHotkey
+	VerbTap
 )
 
 type Action string
@@ -64,6 +72,8 @@ type Command struct {
 	Verb   Verb
 	ID     contracts.HotkeyID
 	Action Action
+	// Key is the tapped key of VerbTap, a doubletap.Keys entry.
+	Key string
 }
 
 // ProtocolError carries the reply code for a rejected command.
@@ -99,6 +109,14 @@ func ParseLine(line string) (Command, error) {
 			return Command{}, &ProtocolError{CodeBadAction}
 		}
 		return Command{Verb: VerbHotkey, ID: contracts.HotkeyID(f[1]), Action: a}, nil
+	case "tap":
+		if len(f) != 2 {
+			return Command{}, &ProtocolError{CodeBadCommand}
+		}
+		if f[1] == "" || !doubletap.Valid(f[1]) {
+			return Command{}, &ProtocolError{CodeBadKey}
+		}
+		return Command{Verb: VerbTap, Key: f[1]}, nil
 	}
 	return Command{}, &ProtocolError{CodeBadCommand}
 }
@@ -124,6 +142,10 @@ var ctlCommands = []struct{ name, line string }{
 	{"dictate-toggle", "hotkey dictate toggle"},
 	{"dictate-press", "hotkey dictate press"},
 	{"dictate-release", "hotkey dictate release"},
+	{"tap-ctrl", "tap ctrl"},
+	{"tap-shift", "tap shift"},
+	{"tap-alt", "tap alt"},
+	{"tap-super", "tap super"},
 	{"ping", "ping"},
 }
 

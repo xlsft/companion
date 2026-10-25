@@ -170,3 +170,65 @@ func TestServiceMergesEventsAndRelease(t *testing.T) {
 		t.Fatal("Events not closed")
 	}
 }
+
+// tapBackend is a fakeBackend that can watch for a double tap.
+type tapBackend struct {
+	*fakeBackend
+	key string
+}
+
+func (b *tapBackend) SetDoubleTap(_ context.Context, _ contracts.HotkeyID, key string) error {
+	b.key = key
+	return nil
+}
+
+func TestSetDoubleTap(t *testing.T) {
+	tests := []struct {
+		name       string
+		primary    string // "", "plain" (portal), "tap" (x11)
+		ipc        bool
+		key        string
+		wantErr    error
+		wantDirect bool
+		primaryKey string
+		ipcKey     string
+	}{
+		{name: "x11 sees it", primary: "tap", ipc: true, key: "ctrl", wantDirect: true, primaryKey: "ctrl"},
+		{name: "portal: socket counts compositor taps", primary: "plain", ipc: true, key: "super", ipcKey: "super"},
+		{name: "socket only", ipc: true, key: "alt", ipcKey: "alt"},
+		{name: "portal without socket", primary: "plain", key: "ctrl", wantErr: contracts.ErrUnsupported},
+		{name: "off without any", primary: "plain", key: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var primary, ipc backend
+			var ptap, itap *tapBackend
+			switch tt.primary {
+			case "plain":
+				primary = newFake(BackendPortal)
+			case "tap":
+				ptap = &tapBackend{fakeBackend: newFake(BackendX11)}
+				primary = ptap
+			}
+			if tt.ipc {
+				itap = &tapBackend{fakeBackend: newFake(BackendIPC), key: "stale"}
+				ipc = itap
+			}
+			s := newService(primary, BackendX11, ipc)
+			defer s.Close()
+			err := s.SetDoubleTap(context.Background(), "talk", tt.key)
+			if (tt.wantErr == nil) != (err == nil) || (tt.wantErr != nil && !errors.Is(err, tt.wantErr)) {
+				t.Fatalf("err = %v, want %v", err, tt.wantErr)
+			}
+			if got := s.DoubleTapDirect(); got != tt.wantDirect {
+				t.Errorf("DoubleTapDirect = %v", got)
+			}
+			if ptap != nil && ptap.key != tt.primaryKey {
+				t.Errorf("primary key %q, want %q", ptap.key, tt.primaryKey)
+			}
+			if itap != nil && itap.key != tt.ipcKey {
+				t.Errorf("socket key %q, want %q", itap.key, tt.ipcKey)
+			}
+		})
+	}
+}

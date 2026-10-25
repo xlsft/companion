@@ -139,6 +139,41 @@ func (s *Service) SupportsRelease() bool {
 
 func (s *Service) Events() <-chan contracts.HotkeyEvent { return s.events }
 
+// DoubleTapDirect reports whether the primary backend sees a double tap
+// itself (X11). Otherwise taps can only come through the control socket,
+// from compositor binds that keybind writes.
+func (s *Service) DoubleTapDirect() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.primary.(contracts.DoubleTapper)
+	return ok
+}
+
+// SetDoubleTap arms the double tap on the primary backend when it can see
+// one, else on the control socket; the other one is turned off so a tap
+// never counts twice. It implements contracts.DoubleTapper.
+func (s *Service) SetDoubleTap(ctx context.Context, id contracts.HotkeyID, key string) error {
+	s.mu.Lock()
+	primary := s.primary
+	s.mu.Unlock()
+	pdt, direct := primary.(contracts.DoubleTapper)
+	idt, viaIPC := s.ipc.(contracts.DoubleTapper)
+	switch {
+	case direct:
+		if viaIPC {
+			if err := idt.SetDoubleTap(ctx, id, ""); err != nil {
+				return err
+			}
+		}
+		return pdt.SetDoubleTap(ctx, id, key)
+	case viaIPC:
+		return idt.SetDoubleTap(ctx, id, key)
+	case key == "":
+		return nil
+	}
+	return contracts.Unsupported(contracts.CapDoubleTap)
+}
+
 // Close stops all backends; Events is closed once they have closed theirs.
 func (s *Service) Close() error {
 	var errs []error

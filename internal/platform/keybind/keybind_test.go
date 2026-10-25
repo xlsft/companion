@@ -670,3 +670,55 @@ func TestDictateBinds(t *testing.T) {
 		t.Errorf("bad dictation chord: %v", err)
 	}
 }
+
+// A double-tap key adds a release bind of each side of the lone modifier
+// where the desktop has those, and is refused where it has not.
+func TestDoubleTapBinds(t *testing.T) {
+	treq := req
+	treq.DoubleTap = "ctrl"
+	e := "/opt/companion/bin/companion"
+	tests := []struct {
+		name  string
+		block string
+		want  []string
+	}{
+		{"sway", swayBlock(treq), []string{"bindsym --release Control_L exec " + e + " ctl tap-ctrl", "bindsym --release Control_R exec " + e + " ctl tap-ctrl"}},
+		{"hyprland", hyprBlock(treq), []string{"bindr = CTRL, Control_L, exec, " + e + " ctl tap-ctrl", "bindr = CTRL, Control_R, exec, " + e + " ctl tap-ctrl"}},
+	}
+	for _, tt := range tests {
+		for _, w := range tt.want {
+			if !strings.Contains(tt.block, w) {
+				t.Errorf("%s block lacks %q:\n%s", tt.name, w, tt.block)
+			}
+		}
+	}
+	if strings.Contains(swayBlock(req)+hyprBlock(req), "tap-") {
+		t.Error("a request without a double-tap key binds one")
+	}
+	super := req
+	super.DoubleTap = "super"
+	if b := hyprBlock(super); !strings.Contains(b, "bindr = SUPER, Super_L, exec, "+e+" ctl tap-super") {
+		t.Errorf("hyprland super:\n%s", b)
+	}
+
+	methods := []struct {
+		m    Method
+		taps bool
+	}{{MethodSway, true}, {MethodHyprland, true}, {MethodNiri, false}, {MethodGNOME, false}, {MethodService, false}, {MethodManual, false}}
+	for _, mt := range methods {
+		if got := mt.m.TapBinds(); got != mt.taps {
+			t.Errorf("%s.TapBinds() = %v", mt.m, got)
+		}
+	}
+	env := testEnv(t, &fakeTools{}, nil)
+	for _, m := range []Method{MethodNiri, MethodGNOME} {
+		if _, err := Apply(context.Background(), m, env, treq); !errors.Is(err, contracts.ErrUnsupported) || ErrorCode(err) != CodeUnsupported {
+			t.Errorf("%s with a double tap: %v", m, err)
+		}
+	}
+	bad := treq
+	bad.DoubleTap = "space"
+	if _, err := Apply(context.Background(), MethodSway, env, bad); ErrorCode(err) != CodeBadChord {
+		t.Errorf("bad double-tap key: %v", err)
+	}
+}

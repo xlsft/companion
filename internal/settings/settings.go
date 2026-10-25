@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 
+	"github.com/xlsft/companion/internal/doubletap"
 	"github.com/xlsft/companion/internal/shortcut"
 	"github.com/xlsft/companion/pkg/contracts"
 )
@@ -51,6 +52,10 @@ type Voice struct {
 	// DictateHotkey types what is said into the focused field of any app,
 	// verbatim (OC-78); "" turns dictation's shortcut off.
 	DictateHotkey string `json:"dictate_hotkey"`
+	// DoubleTapKey toggles Talk on a double tap of one modifier
+	// (internal/doubletap.Keys, OC-133); "" is off. Not every system can
+	// see a lone modifier, so it is off by default.
+	DoubleTapKey string `json:"double_tap_key,omitempty"`
 	// DictationClipboard lets dictation paste through the clipboard where
 	// typing does not work; the clipboard is restored afterwards.
 	DictationClipboard bool `json:"dictation_clipboard"`
@@ -183,6 +188,9 @@ func (s Settings) Validate() error {
 		if _, err := shortcut.ValidateDictate(s.Voice.DictateHotkey, talk, cancel); err != nil {
 			return fmt.Errorf("settings: voice dictate hotkey: %w", err)
 		}
+	}
+	if !doubletap.Valid(s.Voice.DoubleTapKey) {
+		return fmt.Errorf("settings: voice.double_tap_key %q invalid", s.Voice.DoubleTapKey)
 	}
 	switch s.Screen.Target {
 	case ScreenActive, ScreenAll:

@@ -97,6 +97,8 @@ type core struct {
 	// dictateErr is why the service refused the Dictate chord while it
 	// took Talk and Cancel.
 	dictateErr error
+	// hkTap is the double-tap key armed on the hotkey service (OC-133).
+	hkTap string
 
 	// dictation types what is said into the focused field (OC-78).
 	inserter  *insert.Inserter

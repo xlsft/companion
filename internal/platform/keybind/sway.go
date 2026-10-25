@@ -97,6 +97,13 @@ func swayBlock(req Request) string {
 		s += "bindsym " + d + " exec " + e + " ctl dictate-press\n" +
 			"bindsym --release " + d + " exec " + e + " ctl dictate-release\n"
 	}
+	// A release bind of a lone modifier fires only when no other key went
+	// down while it was held (sway/input/keyboard.c, held_binding).
+	if req.DoubleTap != "" {
+		for _, k := range tapKeys[req.DoubleTap] {
+			s += "bindsym --release " + k + " exec " + TapCommand(req.Exe, req.DoubleTap) + "\n"
+		}
+	}
 	return block("#", s)
 }
 

@@ -62,3 +62,13 @@ type HotkeyService interface {
 	// Events is closed when the service is stopped.
 	Events() <-chan HotkeyEvent
 }
+
+// DoubleTapper is a HotkeyService that can also toggle a binding on a
+// double tap of one modifier key (OC-133). A backend that cannot see a
+// lone modifier (GlobalShortcuts portal, compositors without release
+// binds) returns Unsupported(CapDoubleTap).
+type DoubleTapper interface {
+	// SetDoubleTap makes a double tap of key ("ctrl", "shift", "alt" or
+	// "super", either side) send HotkeyToggled for id; "" turns it off.
+	SetDoubleTap(ctx context.Context, id HotkeyID, key string) error
+}
