@@ -31,7 +31,7 @@ var Presets = []Preset{
 	{ID: "xai", Name: "xAI", Kind: llm.KindOpenAI, BaseURL: "https://api.x.ai/v1", Model: "grok-4"},
 	{ID: "groq", Name: "Groq", Kind: llm.KindOpenAI, BaseURL: "https://api.groq.com/openai/v1", Model: "meta-llama/llama-4-scout-17b-16e-instruct"},
 	{ID: "deepseek", Name: "DeepSeek", Kind: llm.KindOpenAI, BaseURL: "https://api.deepseek.com/v1", Model: "deepseek-chat"},
-	{ID: "ollama", Name: "Ollama", Kind: llm.KindOpenAI, BaseURL: "http://localhost:11434/v1", Model: "gemma3", Local: true},
+	{ID: "ollama", Name: "Ollama", Kind: llm.KindOpenAI, BaseURL: "http://localhost:11434/v1", Model: "gemma4:e4b", Local: true},
 	{ID: "lmstudio", Name: "LM Studio", Kind: llm.KindOpenAI, BaseURL: "http://localhost:1234/v1", Local: true},
 	{ID: "vllm", Name: "vLLM", Kind: llm.KindOpenAI, BaseURL: "http://localhost:8000/v1", Local: true},
 }
