@@ -251,6 +251,7 @@ type fakeTTS struct {
 	keys    []string
 	models  []string // ListModels answer
 	queries []TTSModelQuery
+	voices  []tts.Voice // nil: two voices
 }
 
 func (f *fakeTTS) ListModels(_ context.Context, q TTSModelQuery) ([]string, error) {
@@ -279,6 +280,11 @@ func (f *fakeTTS) Save(_ context.Context, cfg TTSConfig, key string) (TTSConfig,
 }
 
 func (f *fakeTTS) Voices(context.Context) ([]tts.Voice, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.voices != nil {
+		return f.voices, nil
+	}
 	return []tts.Voice{{ID: "alloy", Name: "Alloy"}, {ID: "nova", Name: "Nova", Languages: []string{"en"}}}, nil
 }
 

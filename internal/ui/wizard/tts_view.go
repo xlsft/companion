@@ -41,6 +41,12 @@ func (t *ttsState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) ste
 		keyField = storedKey(w, th, l, i18n.T(l, "wiz.tts.key"), enabled)
 	}
 	keyRow := func(gtx layout.Context) layout.Dimensions {
+		if t.provider.Value == tts.EdgeProviderID {
+			// Edge takes no key: only Save is left on the row.
+			return layout.Flex{Spacing: layout.SpaceStart}.Layout(gtx, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return w.btn(gtx, th, ActSave, kit.ButtonStyle{Kind: kit.Secondary, Label: i18n.T(l, "wiz.save")}, enabled)
+			}))
+		}
 		return layout.Flex{Alignment: layout.End}.Layout(gtx,
 			layout.Flexed(1, keyField),
 			kit.HSpace(th.Dp(8)),
@@ -130,6 +136,9 @@ func storedKey(w *Wizard, th *theme.Theme, l i18n.Lang, title string, enabled bo
 	})
 }
 
+// maxVoiceCards is the most voices shown as cards; more become a dropdown.
+const maxVoiceCards = 12
+
 func (t *ttsState) voicesBlock(w *Wizard, th *theme.Theme, l i18n.Lang, voices []tts.Voice, voice string, loading, canLoad bool) layout.Widget {
 	head := kit.Spread(w.text(kit.Caption(th, i18n.T(l, "wiz.tts.voice"))), func(gtx layout.Context) layout.Dimensions {
 		return w.btn(gtx, th, ActLoadVoices, kit.ButtonStyle{Kind: kit.Ghost, Small: true, Icon: icon.Refresh2, Label: i18n.T(l, "wiz.tts.loadVoices")}, canLoad)
@@ -143,7 +152,28 @@ func (t *ttsState) voicesBlock(w *Wizard, th *theme.Theme, l i18n.Lang, voices [
 		}
 		return kit.VStack(th, 8, head, w.text(kit.Muted(th, msg)))
 	}
-	// Voices are a radio group like the providers above: the same card.
+	// A long list (Edge has hundreds) is a dropdown; typing jumps to a
+	// voice. A few voices are cards, like the providers above.
+	if len(voices) > maxVoiceCards {
+		opts := make([]kit.RichOption, len(voices))
+		sel := -1
+		for i, v := range voices {
+			opts[i] = kit.RichOption{Title: kit.OrDash(v.Name), Desc: strings.Join(v.Languages, ", ")}
+			if v.ID == voice {
+				sel = i
+			}
+		}
+		if sel >= 0 {
+			w.frame.texts = append(w.frame.texts, opts[sel].Title)
+		} else {
+			w.frame.texts = append(w.frame.texts, i18n.T(l, "wiz.tts.pickVoice"))
+		}
+		w.frame.actions = append(w.frame.actions, ActChoose)
+		pick := func(gtx layout.Context) layout.Dimensions {
+			return t.voiceDD.LayoutRich(gtx, th, opts, sel, i18n.T(l, "wiz.tts.pickVoice"))
+		}
+		return kit.VStack(th, 8, head, pick)
+	}
 	t.voiceEnum.Value = voice
 	tiles := make([]layout.Widget, len(voices))
 	for i, v := range voices {

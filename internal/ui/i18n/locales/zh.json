@@ -191,6 +191,7 @@
   "wiz.byok.provider.local": "在这台电脑上",
   "wiz.byok.provider.custom": "其他地址",
   "wiz.byok.provider.custom.d": "任何兼容 Anthropic 或 OpenAI 的 API",
+  "wiz.tts.pickVoice": "选择声音",
   "wiz.tts.provider.custom.d": "任何兼容 OpenAI 的语音服务器",
   "wiz.byok.key.local": "本地服务器无需密钥",
   "wiz.byok.kind": "API 类型",

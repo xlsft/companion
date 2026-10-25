@@ -27,6 +27,7 @@ type ttsState struct {
 	key       widget.Editor
 	speed     kit.Slider
 	voiceEnum widget.Enum
+	voiceDD   kit.Dropdown // the voice picker once there are too many for cards
 	dirty     bool
 	replacing bool // the key editor is shown over a stored key
 	models    modelList
@@ -147,6 +148,15 @@ func (t *ttsState) update(w *Wizard, gtx layout.Context, s snapshot) {
 			s := sliderToSpeed(t.speed.Float.Value) + float64(steps)*0.05
 			t.speed.Float.Value = speedToSlider(sliderToSpeed(speedToSlider(s)))
 		}
+		t.dirty = true
+	}
+	w.mu.Lock()
+	voices := t.voices
+	w.mu.Unlock()
+	if i := t.voiceDD.Update(gtx, len(voices)); i >= 0 && i < len(voices) {
+		w.mu.Lock()
+		t.voice = voices[i].ID
+		w.mu.Unlock()
 		t.dirty = true
 	}
 	if t.voiceEnum.Update(gtx) {

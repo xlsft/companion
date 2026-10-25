@@ -191,6 +191,7 @@
   "wiz.byok.provider.local": "Na tym komputerze",
   "wiz.byok.provider.custom": "Inny adres",
   "wiz.byok.provider.custom.d": "Dowolne API zgodne z Anthropic lub OpenAI",
+  "wiz.tts.pickVoice": "Wybierz głos",
   "wiz.tts.provider.custom.d": "Dowolny serwer mowy zgodny z OpenAI",
   "wiz.byok.key.local": "niepotrzebny dla lokalnego serwera",
   "wiz.byok.kind": "Typ API",

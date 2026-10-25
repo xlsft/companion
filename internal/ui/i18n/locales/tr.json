@@ -191,6 +191,7 @@
   "wiz.byok.provider.local": "Bu bilgisayarda",
   "wiz.byok.provider.custom": "Başka adres",
   "wiz.byok.provider.custom.d": "Anthropic veya OpenAI uyumlu herhangi bir API",
+  "wiz.tts.pickVoice": "Bir ses seçin",
   "wiz.tts.provider.custom.d": "OpenAI uyumlu herhangi bir ses sunucusu",
   "wiz.byok.key.local": "yerel sunucu için gerekmez",
   "wiz.byok.kind": "API türü",

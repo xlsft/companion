@@ -180,6 +180,7 @@ var texts = map[string][2]string{
 	"wiz.byok.provider.local":    {"On this computer", "На этом компьютере"},
 	"wiz.byok.provider.custom":   {"Other endpoint", "Другой адрес"},
 	"wiz.byok.provider.custom.d": {"Any Anthropic- or OpenAI-compatible API", "Любой API, совместимый с Anthropic или OpenAI"},
+	"wiz.tts.pickVoice":          {"Choose a voice", "Выберите голос"},
 	"wiz.tts.provider.custom.d":  {"Any OpenAI-compatible speech server", "Любой сервер речи, совместимый с OpenAI"},
 	"wiz.byok.key.local":         {"not needed for a local server", "не нужен для локального сервера"},
 	"wiz.byok.kind":              {"API type", "Тип API"},

@@ -2,6 +2,7 @@ package wizard
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -604,5 +605,49 @@ func TestTTSPresetSavesEndpoint(t *testing.T) {
 	pick(slices.IndexFunc(tts.Presets, func(p tts.Preset) bool { return p.ID == "elevenlabs" }))
 	if ts.endpoint() != "" || h.shows(i18n.T(h.lang, "wiz.byok.baseURL")) {
 		t.Errorf("ElevenLabs keeps an endpoint: %q", ts.endpoint())
+	}
+}
+
+// Hundreds of voices (Edge) are a dropdown, not a wall of cards; picking
+// one marks the form edited.
+func TestManyVoicesAreADropdown(t *testing.T) {
+	h := newHarness(t)
+	var many []tts.Voice
+	for i := range 20 {
+		id := fmt.Sprintf("v%02d", i)
+		many = append(many, tts.Voice{ID: id, Name: "Voice " + id, Languages: []string{"en-US"}})
+	}
+	h.tts.mu.Lock()
+	h.tts.voices = many
+	h.tts.cfg = TTSConfig{Provider: tts.EdgeProviderID, Speed: 1}
+	h.tts.mu.Unlock()
+	for _, st := range []readiness.Step{readiness.StepPermissions, readiness.StepBYOK, readiness.StepSTT} {
+		h.eventually(string(st), func() bool { return h.view() == st })
+		h.pass(st)
+	}
+	h.eventually("tts", func() bool { return h.view() == readiness.StepTTS })
+	ts := &h.w.tts
+	h.eventually("voices", func() bool {
+		h.w.mu.Lock()
+		defer h.w.mu.Unlock()
+		return len(ts.voices) == 20
+	})
+	h.frame()
+	if h.shows("Voice v05") {
+		t.Fatal("voices drawn as cards")
+	}
+	if !h.shows(i18n.T(h.lang, "wiz.tts.pickVoice")) {
+		t.Fatal("no voice dropdown")
+	}
+	ts.voiceDD.SetOpen(true)
+	h.frame()
+	ts.voiceDD.Pick(5)
+	h.frame()
+	h.frame()
+	h.w.mu.Lock()
+	got := ts.voice
+	h.w.mu.Unlock()
+	if got != "v05" || !ts.dirty {
+		t.Errorf("voice = %q, dirty %v", got, ts.dirty)
 	}
 }
