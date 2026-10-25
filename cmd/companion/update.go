@@ -78,10 +78,14 @@ func newUpdater(log *slog.Logger, dataDir string, svc *settings.Service, exe str
 	// local feed offers as soon as it is found. Ignored without the local
 	// feed, so a real release is never installed unasked.
 	if os.Getenv(envAutoInstall) == "1" && os.Getenv(envUpdateURL) != "" {
-		var once sync.Once
+		var install, restart sync.Once
 		s.Watch(func() {
-			if st := s.State(); st.Latest != nil && st.Phase == update.PhaseIdle {
-				once.Do(func() { go s.Install() })
+			switch st := s.State(); {
+			case st.Latest != nil && st.Phase == update.PhaseIdle:
+				install.Do(func() { go s.Install() })
+			case st.Phase == update.PhaseRestartNeeded:
+				// Nobody is there to press Restart.
+				restart.Do(func() { go s.RestartNow() })
 			}
 		})
 	}

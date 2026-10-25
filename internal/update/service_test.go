@@ -139,7 +139,7 @@ func TestServiceInstall(t *testing.T) {
 		phase    Phase
 		code     string
 	}{
-		{"installs and restarts", nil, &fakeVerifier{}, true, PhaseRestarting, ""},
+		{"installs, restarts on request", nil, &fakeVerifier{}, true, PhaseRestartNeeded, ""},
 		{"installs, user restarts", nil, &fakeVerifier{}, false, PhaseRestartNeeded, ""},
 		{"bad signature", nil, &fakeVerifier{err: ErrBadSignature}, true, PhaseFailed, "bad_signature"},
 		{"no signature asset", func(f *fakeRelease) { f.noSig = true }, &fakeVerifier{}, true, PhaseFailed, "no_signature"},
@@ -179,21 +179,35 @@ func TestServiceInstall(t *testing.T) {
 				t.Fatalf("state = %+v", st)
 			}
 			s.Install()
-			st = waitFor(t, s, "install end", func(st State) bool { return !st.Busy() || st.Phase == PhaseRestarting })
+			st = waitFor(t, s, "install end", func(st State) bool { return !st.Busy() })
 			if st.Phase != tt.phase || st.Err != tt.code {
 				t.Fatalf("phase = %v err = %q, want %v %q", st.Phase, st.Err, tt.phase, tt.code)
+			}
+			if st.CanRestart != tt.restart {
+				t.Errorf("CanRestart = %v", st.CanRestart)
 			}
 			core := readFile(t, filepath.Join(dir, "companion"))
 			if tt.code == "" {
 				if core != "new core" || string(tt.verifier.sums) != rel.sums {
 					t.Errorf("core = %q, verified %q", core, tt.verifier.sums)
 				}
+				select {
+				case <-restarted:
+					t.Fatal("restarted without being asked")
+				case <-time.After(20 * time.Millisecond):
+				}
+				s.RestartNow()
 				if tt.restart {
 					select {
 					case <-restarted:
 					case <-time.After(5 * time.Second):
 						t.Error("not restarted")
 					}
+					if p := s.State().Phase; p != PhaseRestarting {
+						t.Errorf("after RestartNow phase = %v", p)
+					}
+				} else if p := s.State().Phase; p != PhaseRestartNeeded {
+					t.Errorf("RestartNow without a way to restart moved to %v", p)
 				}
 				return
 			}

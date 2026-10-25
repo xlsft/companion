@@ -27,7 +27,8 @@ const (
 	PhaseInstalling
 	// PhaseRestarting: installed, the app is restarting into it.
 	PhaseRestarting
-	// PhaseRestartNeeded: installed, but the app cannot restart itself.
+	// PhaseRestartNeeded: installed and waiting for the user to restart
+	// (RestartNow); CanRestart says whether the app can do it itself.
 	PhaseRestartNeeded
 	// PhaseFailed: the last attempt failed; Err has the code.
 	PhaseFailed
@@ -50,6 +51,9 @@ type State struct {
 	LastCheck time.Time // zero before the first finished check
 	// CheckErr is the Code of the last check, "" when it succeeded.
 	CheckErr string
+	// CanRestart: RestartNow restarts into the installed version; false
+	// leaves quitting and reopening to the user.
+	CanRestart bool
 }
 
 // Busy reports an install in progress.
@@ -79,8 +83,8 @@ type Config struct {
 	WorkDir string
 	// Interval between automatic checks; DefaultInterval when zero.
 	Interval time.Duration
-	// Restart, when set, is called after a successful install to restart
-	// into the new binaries; without it the user is asked to.
+	// Restart, when set, restarts into the new binaries once the user asks
+	// for it (RestartNow); without it the user quits and reopens.
 	Restart func()
 	// Open shows a URL in the browser (the release notes).
 	Open func(ctx context.Context, url string) error
@@ -119,6 +123,7 @@ func NewService(cfg Config) *Service {
 	s := &Service{cfg: cfg, kick: make(chan struct{}, 1), watchers: map[int]func(){}}
 	s.current, s.verErr = ParseVersion(cfg.Current)
 	s.st.Current = s.current
+	s.st.CanRestart = cfg.Restart != nil
 	if cfg.Installer == nil {
 		if _, err := TarballName(s.current, cfg.GOOS, cfg.GOARCH); err != nil {
 			s.st.Managed = Code(err)
@@ -293,13 +298,24 @@ func (s *Service) Install() {
 			return
 		}
 		s.cfg.Log.Info("update installed", "version", rel.Version.String())
-		if s.cfg.Restart == nil {
-			s.update(func(st *State) { st.Phase = PhaseRestartNeeded })
-			return
-		}
-		s.update(func(st *State) { st.Phase = PhaseRestarting })
-		s.cfg.Restart()
+		// No restart by itself: the window closing in the middle of a
+		// conversation is worse than one more click.
+		s.update(func(st *State) { st.Phase = PhaseRestartNeeded })
 	}()
+}
+
+// RestartNow restarts into the installed update; it does nothing before
+// an install finished or when the app cannot restart itself.
+func (s *Service) RestartNow() {
+	s.mu.Lock()
+	if s.st.Phase != PhaseRestartNeeded || s.cfg.Restart == nil {
+		s.mu.Unlock()
+		return
+	}
+	s.st.Phase = PhaseRestarting
+	s.mu.Unlock()
+	s.notify()
+	s.cfg.Restart()
 }
 
 func (s *Service) install(ctx context.Context, rel Release) error {
