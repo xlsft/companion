@@ -9,6 +9,13 @@ import (
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
+// The backends that can see a double tap (OC-133).
+var (
+	_ contracts.DoubleTapper = (*x11hotkeys.Service)(nil)
+	_ contracts.DoubleTapper = (*control.Server)(nil)
+	_ contracts.DoubleTapper = (*Service)(nil)
+)
+
 // New starts the hotkey service for the session in report, with the
 // control socket at control.DefaultPath. The caller must Close it.
 func New(ctx context.Context, report contracts.CapabilityReport) (*Service, error) {

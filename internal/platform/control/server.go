@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/xlsft/companion/internal/doubletap"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -48,6 +49,12 @@ type Server struct {
 	ids  map[contracts.HotkeyID]bool
 	open map[*net.UnixConn]struct{}
 	shut bool
+
+	// tap counts "tap" commands toward a double tap of its key for tapID;
+	// nil while double tap is off.
+	tap   *doubletap.Detector
+	tapID contracts.HotkeyID
+	now   func() time.Time
 
 	sawRelease atomic.Bool
 	events     chan contracts.HotkeyEvent
@@ -96,6 +103,7 @@ func newServer(uid uint32) *Server {
 		ids:      map[contracts.HotkeyID]bool{},
 		open:     map[*net.UnixConn]struct{}{},
 		events:   make(chan contracts.HotkeyEvent, 32),
+		now:      time.Now,
 		done:     make(chan struct{}),
 	}
 }
@@ -202,6 +210,9 @@ func (s *Server) handle(line string) string {
 	if cmd.Verb == VerbPing {
 		return ""
 	}
+	if cmd.Verb == VerbTap {
+		return s.handleTap(cmd.Key)
+	}
 	s.mu.Lock()
 	known := s.ids[cmd.ID]
 	s.mu.Unlock()
@@ -217,6 +228,47 @@ func (s *Server) handle(line string) string {
 	default:
 		return CodeBusy
 	}
+}
+
+// handleTap counts one clean tap of key. A tap of a key that is not set
+// (a bind left from an earlier setting) is refused like an unknown binding.
+func (s *Server) handleTap(key string) string {
+	s.mu.Lock()
+	det, id := s.tap, s.tapID
+	if det == nil || det.Key() != key {
+		s.mu.Unlock()
+		return CodeUnknownBinding
+	}
+	fired := det.Tap(s.now())
+	s.mu.Unlock()
+	if !fired {
+		return ""
+	}
+	select {
+	case s.events <- contracts.HotkeyEvent{ID: id, Kind: contracts.HotkeyToggled}:
+		return ""
+	default:
+		return CodeBusy
+	}
+}
+
+// SetDoubleTap makes two quick "tap key" commands toggle id; "" stops
+// counting. Whether taps arrive at all is up to the compositor's binds
+// (internal/platform/keybind). It implements contracts.DoubleTapper.
+func (s *Server) SetDoubleTap(ctx context.Context, id contracts.HotkeyID, key string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := doubletap.Check(key); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tap, s.tapID = nil, id
+	if key != "" {
+		s.tap = doubletap.New(key)
+	}
+	return nil
 }
 
 // Register accepts every binding: the chord is whatever the user binds in

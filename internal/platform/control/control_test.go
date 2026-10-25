@@ -25,10 +25,10 @@ func TestParseLine(t *testing.T) {
 		code string
 	}{
 		{"ping", Command{Verb: VerbPing}, ""},
-		{"hotkey talk press", Command{VerbHotkey, "talk", ActionPress}, ""},
-		{"hotkey talk release", Command{VerbHotkey, "talk", ActionRelease}, ""},
-		{"  hotkey   cancel  toggle ", Command{VerbHotkey, "cancel", ActionToggle}, ""},
-		{"hotkey dictate_2 press", Command{VerbHotkey, "dictate_2", ActionPress}, ""},
+		{"hotkey talk press", Command{VerbHotkey, "talk", ActionPress, ""}, ""},
+		{"hotkey talk release", Command{VerbHotkey, "talk", ActionRelease, ""}, ""},
+		{"  hotkey   cancel  toggle ", Command{VerbHotkey, "cancel", ActionToggle, ""}, ""},
+		{"hotkey dictate_2 press", Command{VerbHotkey, "dictate_2", ActionPress, ""}, ""},
 		{"", Command{}, CodeBadCommand},
 		{"ping now", Command{}, CodeBadCommand},
 		{"hotkey talk", Command{}, CodeBadCommand},
@@ -38,6 +38,12 @@ func TestParseLine(t *testing.T) {
 		{"hotkey ../x press", Command{}, CodeBadID},
 		{"hotkey " + strings.Repeat("a", 33) + " press", Command{}, CodeBadID},
 		{"hotkey talk hold", Command{}, CodeBadAction},
+		{"tap ctrl", Command{Verb: VerbTap, Key: "ctrl"}, ""},
+		{"tap super", Command{Verb: VerbTap, Key: "super"}, ""},
+		{"tap", Command{}, CodeBadCommand},
+		{"tap ctrl ctrl", Command{}, CodeBadCommand},
+		{"tap space", Command{}, CodeBadKey},
+		{"tap Ctrl", Command{}, CodeBadKey},
 	}
 	for _, tt := range tests {
 		got, err := ParseLine(tt.line)
@@ -60,6 +66,7 @@ func TestCtlLine(t *testing.T) {
 		"talk-release": "hotkey talk release", "cancel": "hotkey cancel press", "ping": "ping",
 		"dictate-toggle": "hotkey dictate toggle", "dictate-press": "hotkey dictate press",
 		"dictate-release": "hotkey dictate release",
+		"tap-ctrl":        "tap ctrl", "tap-shift": "tap shift", "tap-alt": "tap alt", "tap-super": "tap super",
 	} {
 		got, err := CtlLine(sub)
 		if err != nil || got != want {
@@ -71,6 +78,56 @@ func TestCtlLine(t *testing.T) {
 	}
 	if _, err := CtlLine("talk"); !errors.Is(err, ErrUnknownCtl) {
 		t.Errorf("unknown subcommand: %v", err)
+	}
+}
+
+func TestTaps(t *testing.T) {
+	type tap struct {
+		ms   int
+		line string
+		code string
+	}
+	tests := []struct {
+		name   string
+		key    string // SetDoubleTap
+		taps   []tap
+		toggle int // talk toggles expected
+	}{
+		{"double tap toggles", "ctrl", []tap{{0, "tap ctrl", ""}, {250, "tap ctrl", ""}}, 1},
+		{"single tap", "ctrl", []tap{{0, "tap ctrl", ""}}, 0},
+		{"too slow", "ctrl", []tap{{0, "tap ctrl", ""}, {900, "tap ctrl", ""}}, 0},
+		{"four taps toggle twice", "super", []tap{{0, "tap super", ""}, {200, "tap super", ""}, {400, "tap super", ""}, {600, "tap super", ""}}, 2},
+		{"other key refused", "ctrl", []tap{{0, "tap alt", CodeUnknownBinding}}, 0},
+		{"off refuses taps", "", []tap{{0, "tap ctrl", CodeUnknownBinding}}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newServer(0)
+			var now time.Time
+			s.now = func() time.Time { return now }
+			if err := s.SetDoubleTap(context.Background(), TalkID, tt.key); err != nil {
+				t.Fatal(err)
+			}
+			t0 := time.Unix(1000, 0)
+			for _, tp := range tt.taps {
+				now = t0.Add(time.Duration(tp.ms) * time.Millisecond)
+				if code := s.handle(tp.line); code != tp.code {
+					t.Fatalf("handle(%q) = %q, want %q", tp.line, code, tp.code)
+				}
+			}
+			n := 0
+			for len(s.events) > 0 {
+				if ev := <-s.events; ev.ID == TalkID && ev.Kind == contracts.HotkeyToggled {
+					n++
+				}
+			}
+			if n != tt.toggle {
+				t.Errorf("%d toggles, want %d", n, tt.toggle)
+			}
+		})
+	}
+	if err := newServer(0).SetDoubleTap(context.Background(), TalkID, "space"); err == nil {
+		t.Error("bad key accepted")
 	}
 }
 
