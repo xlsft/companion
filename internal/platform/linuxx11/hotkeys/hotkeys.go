@@ -43,8 +43,10 @@ type Service struct {
 	bindings []contracts.HotkeyBinding
 	grabs    []grab
 	filter   *repeatFilter
+	tapStop  chan struct{} // stops the double-tap poller; nil when off
 
 	events    chan contracts.HotkeyEvent
+	taps      chan contracts.HotkeyEvent // from the double-tap poller
 	raw       chan xgb.Event
 	done      chan struct{}
 	closeOnce sync.Once
@@ -62,6 +64,7 @@ func Open() (*Service, error) {
 		filter: newRepeatFilter(),
 		events: make(chan contracts.HotkeyEvent, 64),
 		raw:    make(chan xgb.Event, 64),
+		taps:   make(chan contracts.HotkeyEvent, 4),
 		done:   make(chan struct{}),
 	}
 	km, err := s.loadKeymap()
@@ -117,6 +120,8 @@ func (s *Service) loop() {
 				return
 			}
 			s.handle(ev, timer)
+		case ev := <-s.taps:
+			s.emit([]contracts.HotkeyEvent{ev})
 		case <-timer.C:
 			s.mu.Lock()
 			out := s.filter.expire()
