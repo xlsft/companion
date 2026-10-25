@@ -68,12 +68,6 @@ func (c *checks) set(s readiness.Step, r readiness.Result) {
 	c.res[s] = r
 }
 
-func (c *checks) passAll() {
-	for _, s := range readiness.Steps {
-		c.set(s, readiness.Result{Status: readiness.Passed})
-	}
-}
-
 func (c *checks) count(s readiness.Step) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()

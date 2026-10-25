@@ -291,10 +291,6 @@ func (t *ttsState) pickPreset(w *Wizard, gtx layout.Context, i int) {
 	}
 }
 
-// keyless reports a saved endpoint of the user's own, which may take no
-// key; voices can be listed without one.
-func keyless(cfg TTSConfig) bool { return !tts.NeedsKey(cfg.Provider, cfg.BaseURL) }
-
 // save stores the form; the key leaves the editor at once.
 func (t *ttsState) save(w *Wizard, gtx layout.Context) {
 	b := w.cfg.Backends.TTS
@@ -337,14 +333,3 @@ func (t *ttsState) save(w *Wizard, gtx layout.Context) {
 	})
 }
 
-// autoSig is non-empty only after the user saved in this session: the
-// check plays a sentence, which is expected right after Save and a surprise
-// on merely opening the step.
-func (t *ttsState) autoSig(w *Wizard) (string, bool) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if t.saveGen == 0 || t.saving {
-		return "", false
-	}
-	return strconv.Itoa(t.saveGen), true
-}

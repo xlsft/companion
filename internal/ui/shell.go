@@ -173,7 +173,13 @@ func newShell(opts Options, f windowFactory) *Shell {
 	s.diag = newDiagModel(opts.Diagnose, s.invalidateAll)
 	if s.opts.ChangeVoice == nil && opts.Gate != nil {
 		// The click comes from the main window, which ChangeVoice closes.
-		s.opts.ChangeVoice = func() { go s.ChangeVoice() }
+		s.opts.ChangeVoice = func() {
+			go func() {
+				if err := s.ChangeVoice(); err != nil {
+					s.log.Warn("change voice: setup not reopened", "err", err)
+				}
+			}()
+		}
 	}
 	return s
 }
