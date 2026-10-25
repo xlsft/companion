@@ -34,9 +34,13 @@ func (c *core) startHotkeys(ctx context.Context) {
 	c.hkMu.Lock()
 	err = c.registerLocked(ctx, c.settings.Get())
 	c.refreshAppliedLocked(ctx)
+	tapErr := c.armStoredTapLocked(ctx, c.settings.Get())
 	c.hkMu.Unlock()
 	if err != nil {
 		c.log.Warn("hotkey registration", "err", err)
+	}
+	if tapErr != nil {
+		c.log.Warn("double tap", "code", hotkeyErrCode(tapErr))
 	}
 	c.wg.Add(1)
 	go func() {
@@ -129,6 +133,9 @@ func (c *core) rebindHotkeys(ctx context.Context, s settings.Settings) {
 	}
 	c.hkMu.Lock()
 	defer c.hkMu.Unlock()
+	if err := c.armStoredTapLocked(ctx, s); err != nil {
+		c.log.Warn("double tap", "code", hotkeyErrCode(err))
+	}
 	if c.hkBound == chordsOf(s) {
 		return
 	}
@@ -193,7 +200,21 @@ func (c *core) bindRequest(s settings.Settings) (keybind.Request, error) {
 	if d, ok := dictateOf(s, talk, cancel); ok {
 		req.Dictate = d
 	}
+	if c.hotkeyMethod().TapBinds() {
+		req.DoubleTap = s.Voice.DoubleTapKey
+	}
 	return req, err
+}
+
+// armStoredTapLocked arms the stored double-tap key where this system can
+// see one; a key stored on another system stays stored but unarmed.
+// c.hkMu must be held.
+func (c *core) armStoredTapLocked(ctx context.Context, s settings.Settings) error {
+	key := s.Voice.DoubleTapKey
+	if !c.doubleTapSupportedLocked() {
+		key = ""
+	}
+	return c.armDoubleTapLocked(ctx, key)
 }
 
 // selfPath is this binary, so binds work without companion on $PATH.
@@ -309,6 +330,9 @@ func (c *core) applyChords(ctx context.Context, talk, cancel, dictate string, fo
 		ok()
 	default:
 		req := keybind.Request{Talk: t, Cancel: cn, Dictate: d, Exe: selfPath()}
+		if m.TapBinds() {
+			req.DoubleTap = prev.Voice.DoubleTapKey
+		}
 		_, err := keybind.Apply(ctx, m, hotkeyEnv(), req)
 		if err != nil && !forDictate && d.Key != "" && keybind.ErrorCode(err) == keybind.CodeConflict {
 			// The Dictate chord may be the one taken: Talk still goes in.
