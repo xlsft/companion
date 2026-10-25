@@ -435,7 +435,7 @@
   "hotkey.err.canceled": "Anulowano",
   "hotkey.err.register_failed": "System nie przyjął skrótów",
   "hotkey.err.save_failed": "Nie udało się zapisać ustawień",
-  "hotkey.err.other": "Nie udało się zastosować (%s)",
+  "hotkey.err.other": "Nie udało się zastosować skrótów. Szczegóły pokaże Diagnostyka.",
   "voice.shortcuts": "Skróty klawiszowe",
   "voice.shortcuts.d": "Rozmowa i anulowanie działają z każdego okna",
   "update.install": "Aktualizuj",

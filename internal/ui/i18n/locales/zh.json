@@ -414,7 +414,7 @@
   "hotkey.err.damaged_block": "系统设置中 Companion 的部分被手动修改过：请删除后重新应用",
   "hotkey.err.denied": "系统对话框被拒绝",
   "hotkey.err.hotkey_conflict": "已被其他功能占用：请换一个",
-  "hotkey.err.other": "无法应用（%s）",
+  "hotkey.err.other": "无法应用快捷键。诊断中有详细信息。",
   "hotkey.err.read_failed": "无法读取系统的快捷键设置",
   "hotkey.err.register_failed": "系统拒绝了这些快捷键",
   "hotkey.err.reload_failed": "系统未加载新的快捷键",

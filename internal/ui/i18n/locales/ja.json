@@ -414,7 +414,7 @@
   "hotkey.err.damaged_block": "システム設定内の Companion の部分が手動で編集されています：削除してからもう一度適用してください",
   "hotkey.err.denied": "システムのダイアログが拒否されました",
   "hotkey.err.hotkey_conflict": "すでに別の機能で使われています：別のものを選んでください",
-  "hotkey.err.other": "適用できませんでした（%s）",
+  "hotkey.err.other": "ショートカットを適用できませんでした。詳細は診断にあります。",
   "hotkey.err.read_failed": "システムのショートカット設定を読み込めませんでした",
   "hotkey.err.register_failed": "システムがショートカットを拒否しました",
   "hotkey.err.reload_failed": "システムが新しいショートカットを読み込みませんでした",

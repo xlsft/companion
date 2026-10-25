@@ -247,7 +247,7 @@ func statusLine(th *theme.Theme, l i18n.Lang, v applyView, add func(string) stri
 }
 
 // hotkeyFailure explains an apply failure in the user's words; an unknown
-// code is still shown, as a code.
+// code stays out of sight, in the diagnostics log.
 func hotkeyFailure(l i18n.Lang, code string) string {
 	k := "hotkey.err." + code
 	if i18n.Has(k) {
@@ -256,5 +256,5 @@ func hotkeyFailure(l i18n.Lang, code string) string {
 	if k = "hotkey.invalid." + code; i18n.Has(k) {
 		return i18n.T(l, k)
 	}
-	return i18n.Tf(l, "hotkey.err.other", code)
+	return i18n.T(l, "hotkey.err.other")
 }

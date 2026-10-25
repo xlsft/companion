@@ -107,7 +107,7 @@ func TestHotkeyEditorOutcomes(t *testing.T) {
 		{"applied toggle-only", HotkeyStatus{State: HotkeyApplied, ToggleOnly: true}, []string{"Works: Super+Space to talk", "press again to send"}},
 		{"conflict", HotkeyStatus{State: HotkeyFailed, Code: "hotkey_conflict"}, []string{"Already used by something else"}},
 		{"invalid config", HotkeyStatus{State: HotkeyFailed, Code: "config_invalid"}, []string{"nothing was changed"}},
-		{"unknown code", HotkeyStatus{State: HotkeyFailed, Code: "weird"}, []string{"Could not apply (weird)"}},
+		{"unknown code", HotkeyStatus{State: HotkeyFailed, Code: "weird"}, []string{"Could not apply the shortcuts. Diagnostics shows details."}},
 		{"manual", HotkeyStatus{State: HotkeyManual, Commands: []string{"/usr/bin/companion ctl talk-toggle", "/usr/bin/companion ctl cancel"}},
 			[]string{"cannot be set up automatically", "/usr/bin/companion ctl talk-toggle"}},
 	}

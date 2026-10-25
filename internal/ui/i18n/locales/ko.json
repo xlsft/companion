@@ -414,7 +414,7 @@
   "hotkey.err.damaged_block": "시스템 설정의 Companion 부분이 직접 수정되었습니다: 삭제한 뒤 다시 적용하세요",
   "hotkey.err.denied": "시스템 대화상자가 거부되었습니다",
   "hotkey.err.hotkey_conflict": "이미 다른 곳에서 사용 중입니다: 다른 것을 선택하세요",
-  "hotkey.err.other": "적용할 수 없습니다(%s)",
+  "hotkey.err.other": "단축키를 적용할 수 없습니다. 자세한 내용은 진단에서 볼 수 있습니다.",
   "hotkey.err.read_failed": "시스템의 단축키 설정을 읽을 수 없습니다",
   "hotkey.err.register_failed": "시스템이 단축키를 거부했습니다",
   "hotkey.err.reload_failed": "시스템이 새 단축키를 불러오지 않았습니다",

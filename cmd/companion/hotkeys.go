@@ -257,6 +257,8 @@ func (c *core) applyDictateHotkey(ctx context.Context, dictate string) wizard.Ho
 // costs the Dictate shortcut when Talk's editor applies.
 func (c *core) applyChords(ctx context.Context, talk, cancel, dictate string, forDictate bool) wizard.HotkeyStatus {
 	failed := func(code string) wizard.HotkeyStatus {
+		// The UI names only known codes; diagnostics keeps every one.
+		c.log.Warn("hotkey apply failed", "code", code, "dictate", forDictate)
 		st := c.hotkeyStatus()
 		if forDictate {
 			st.DictateState, st.DictateCode = wizard.HotkeyFailed, code

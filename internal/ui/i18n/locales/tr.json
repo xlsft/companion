@@ -435,7 +435,7 @@
   "hotkey.err.canceled": "İptal edildi",
   "hotkey.err.register_failed": "Sistem kısayolları kabul etmedi",
   "hotkey.err.save_failed": "Ayarlar kaydedilemedi",
-  "hotkey.err.other": "Uygulanamadı (%s)",
+  "hotkey.err.other": "Kısayollar uygulanamadı. Ayrıntıları Tanılama gösterir.",
   "voice.shortcuts": "Klavye kısayolları",
   "voice.shortcuts.d": "Konuş ve İptal her pencereden çalışır",
   "update.install": "Güncelle",

@@ -435,7 +435,7 @@
   "hotkey.err.canceled": "Cancelado",
   "hotkey.err.register_failed": "O sistema recusou os atalhos",
   "hotkey.err.save_failed": "Não foi possível salvar as configurações",
-  "hotkey.err.other": "Não foi possível aplicar (%s)",
+  "hotkey.err.other": "Não foi possível aplicar os atalhos. O Diagnóstico mostra os detalhes.",
   "voice.shortcuts": "Atalhos de teclado",
   "voice.shortcuts.d": "Falar e Cancelar funcionam em qualquer janela",
   "update.install": "Atualizar",

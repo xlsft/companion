@@ -435,7 +435,7 @@
   "hotkey.err.canceled": "Annullato",
   "hotkey.err.register_failed": "Il sistema ha rifiutato le scorciatoie",
   "hotkey.err.save_failed": "Impossibile salvare le impostazioni",
-  "hotkey.err.other": "Impossibile applicare (%s)",
+  "hotkey.err.other": "Impossibile applicare le scorciatoie. Diagnostica mostra i dettagli.",
   "voice.shortcuts": "Scorciatoie da tastiera",
   "voice.shortcuts.d": "Parla e Annulla funzionano da qualsiasi finestra",
   "update.install": "Aggiorna",

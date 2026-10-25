@@ -435,7 +435,7 @@
   "hotkey.err.canceled": "Annulé",
   "hotkey.err.register_failed": "Le système a refusé les raccourcis",
   "hotkey.err.save_failed": "Impossible d'enregistrer les réglages",
-  "hotkey.err.other": "Impossible d'appliquer (%s)",
+  "hotkey.err.other": "Impossible d'appliquer les raccourcis. Diagnostic affiche les détails.",
   "voice.shortcuts": "Raccourcis clavier",
   "voice.shortcuts.d": "Parler et Annuler fonctionnent depuis n'importe quelle fenêtre",
   "update.install": "Mettre à jour",

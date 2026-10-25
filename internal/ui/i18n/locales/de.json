@@ -435,7 +435,7 @@
   "hotkey.err.canceled": "Abgebrochen",
   "hotkey.err.register_failed": "Das System hat die Kürzel nicht angenommen",
   "hotkey.err.save_failed": "Die Einstellungen konnten nicht gespeichert werden",
-  "hotkey.err.other": "Übernehmen fehlgeschlagen (%s)",
+  "hotkey.err.other": "Die Tastenkürzel konnten nicht übernommen werden. Details zeigt die Diagnose.",
   "voice.shortcuts": "Tastenkürzel",
   "voice.shortcuts.d": "Sprechen und Abbrechen funktionieren aus jedem Fenster",
   "update.install": "Aktualisieren",

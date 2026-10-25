@@ -435,7 +435,7 @@
   "hotkey.err.canceled": "Скасовано",
   "hotkey.err.register_failed": "Система не прийняла сполучення",
   "hotkey.err.save_failed": "Не вдалося зберегти налаштування",
-  "hotkey.err.other": "Не вдалося застосувати (%s)",
+  "hotkey.err.other": "Не вдалося застосувати сполучення. Подробиці покаже Діагностика.",
   "voice.shortcuts": "Сполучення клавіш",
   "voice.shortcuts.d": "Розмова і скасування працюють з будь-якого вікна",
   "update.install": "Оновити",

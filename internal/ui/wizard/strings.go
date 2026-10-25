@@ -172,7 +172,7 @@ var texts = map[string][2]string{
 	"hotkey.err.canceled":        {"Cancelled", "Отменено"},
 	"hotkey.err.register_failed": {"The system refused the shortcuts", "Система не приняла сочетания"},
 	"hotkey.err.save_failed":     {"Could not save the settings", "Не удалось сохранить настройки"},
-	"hotkey.err.other":           {"Could not apply (%s)", "Не удалось применить (%s)"},
+	"hotkey.err.other":           {"Could not apply the shortcuts. Diagnostics shows details.", "Не удалось применить сочетания. Подробности — в диагностике."},
 	"wiz.perm.ready":             {"%d of %d ready", "%d из %d готовы"},
 
 	"wiz.screen.agent":           {"Agent setup", "Настройка агента"},
