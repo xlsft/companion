@@ -120,7 +120,8 @@ func TestNamesExist(t *testing.T) {
 		CloseCircle, Close, Computer, Copy2, Dashboard2, Delete2, Down, Download2, Edit, Exit, EyeClose, Eye,
 		Heartbeat, History, Information, Key2, Keyboard, Layers, Left, ListCheck, Loading3, Lock, Mic, More2,
 		PauseFill, Pin, PlayFill, Refresh2, Right, Robot, Search, Settings3, Sparkles, StopFill, Time,
-		Translate, Up, Volume, Warning} {
+		Translate, Up, Volume, Warning,
+		BrandAnthropic, BrandOpenAI, BrandGemini, BrandOpenRouter, BrandMistral, BrandOllama, BrandElevenLabs} {
 		if len(contours(n)) == 0 {
 			t.Errorf("%s has no contours", n)
 		}

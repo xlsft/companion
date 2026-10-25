@@ -1,4 +1,5 @@
 // Package icon draws MingCute icons (Apache-2.0, see LICENSE.mingcute)
+// and a few service logos from Simple Icons (CC0, LICENSE.simple-icons)
 // as Gio vector paths. Gio has no SVG support, so the icons' path data is
 // parsed once and filled with clip.Outline.
 //
@@ -83,6 +84,23 @@ const (
 //go:embed mingcute.json
 var data []byte
 
+// brands are the service logos (Simple Icons), kept apart from the MingCute
+// set so gen.go can rewrite mingcute.json without them.
+//
+//go:embed brands.json
+var brands []byte
+
+// Service logos for the setup's provider tiles.
+const (
+	BrandAnthropic  Name = "brand-anthropic"
+	BrandOpenAI     Name = "brand-openai"
+	BrandGemini     Name = "brand-gemini"
+	BrandOpenRouter Name = "brand-openrouter"
+	BrandMistral    Name = "brand-mistral"
+	BrandOllama     Name = "brand-ollama"
+	BrandElevenLabs Name = "brand-elevenlabs"
+)
+
 var (
 	loadOnce sync.Once
 	icons    map[Name][]contour
@@ -90,9 +108,15 @@ var (
 )
 
 func load() {
-	var raw map[Name][]string
+	var raw, logos map[Name][]string
 	if loadErr = json.Unmarshal(data, &raw); loadErr != nil {
 		return
+	}
+	if loadErr = json.Unmarshal(brands, &logos); loadErr != nil {
+		return
+	}
+	for n, p := range logos {
+		raw[n] = p
 	}
 	icons = make(map[Name][]contour, len(raw))
 	for n, paths := range raw {

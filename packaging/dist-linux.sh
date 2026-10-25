@@ -67,6 +67,7 @@ stage() { # stage DIR: fills DIR with the files common to both formats
 	install -m 644 packaging/NOTICE "$d/NOTICE"
 	install -m 644 internal/assets/fonts/OFL.txt "$d/licenses/OFL.txt"
 	install -m 644 internal/ui/icon/LICENSE.mingcute "$d/licenses/LICENSE.mingcute"
+	install -m 644 internal/ui/icon/LICENSE.simple-icons "$d/licenses/LICENSE.simple-icons"
 	install -m 644 packaging/licenses/LICENSE.sherpa-onnx packaging/licenses/LICENSE.onnxruntime "$d/licenses/"
 }
 

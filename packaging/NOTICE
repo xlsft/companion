@@ -11,6 +11,8 @@ Fonts (internal/assets/fonts, embedded in the companion binary)
 Icons (internal/ui/icon, embedded in the companion binary)
   MingCute Icon, Copyright MingCute Design: Apache License 2.0.
   Full text: licenses/LICENSE.mingcute
+  Service logos from Simple Icons: CC0 1.0; the logos are their owners'
+  trademarks. Note: licenses/LICENSE.simple-icons
 
 Speech recognition (stt-sidecar)
   sherpa-onnx, Copyright Xiaomi Corporation and the k2-fsa authors: Apache
