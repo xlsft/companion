@@ -30,6 +30,18 @@ type EndToEnd struct {
 	// Heard, when set, gets what the run heard ("" as a run starts), so the
 	// step can show it next to a mismatch. User content: memory only.
 	Heard func(text string)
+	// Reply, when set, gets the model's reply ("" as a run starts), for the
+	// step to show. User content: memory only.
+	Reply func(text string)
+
+	// Silent runs without the user's voice and without sound (OC-133): the
+	// voice check already proved microphone, recognition and voice, so
+	// "speech" and "stt" report StepSTT, "tts" reports StepTTS (DetailOK
+	// when passed, else DetailSkipped), nothing is recorded and the reply
+	// is not spoken. The model request is fixed text either way.
+	Silent bool
+	// Passed reports whether a step passed, for Silent; nil: none did.
+	Passed func(readiness.Step) bool
 
 	Capturer contracts.ScreenCapturer // nil: capture is unavailable
 	Target   contracts.CaptureRequest
@@ -58,23 +70,16 @@ func (e EndToEnd) Run(ctx context.Context) readiness.Result {
 	if e.Heard != nil {
 		e.Heard("")
 	}
+	if e.Reply != nil {
+		e.Reply("")
+	}
 
-	heard, f := e.Listener.Listen(ctx, readiness.PhraseLanguage(lang))
-	switch {
-	case f != nil && f.Stage == StageSpeech:
-		return r.fail(StageSpeech, f.Code)
-	case f != nil:
-		r.ok(StageSpeech)
-		return r.fail(StageSTT, f.Code)
+	if e.Silent {
+		r.detail[StageSpeech] = e.voiceStage(readiness.StepSTT)
+		r.detail[StageSTT] = e.voiceStage(readiness.StepSTT)
+	} else if res, failed := e.listen(ctx, r, lang); failed {
+		return res
 	}
-	r.ok(StageSpeech)
-	if e.Heard != nil {
-		e.Heard(heard.Text)
-	}
-	if !readiness.PhraseMatches(readiness.MicPhrase(lang), heard.Text) {
-		return r.fail(StageSTT, CodeMismatch)
-	}
-	r.ok(StageSTT)
 
 	shot, code := e.capture(ctx)
 	if code != "" {
@@ -92,11 +97,17 @@ func (e EndToEnd) Run(ctx context.Context) readiness.Result {
 		return r.fail("llm", code)
 	}
 	r.ok("llm")
-
-	if code := say(ctx, e.Speaker, e.Configured, reply, e.TTSTimeout); code != "" {
-		return r.fail("tts", code)
+	if e.Reply != nil {
+		e.Reply(reply)
 	}
-	r.ok("tts")
+
+	if e.Silent {
+		r.detail["tts"] = e.voiceStage(readiness.StepTTS)
+	} else if code := say(ctx, e.Speaker, e.Configured, reply, e.TTSTimeout); code != "" {
+		return r.fail("tts", code)
+	} else {
+		r.ok("tts")
+	}
 
 	if e.Hints == nil {
 		r.detail["pointing"] = readiness.DetailSkipped
@@ -107,6 +118,35 @@ func (e EndToEnd) Run(ctx context.Context) readiness.Result {
 	}
 	r.ok("pointing")
 	return r.result()
+}
+
+// listen records the fixed phrase; failed reports a failed stage.
+func (e EndToEnd) listen(ctx context.Context, r *stages, lang string) (readiness.Result, bool) {
+	heard, f := e.Listener.Listen(ctx, readiness.PhraseLanguage(lang))
+	switch {
+	case f != nil && f.Stage == StageSpeech:
+		return r.fail(StageSpeech, f.Code), true
+	case f != nil:
+		r.ok(StageSpeech)
+		return r.fail(StageSTT, f.Code), true
+	}
+	r.ok(StageSpeech)
+	if e.Heard != nil {
+		e.Heard(heard.Text)
+	}
+	if !readiness.PhraseMatches(readiness.MicPhrase(lang), heard.Text) {
+		return r.fail(StageSTT, CodeMismatch), true
+	}
+	r.ok(StageSTT)
+	return readiness.Result{}, false
+}
+
+// voiceStage is a silent run's stage taken from the voice check's step.
+func (e EndToEnd) voiceStage(step readiness.Step) string {
+	if e.Passed != nil && e.Passed(step) {
+		return readiness.DetailOK
+	}
+	return readiness.DetailSkipped
 }
 
 func (e EndToEnd) capture(ctx context.Context) (*contracts.Capture, string) {
