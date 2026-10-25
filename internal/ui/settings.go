@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"math"
+	"strings"
 	"time"
 
 	"gioui.org/layout"
@@ -10,6 +11,7 @@ import (
 	"gioui.org/widget/material"
 
 	"github.com/xlsft/companion/internal/settings"
+	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui/i18n"
 	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/kit"
@@ -127,6 +129,10 @@ type settingsPage struct {
 	autoUpd, preUpd widget.Bool
 	checkNow        widget.Clickable
 
+	// changeVoice leads to the voice choice; nil hides the button.
+	changeVoice func()
+	voiceBtn    widget.Clickable
+
 	saveErr bool
 
 	// mem lists the remembered facts; nil leaves the section with only its
@@ -201,6 +207,9 @@ func (p *settingsPage) update(gtx layout.Context) {
 			v, set := b.w.Value, b.set
 			p.apply(func(s *settings.Settings) { set(s, v) })
 		}
+	}
+	if p.voiceBtn.Clicked(gtx) && p.changeVoice != nil {
+		p.changeVoice()
 	}
 	if p.checkNow.Clicked(gtx) && p.updates != nil {
 		p.updates.CheckNow()
@@ -343,6 +352,23 @@ func setting(th *theme.Theme, l Lang, title, desc string, ready bool, ctl layout
 	return func(gtx layout.Context) layout.Dimensions { return r.Layout(gtx, th) }
 }
 
+// voiceName is the speech provider in the user's words: a known service by
+// its name, anything else as the user's own server.
+func voiceName(l Lang, c settings.TTS) string {
+	if c.ProviderID == "" {
+		return T(l, "tts.none")
+	}
+	for _, pr := range tts.Presets {
+		if pr.ID == c.ProviderID && (c.BaseURL == "" || strings.EqualFold(strings.TrimRight(c.BaseURL, "/"), pr.BaseURL)) {
+			return pr.Name
+		}
+	}
+	if pr, ok := tts.PresetFor(c.ProviderID, c.BaseURL); ok {
+		return pr.Name
+	}
+	return T(l, "tts.custom")
+}
+
 func panelOf(th *theme.Theme, rows ...layout.Widget) layout.Widget {
 	return func(gtx layout.Context) layout.Dimensions { return kit.Rows(gtx, th, rows...) }
 }
@@ -384,6 +410,15 @@ func (p *settingsPage) sectionRows(gtx layout.Context, th *theme.Theme, l Lang, 
 			))
 		}
 		return append(shortcuts, panelOf(th,
+			setting(th, l, "tts.provider", "tts.provider.d", true, func(gtx layout.Context) layout.Dimensions {
+				name := kit.Text(th, 14, voiceName(l, cur.TTS), th.Pal.Subtle).Layout
+				if p.changeVoice == nil {
+					return name(gtx)
+				}
+				return kit.HStack(th, 12, name, func(gtx layout.Context) layout.Dimensions {
+					return kit.ButtonStyle{Kind: kit.Secondary, Small: true, Label: T(l, "tts.change")}.Layout(gtx, th, &p.voiceBtn)
+				})(gtx)
+			}),
 			setting(th, l, "voice.hotkeyMode", "voice.hotkeyMode.d", false, func(gtx layout.Context) layout.Dimensions {
 				return kit.Segmented(gtx, th, &p.hotkey, []kit.Option{
 					{Key: string(settings.HotkeyHold), Label: T(l, "voice.hold")},

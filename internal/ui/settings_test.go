@@ -14,6 +14,7 @@ import (
 
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/ui/theme"
+	"github.com/xlsft/companion/internal/ui/wizard"
 )
 
 func TestSpeedMapping(t *testing.T) {
@@ -128,6 +129,47 @@ func TestSettingsVoiceShortcutEditor(t *testing.T) {
 					t.Errorf("%q names %q", s, n)
 				}
 			}
+		}
+	}
+}
+
+// A finished slider drag is written to the settings, snapped to the step.
+func TestSettingsSpeedPersists(t *testing.T) {
+	svc := newSettings(t)
+	p := newSettingsPage(svc)
+	p.speed.Float.Value = sliderFromSpeed(1.23)
+	p.speedPending = true
+	gtx := layout.Context{Ops: new(op.Ops), Metric: unit.Metric{PxPerDp: 1, PxPerSp: 1}, Source: new(input.Router).Source(),
+		Constraints: layout.Exact(image.Pt(700, 400))}
+	p.update(gtx)
+	if got := svc.Get().Voice.TTSSpeed; got != 1.25 || p.speedPending {
+		t.Errorf("speed = %v pending=%v, want 1.25 written", got, p.speedPending)
+	}
+}
+
+// Voice settings show the model choice, and the provider by name.
+func TestSettingsVoiceRows(t *testing.T) {
+	svc := newSettings(t)
+	p := newSettingsPage(svc)
+	p.section = secVoice
+	th := theme.New(false, 1)
+	gtx := layout.Context{Ops: new(op.Ops), Metric: unit.Metric{PxPerDp: 1, PxPerSp: 1}, Source: new(input.Router).Source(),
+		Constraints: layout.Exact(image.Pt(700, 400))}
+	without := len(p.sectionRows(gtx, th, LangEN, svc.Get()))
+	p.models = &wizard.ModelPicker{}
+	if with := len(p.sectionRows(gtx, th, LangEN, svc.Get())); with != without+1 {
+		t.Errorf("rows with picker = %d, without = %d", with, without)
+	}
+	for _, tt := range []struct {
+		c    settings.TTS
+		want string
+	}{
+		{settings.TTS{}, T(LangEN, "tts.none")},
+		{settings.TTS{ProviderID: "edge"}, "Microsoft Edge"},
+		{settings.TTS{ProviderID: "openai", BaseURL: "http://my.box/v1"}, T(LangEN, "tts.custom")},
+	} {
+		if got := voiceName(LangEN, tt.c); got != tt.want {
+			t.Errorf("voiceName(%+v) = %q, want %q", tt.c, got, tt.want)
 		}
 	}
 }
