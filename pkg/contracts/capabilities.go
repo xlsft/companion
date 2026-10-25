@@ -19,6 +19,7 @@ const (
 	CapAudioOutput          Capability = "audio_output" // speech playback
 	CapTray                 Capability = "tray"
 	CapColorScheme          Capability = "color_scheme" // system light/dark preference
+	CapDoubleTap            Capability = "double_tap"   // a double tap of one modifier toggles Talk
 
 	// FallbackToggleTalk is the UX used instead of CapHotkeyRelease: one
 	// press starts recording, the next one stops it.
