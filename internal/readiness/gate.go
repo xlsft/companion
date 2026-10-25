@@ -198,7 +198,7 @@ func (g *Gate) Run(ctx context.Context, step Step) (Result, error) {
 	g.mu.Lock()
 	if g.p.State == Ready {
 		g.mu.Unlock()
-		return g.p.Results[step], nil
+		return g.recheck(ctx, step, check)
 	}
 	if step == StepEndToEnd {
 		for _, prev := range Steps {
@@ -270,6 +270,31 @@ func (g *Gate) Run(ctx context.Context, step Step) (Result, error) {
 	}
 	g.publishLocked()
 	return res, nil
+}
+
+// recheck runs a step again after Ready, when the user changes something
+// set up earlier (a new voice from Settings). Its result replaces the old
+// one so the user sees what is wrong now, but Ready stays for this run:
+// one failed check does not lock the user out of an app already set up.
+// Open derives Ready from the stored results, so the next start shows
+// setup on what is broken.
+func (g *Gate) recheck(ctx context.Context, step Step, check Check) (Result, error) {
+	res := check(ctx)
+	if res.Status == "" {
+		res.Status = Failed
+	}
+	if res.At.IsZero() {
+		res.At = g.now()
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if ctx.Err() != nil && res.Status != Passed {
+		return g.p.Results[step], nil
+	}
+	g.p.Results[step] = res
+	err := g.saveLocked(ctx)
+	g.publishLocked()
+	return res, err
 }
 
 // Select moves the wizard to a step for display (back navigation); it does

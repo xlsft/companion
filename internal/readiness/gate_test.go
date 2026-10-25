@@ -172,6 +172,47 @@ func TestReadyOnlyAfterEndToEnd(t *testing.T) {
 	}
 }
 
+// After Ready a step can be checked again (a voice changed in Settings):
+// the new result is kept and shown, and Ready stays until a restart.
+func TestRecheckAfterReady(t *testing.T) {
+	tests := []struct {
+		name   string
+		check  Check
+		status CheckStatus
+		code   string
+	}{
+		{"passes", pass, Passed, ""},
+		{"fails", fail("playback_failed"), Failed, "playback_failed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &memStore{}
+			checks := allChecks(pass)
+			g, _ := Open(context.Background(), st, checks)
+			runAll(t, g)
+			if !g.IsReady() {
+				t.Fatal("not ready")
+			}
+			checks[StepTTS] = tt.check
+			res, err := g.Run(context.Background(), StepTTS)
+			if err != nil || res.Status != tt.status || res.Code != tt.code {
+				t.Fatalf("res %+v err %v", res, err)
+			}
+			if r := g.Progress().Results[StepTTS]; r.Status != tt.status || r.Code != tt.code {
+				t.Fatalf("stored %+v", r)
+			}
+			if !g.IsReady() {
+				t.Fatal("a re-check left Ready")
+			}
+			// A restart opens setup on what is broken.
+			g2, _ := Open(context.Background(), st, checks)
+			if g2.IsReady() != (tt.status == Passed) || g2.Progress().Results[StepTTS].Code != tt.code {
+				t.Fatalf("after restart: ready %v %+v", g2.IsReady(), g2.Progress().Results[StepTTS])
+			}
+		})
+	}
+}
+
 func TestFailureStaysOnStep(t *testing.T) {
 	checks := allChecks(pass)
 	checks[StepTTS] = fail("tts.auth")
