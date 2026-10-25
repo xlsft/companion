@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/xlsft/companion/pkg/contracts"
+	"github.com/zalando/go-keyring"
 )
 
 func TestNewRef(t *testing.T) {
@@ -83,4 +84,56 @@ func TestKeyring(t *testing.T) {
 		t.Skip("set OPENCLICK_KEYRING_TEST=1 to run against the real OS keyring")
 	}
 	roundTrip(t, NewKeyring())
+}
+
+// A key saved under the old service name is read and moved to the new
+// one; deleting removes it from wherever it is.
+func TestKeyringAdoptsLegacyService(t *testing.T) {
+	ctx := context.Background()
+	ref := NewRef("provider", "p1", "api_key")
+	tests := []struct {
+		name   string
+		legacy bool
+		read   bool
+	}{
+		{"read moves it", true, true},
+		{"delete without reading", true, false},
+		{"nothing saved", false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keyring.MockInit()
+			k := NewKeyring()
+			if tt.legacy {
+				if err := keyring.Set(legacyService, string(ref), "s3cret"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !tt.read {
+				if err := k.Delete(ctx, ref); err != nil {
+					t.Fatalf("delete: %v", err)
+				}
+				if _, err := keyring.Get(legacyService, string(ref)); !errors.Is(err, keyring.ErrNotFound) {
+					t.Fatal("old entry left after delete")
+				}
+				return
+			}
+			v, err := k.Get(ctx, ref)
+			if !tt.legacy {
+				if !errors.Is(err, contracts.ErrSecretNotFound) {
+					t.Fatalf("get: %v", err)
+				}
+				return
+			}
+			if err != nil || string(v) != "s3cret" {
+				t.Fatalf("get: %q %v", v, err)
+			}
+			if got, err := keyring.Get(Service, string(ref)); err != nil || got != "s3cret" {
+				t.Fatalf("not moved: %q %v", got, err)
+			}
+			if _, err := keyring.Get(legacyService, string(ref)); !errors.Is(err, keyring.ErrNotFound) {
+				t.Fatal("old entry left after the move")
+			}
+		})
+	}
 }

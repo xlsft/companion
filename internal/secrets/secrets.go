@@ -13,7 +13,11 @@ import (
 )
 
 // Service is the keyring service name all refs live under.
-const Service = "openclick"
+const Service = "companion"
+
+// legacyService is where versions before 0.1.0 kept the refs, under the
+// project's old name; Get moves what it finds there to Service.
+const legacyService = "openclick"
 
 // NewRef joins parts into a SecretRef, e.g. NewRef("provider", id, "api_key").
 func NewRef(parts ...string) contracts.SecretRef {
@@ -56,17 +60,39 @@ func (Keyring) Get(ctx context.Context, ref contracts.SecretRef) ([]byte, error)
 		return nil, err
 	}
 	v, err := keyring.Get(Service, string(ref))
+	if errors.Is(err, keyring.ErrNotFound) {
+		v, err = adopt(ref)
+	}
 	if err != nil {
 		return nil, wrap("get", ref, err)
 	}
 	return []byte(v), nil
 }
 
+// adopt moves ref from legacyService to Service. A failed move still
+// returns the value: the key works now and moves on the next read.
+func adopt(ref contracts.SecretRef) (string, error) {
+	v, err := keyring.Get(legacyService, string(ref))
+	if err != nil {
+		return "", err
+	}
+	if keyring.Set(Service, string(ref), v) == nil {
+		_ = keyring.Delete(legacyService, string(ref))
+	}
+	return v, nil
+}
+
 func (Keyring) Delete(ctx context.Context, ref contracts.SecretRef) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := keyring.Delete(Service, string(ref)); err != nil {
+	err := keyring.Delete(Service, string(ref))
+	// A ref not read since the rename still sits under the old name.
+	legacy := keyring.Delete(legacyService, string(ref))
+	if errors.Is(err, keyring.ErrNotFound) && legacy == nil {
+		err = nil
+	}
+	if err != nil {
 		return wrap("delete", ref, err)
 	}
 	return nil
