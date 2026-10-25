@@ -82,4 +82,3 @@ func DataHome() string {
 	}
 	return filepath.Join(home, ".local", "share")
 }
-
