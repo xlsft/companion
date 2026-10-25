@@ -19,9 +19,32 @@ const maxModels = 1000
 // the model from. The ids come back sorted as the server names them,
 // without filtering: a server's own naming says best what it speaks with.
 func (o *OpenAI) ListModels(ctx context.Context) ([]string, error) {
+	raw, err := o.models(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := parseModelIDs(raw)
+	if err != nil {
+		return nil, &Error{Kind: ErrUnavailable, Provider: o.name, Cause: err}
+	}
+	return ids, nil
+}
+
+// openRouter reports OpenRouter, whose /models lists every model it routes
+// and whose speech voices differ per model.
+func (o *OpenAI) openRouter() bool {
+	return strings.Contains(strings.ToLower(o.cfg.BaseURL), "openrouter.ai")
+}
+
+// models fetches GET {base}/models; on OpenRouter only the speech models.
+func (o *OpenAI) models(ctx context.Context) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, o.cfg.timeout())
 	defer cancel()
-	r, err := http.NewRequest(http.MethodGet, o.cfg.BaseURL+"/models", nil)
+	u := o.cfg.BaseURL + "/models"
+	if o.openRouter() {
+		u += "?output_modalities=speech"
+	}
+	r, err := http.NewRequest(http.MethodGet, u, nil)
 	if err != nil {
 		return nil, &Error{Kind: ErrBadRequest, Provider: o.name, Cause: stripURL(err)}
 	}
@@ -41,11 +64,58 @@ func (o *OpenAI) ListModels(ctx context.Context) ([]string, error) {
 		}
 		return nil, &Error{Kind: ErrUnavailable, Provider: o.name, Cause: stripURL(err)}
 	}
-	ids, err := parseModelIDs(raw)
-	if err != nil {
-		return nil, &Error{Kind: ErrUnavailable, Provider: o.name, Cause: err}
+	return raw, nil
+}
+
+// routerVoices reads the voices OpenRouter lists for model in the
+// supported_voices field of its model entry: plain names or objects.
+func routerVoices(raw []byte, model string) ([]Voice, bool) {
+	var env struct {
+		Data []struct {
+			ID     string            `json:"id"`
+			Voices []json.RawMessage `json:"supported_voices"`
+		} `json:"data"`
 	}
-	return ids, nil
+	if json.Unmarshal(raw, &env) != nil {
+		return nil, false
+	}
+	for _, m := range env.Data {
+		if m.ID != model {
+			continue
+		}
+		var out []Voice
+		for _, v := range m.Voices {
+			var name string
+			if json.Unmarshal(v, &name) == nil {
+				if name = strings.TrimSpace(name); name != "" {
+					out = append(out, Voice{ID: name, Name: name})
+				}
+				continue
+			}
+			var obj struct {
+				ID      string `json:"id"`
+				Name    string `json:"name"`
+				VoiceID string `json:"voice_id"`
+			}
+			if json.Unmarshal(v, &obj) == nil {
+				id := cmpOr(obj.ID, obj.VoiceID, obj.Name)
+				if id != "" {
+					out = append(out, Voice{ID: id, Name: cmpOr(obj.Name, id)})
+				}
+			}
+		}
+		return out, len(out) > 0
+	}
+	return nil, false
+}
+
+func cmpOr(vals ...string) string {
+	for _, v := range vals {
+		if v = strings.TrimSpace(v); v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // parseModelIDs reads {"data": [{"id": ...}]} or the bare array a few

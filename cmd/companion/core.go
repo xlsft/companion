@@ -571,7 +571,7 @@ func (c *core) ttsProvider(ctx context.Context, s settings.Settings) (tts.Provid
 // ttsKeyless reports an OpenAI-compatible endpoint other than OpenAI's:
 // a local or self-hosted server, which often takes no key.
 func ttsKeyless(t settings.TTS) bool {
-	return t.ProviderID == ttsOpenAI && t.BaseURL != ""
+	return t.ProviderID == ttsOpenAI && !tts.NeedsKey(t.ProviderID, t.BaseURL)
 }
 
 const (

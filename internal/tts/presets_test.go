@@ -55,3 +55,22 @@ func TestTTSPresetFor(t *testing.T) {
 		})
 	}
 }
+
+func TestNeedsKey(t *testing.T) {
+	tests := []struct {
+		provider, url string
+		want          bool
+	}{
+		{"openai", "", true},
+		{"openai", "https://openrouter.ai/api/v1", true},
+		{"elevenlabs", "", true},
+		{EdgeProviderID, "", false},
+		{"openai", "http://localhost:8880/v1", false},
+		{"openai", "http://tts.lan:9000/v1", false},
+	}
+	for _, tt := range tests {
+		if got := NeedsKey(tt.provider, tt.url); got != tt.want {
+			t.Errorf("NeedsKey(%q, %q) = %v, want %v", tt.provider, tt.url, got, tt.want)
+		}
+	}
+}

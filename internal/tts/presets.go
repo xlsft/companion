@@ -39,6 +39,7 @@ func voiceList(ids ...string) []Voice {
 var Presets = []Preset{
 	{ID: "openai", Name: "OpenAI", Provider: "openai"},
 	{ID: "elevenlabs", Name: "ElevenLabs", Provider: "elevenlabs"},
+	{ID: "openrouter", Name: "OpenRouter", Provider: "openai", BaseURL: "https://openrouter.ai/api/v1"},
 	{ID: EdgeProviderID, Name: "Microsoft Edge", Provider: EdgeProviderID, Keyless: true},
 	{ID: "kokoro", Name: "Kokoro", Provider: "openai", BaseURL: "http://localhost:8880/v1", Voices: kokoroVoices, Local: true},
 	{ID: "speaches", Name: "Speaches", Provider: "openai", BaseURL: "http://localhost:8000/v1", Voices: kokoroVoices, Local: true},
@@ -54,4 +55,17 @@ func PresetFor(provider, baseURL string) (Preset, bool) {
 		}
 	}
 	return Preset{}, false
+}
+
+// NeedsKey reports whether a provider at baseURL takes an API key: the
+// hosted services do (OpenAI, ElevenLabs, OpenRouter), Edge and a server
+// of the user's own (local Kokoro, Speaches, any other address) do not.
+func NeedsKey(provider, baseURL string) bool {
+	if provider == EdgeProviderID {
+		return false
+	}
+	if p, ok := PresetFor(provider, baseURL); ok {
+		return !p.Local && !p.Keyless
+	}
+	return provider != "openai" || strings.TrimSpace(baseURL) == ""
 }

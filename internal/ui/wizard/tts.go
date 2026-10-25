@@ -247,7 +247,7 @@ func (t *ttsState) pickPreset(w *Wizard, gtx layout.Context, i int) {
 
 // keyless reports a saved endpoint of the user's own, which may take no
 // key; voices can be listed without one.
-func keyless(cfg TTSConfig) bool { return cfg.Provider == TTSOpenAI && cfg.BaseURL != "" }
+func keyless(cfg TTSConfig) bool { return !tts.NeedsKey(cfg.Provider, cfg.BaseURL) }
 
 // save stores the form; the key leaves the editor at once.
 func (t *ttsState) save(w *Wizard, gtx layout.Context) {
