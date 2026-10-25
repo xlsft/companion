@@ -59,8 +59,8 @@ const (
 
 // Config wires the wizard. Gate is required; the callbacks may be nil.
 type Config struct {
-	// AsideExtra, when set, draws under the language picker at the very
-	// bottom of the sidebar (the update chip).
+	// AsideExtra, when set, draws in the footer after the speech model's
+	// chip (the update chip).
 	AsideExtra func(gtx layout.Context, th *theme.Theme, l i18n.Lang) layout.Dimensions
 	Gate       *readiness.Gate
 	Backends   Backends
