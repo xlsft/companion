@@ -50,13 +50,13 @@ func TestHeadlessRender(t *testing.T) {
 		h.w.cfg.Version, h.w.cfg.SetLanguage = "0.1.0-dev", func(i18n.Lang) {}
 		h.provider.info = &providers.Info{ID: "prov_1", HasKey: true,
 			Input: providers.Input{Kind: llm.KindOpenAI, BaseURL: "https://api.example.test/v1", Model: "gpt-test"}}
-		for _, st := range readiness.Steps {
-			h.eventually("step", func() bool { return h.view() == st })
-			h.checks.set(st, failures[st])
-			if _, err := h.gate.Run(t.Context(), st); err != nil {
-				t.Fatal(err)
-			}
-			h.eventually("failure", func() bool { return h.shows(i18n.T(lang, "wiz.result.failed")) })
+		for st, r := range failures {
+			h.checks.set(st, r)
+			_, _ = h.gate.Run(t.Context(), st)
+		}
+		for _, sc := range []screen{screenAgent, screenVoice, screenDone} {
+			st := []string{"agent", "voice", "done"}[sc]
+			h.goScreen(sc)
 			for _, sc := range []struct {
 				suffix string
 				th     *theme.Theme
@@ -72,7 +72,7 @@ func TestHeadlessRender(t *testing.T) {
 					t.Fatalf("%s: screenshot: %v", st, err)
 				}
 				if dir != "" {
-					f, err := os.Create(filepath.Join(dir, "wizard-"+string(lang)+"-"+string(st)+sc.suffix+".png"))
+					f, err := os.Create(filepath.Join(dir, "wizard-"+string(lang)+"-"+st+sc.suffix+".png"))
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -83,9 +83,6 @@ func TestHeadlessRender(t *testing.T) {
 				}
 			}
 			h.th = theme.New(false, 1)
-			if st != readiness.StepEndToEnd {
-				h.pass(st)
-			}
 		}
 	}
 }

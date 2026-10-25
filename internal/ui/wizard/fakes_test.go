@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"image"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -401,7 +402,43 @@ func (h *harness) click(a Action) {
 	h.frame()
 }
 
-func (h *harness) view() readiness.Step { return h.w.snap().view() }
+// gtx is a layout context for calling the screens' handlers directly.
+func (h *harness) gtx() layout.Context {
+	return layout.Context{Ops: new(op.Ops), Metric: unit.Metric{PxPerDp: 1, PxPerSp: 1}, Now: time.Now(), Source: h.r.Source()}
+}
+
+// pickAgent chooses a provider tile, as a click on it would.
+func (h *harness) pickAgent(id string) {
+	b := &h.w.byok
+	i := slices.IndexFunc(providers.Presets, func(p providers.Preset) bool { return p.ID == id })
+	if i < 0 {
+		i = len(providers.Presets)
+	}
+	b.tile.Value = id
+	b.pickPreset(h.gtx(), i)
+	h.frame()
+	h.frame()
+}
+
+// pickVoice chooses a voice tile, as a click on it would.
+func (h *harness) pickVoice(id string) {
+	t := &h.w.tts
+	i := slices.IndexFunc(tts.Presets, func(p tts.Preset) bool { return p.ID == id })
+	if i < 0 {
+		i = len(tts.Presets)
+	}
+	t.tile.Value = id
+	t.pickPreset(h.w, h.gtx(), i)
+	h.frame()
+	h.frame()
+}
+
+// goScreen shows sc, as Next and Back do.
+func (h *harness) goScreen(sc screen) {
+	h.frame()
+	h.w.enterScreen(sc)
+	h.frame()
+}
 
 func (h *harness) idle() bool { return !h.w.snap().running }
 

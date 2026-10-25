@@ -12,12 +12,10 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"slices"
 	"sync"
 	"time"
 
 	"gioui.org/layout"
-	"gioui.org/op"
 	"gioui.org/widget"
 
 	"github.com/xlsft/companion/internal/readiness"
@@ -52,6 +50,11 @@ const (
 	ActReplaceKey   Action = "replace_key" // show the key editor over a stored key
 	ActHeaders      Action = "headers"     // expand the extra headers field
 	ActModelList    Action = "model_list"  // back from typing a model to the fetched list
+	ActRetryModel   Action = "retry_model" // the speech model's download failed
+	ActVoiceCheck   Action = "voice_check" // the voice is spoken and heard
+	ActReadSelf     Action = "read_self"   // the user reads the phrase instead
+	ActOpen         Action = "open"        // finish setup, open the main window
+	ActChangeKeys   Action = "change_keys" // show the shortcut editor
 )
 
 // Config wires the wizard. Gate is required; the callbacks may be nil.
@@ -66,8 +69,9 @@ type Config struct {
 	// SpeechLanguage is the configured speech language ("auto" or a code)
 	// used for the STT model recommendation.
 	SpeechLanguage func() string
-	// OnReady runs exactly once, off the UI goroutine, when the Gate
-	// becomes Ready (FR-ONB-002/010); the shell then enters main mode.
+	// OnReady runs exactly once, off the UI goroutine, when the user opens
+	// Companion from the finish of a Ready Gate (FR-ONB-002/010); the shell
+	// then enters main mode.
 	OnReady       func()
 	OnDiagnostics func()
 	OnQuit        func()
@@ -97,21 +101,24 @@ type Wizard struct {
 	stepCtx    context.Context
 	stepCancel context.CancelFunc
 
+	bg    background
+	model speechModel
+
 	// UI goroutine only.
+	scr       screen
+	started   bool // the first frame chose the screen
 	entered   readiness.Step
 	btns      map[Action]*widget.Clickable
-	stepBtns  [6]widget.Clickable
 	langDD    kit.Dropdown
 	list      widget.List
-	asideList widget.List
 	frame     frameRecord
 	auto      map[readiness.Step]autoRecord
+	keysShown bool // the shortcut editor is open on the finish
 
 	perm permState
 	byok byokState
 	stt  sttState
 	tts  ttsState
-	plat platState
 }
 
 // frameRecord is what the last frame showed, for tests: no hidden bypass,
@@ -135,7 +142,6 @@ func New(cfg Config) *Wizard {
 	ctx, cancel := context.WithCancel(context.Background())
 	w := &Wizard{cfg: cfg, ctx: ctx, cancel: cancel, btns: map[Action]*widget.Clickable{}, auto: map[readiness.Step]autoRecord{}}
 	w.list.Axis = layout.Vertical
-	w.langDD.Up = true // it sits at the bottom of the aside
 	w.prog = cfg.Gate.Progress()
 	w.stepCtx, w.stepCancel = context.WithCancel(ctx)
 	w.byok.init()
@@ -156,19 +162,21 @@ func New(cfg Config) *Wizard {
 			}
 		}
 	}()
-	ready := cfg.Gate.ReadyCh()
-	go func() {
-		select {
-		case <-ready:
-			w.readyOnce.Do(func() {
-				if w.cfg.OnReady != nil {
-					w.cfg.OnReady()
-				}
-			})
-		case <-ctx.Done():
-		}
-	}()
+	w.startSpeechModel()
 	return w
+}
+
+// Open leaves setup for the main window once the Gate is Ready: on the
+// user's click, so the finish can be read first. It does nothing before.
+func (w *Wizard) Open() {
+	if w.snap().prog.State != readiness.Ready {
+		return
+	}
+	go w.readyOnce.Do(func() {
+		if w.cfg.OnReady != nil {
+			w.cfg.OnReady()
+		}
+	})
 }
 
 // Close cancels all running work: checks, downloads, the level meter,
@@ -192,44 +200,9 @@ func (w *Wizard) snap() snapshot {
 	return snapshot{prog: w.prog, running: w.running, runErr: w.runErr}
 }
 
-// view is the step on screen: the Gate's current step.
-func (s snapshot) view() readiness.Step { return s.prog.Current }
-
 func (s snapshot) result(st readiness.Step) (readiness.Result, bool) {
 	r, ok := s.prog.Results[st]
 	return r, ok && r.Status != readiness.Pending
-}
-
-// unlocked reports whether every step before st passed.
-func (s snapshot) unlocked(st readiness.Step) bool {
-	for _, prev := range readiness.Steps[:slices.Index(readiness.Steps, st)] {
-		if s.prog.Results[prev].Status != readiness.Passed {
-			return false
-		}
-	}
-	return true
-}
-
-// enterStep runs when the step on screen changes: the previous step's work
-// is cancelled and the new step loads its data.
-func (w *Wizard) enterStep(st readiness.Step) {
-	w.entered = st
-	w.mu.Lock()
-	w.stepCancel()
-	w.stepCtx, w.stepCancel = context.WithCancel(w.ctx)
-	ctx := w.stepCtx
-	w.runErr = ""
-	w.mu.Unlock()
-	switch st {
-	case readiness.StepBYOK:
-		w.byok.load(w, ctx)
-	case readiness.StepSTT:
-		w.stt.load(w, ctx)
-	case readiness.StepTTS:
-		w.tts.load(w, ctx)
-	case readiness.StepPlatform:
-		w.plat.load(w, ctx)
-	}
 }
 
 // goStep runs fn off the UI goroutine with the current step's context.
@@ -290,76 +263,52 @@ func runErrCode(err error) string {
 	return "store_error"
 }
 
-// selectStep shows st if it is unlocked; the Gate keeps results.
-func (w *Wizard) selectStep(s snapshot, st readiness.Step) {
-	if !s.unlocked(st) || s.running || st == s.view() {
-		return
-	}
-	// Show it at once; the Gate's publish confirms it.
-	w.mu.Lock()
-	w.prog.Current = st
-	w.mu.Unlock()
-	go func() {
-		if err := w.cfg.Gate.Select(w.ctx, st); err != nil {
-			w.cfg.Log.Warn("setup step select failed", "step", string(st), "code", runErrCode(err))
-		}
-		w.cfg.Invalidate()
-	}()
-}
-
 // autoRecord remembers the last automatic run of a step in this session.
 type autoRecord struct {
 	sig string
 	at  time.Time
 }
 
-// autoRetry is how often a failing permissions check is repeated, so a fix
-// made in the system settings turns the row green without a click. The
-// check only reads state, so it is cheap.
-const autoRetry = 3 * time.Second
-
-// autoCheck starts the shown step's check without a click (the owner wants
-// "does it work" answered on arrival). Only checks that need nothing from
-// the user run on their own: permissions, platform, a saved provider and,
-// right after Save, the speech output. STT records the user's voice and the
-// end-to-end test records and plays sound, so those keep one explicit Start.
+// autoCheck starts the screen's check without a click (the owner wants
+// "does it work" answered on arrival): the agent once its form is saved,
+// the voice check once the speech model is ready, the finish once every
+// other step passed. Each runs again only when what it covers changed.
 func (w *Wizard) autoCheck(gtx layout.Context, s snapshot) {
-	st := s.view()
-	if s.running || !s.unlocked(st) {
+	if s.running {
 		return
 	}
+	var st readiness.Step
 	var sig string
-	switch st {
-	case readiness.StepPermissions, readiness.StepPlatform:
-	case readiness.StepBYOK:
+	switch w.scr {
+	case screenAgent:
 		var ok bool
 		if sig, ok = w.byok.autoSig(w); !ok {
 			return
 		}
-	case readiness.StepTTS:
+		st = readiness.StepBYOK
+	case screenVoice:
 		var ok bool
-		if sig, ok = w.tts.autoSig(w); !ok {
+		if sig, ok = w.voiceSig(); !ok {
 			return
 		}
+		st = readiness.StepTTS
+	case screenDone:
+		for _, other := range readiness.Steps[:len(readiness.Steps)-1] {
+			if r, ok := s.result(other); !ok || r.Status != readiness.Passed {
+				return
+			}
+		}
+		st = readiness.StepEndToEnd
 	default:
 		return
 	}
-	prev, ran := w.auto[st]
-	now := gtx.Now
-	if !ran || prev.sig != sig {
-		w.auto[st] = autoRecord{sig: sig, at: now}
-		w.runCheck(st, nil, nil)
+	if prev, ran := w.auto[st]; ran && prev.sig == sig {
 		return
 	}
-	if st != readiness.StepPermissions {
+	w.auto[st] = autoRecord{sig: sig, at: gtx.Now}
+	if st == readiness.StepTTS {
+		w.voiceCheck()
 		return
 	}
-	if r, ok := s.result(st); ok && r.Status != readiness.Passed {
-		if due := prev.at.Add(autoRetry); now.Before(due) {
-			gtx.Execute(op.InvalidateCmd{At: due})
-		} else {
-			w.auto[st] = autoRecord{sig: sig, at: now}
-			w.runCheck(st, nil, nil)
-		}
-	}
+	w.runCheck(st, nil, nil)
 }

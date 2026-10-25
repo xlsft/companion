@@ -6,79 +6,21 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/xlsft/companion/internal/llm"
-	"github.com/xlsft/companion/internal/llm/probe"
+	"github.com/xlsft/companion/internal/models"
 	"github.com/xlsft/companion/internal/providers"
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui/i18n"
-	"github.com/xlsft/companion/internal/ui/theme"
 )
 
 func contains(s, sub string) bool { return strings.Contains(strings.ToLower(s), strings.ToLower(sub)) }
 
-func TestStepLocking(t *testing.T) {
-	h := newHarness(t)
-	h.frame()
-	if h.view() != readiness.StepPermissions {
-		t.Fatalf("first step = %s", h.view())
-	}
-	// Only the first step is selectable; the rest are visible but locked.
-	n := 0
-	for _, a := range h.w.frame.actions {
-		if a == ActSelectStep {
-			n++
-		}
-	}
-	if n != 1 {
-		t.Errorf("selectable steps = %d, want 1", n)
-	}
-	for _, st := range readiness.Steps {
-		if !h.shows(i18n.T(i18n.EN, "wiz.step."+string(st))) {
-			t.Errorf("step %s not listed", st)
-		}
-	}
-	if !h.shows("locked") {
-		t.Error("locked state not shown")
-	}
-	// Jumping ahead does nothing.
-	h.w.stepBtns[3].Click()
-	h.frame()
-	h.frame()
-	if h.view() != readiness.StepPermissions {
-		t.Errorf("jumped ahead to %s", h.view())
-	}
-	if h.has(ActBack) {
-		t.Error("Back offered on the first step")
-	}
-	// Next is shown but leads nowhere before the step passes.
-	h.click(ActNext)
-	h.frame()
-	if h.view() != readiness.StepPermissions {
-		t.Errorf("Next moved past an unpassed step to %s", h.view())
-	}
-
-	// Passing a step advances; Back returns; the sidebar goes forward again.
-	h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Passed})
-	h.click(ActCheck)
-	h.eventually("advance to BYOK", func() bool { return h.view() == readiness.StepBYOK && h.idle() })
-	h.click(ActBack)
-	h.eventually("back to permissions", func() bool { return h.view() == readiness.StepPermissions })
-	h.click(ActNext)
-	h.eventually("forward to BYOK", func() bool { return h.view() == readiness.StepBYOK })
-	h.w.stepBtns[2].Click()
-	h.frame()
-	h.frame()
-	if h.view() != readiness.StepBYOK {
-		t.Errorf("unpassed BYOK let the user reach %s", h.view())
-	}
-}
-
-// allowedActions is everything the wizard may ever offer (FR-ONB-004).
-var allowedActions = []Action{ActBack, ActCheck, ActRecheck, ActDiagnostics, ActQuit, ActSelectStep, ActApplyHotkeys,
-	ActSave, ActTest, ActDownload, ActCancel, ActMicTest, ActLoadVoices, ActChoose, ActRunFull,
-	ActNext, ActLanguage, ActReplaceKey, ActHeaders, ActModelList}
+// allowedActions is everything the setup may ever offer (FR-ONB-004).
+var allowedActions = []Action{ActBack, ActNext, ActOpen, ActApplyHotkeys, ActChoose, ActLanguage, ActReplaceKey,
+	ActHeaders, ActModelList, ActRetryModel, ActVoiceCheck, ActReadSelf, ActRunFull, ActChangeKeys}
 
 // forbiddenWords match at the start of a word, so "Скачать" is not "чат".
 var forbiddenWords = []string{"skip", "later", "chat", "try without", "open chat", "пропуст", "позже", "чат", "без настройки"}
@@ -107,9 +49,47 @@ func assertNoBypass(t *testing.T, h *harness, where string) {
 			}
 		}
 	}
-	for _, a := range []Action{ActDiagnostics, ActQuit} {
-		if !h.has(a) {
-			t.Errorf("%s: %s missing", where, a)
+}
+
+// Setup starts on the agent; Next moves on only once a screen passed,
+// Back returns, and a reopened setup starts where work is left.
+func TestScreensAndNavigation(t *testing.T) {
+	h := newHarness(t)
+	h.frame()
+	if h.w.scr != screenAgent || h.has(ActBack) {
+		t.Fatalf("start: screen %d, back %v", h.w.scr, h.has(ActBack))
+	}
+	h.click(ActNext)
+	if h.w.scr != screenAgent {
+		t.Fatal("Next left an unpassed agent")
+	}
+	h.pass(readiness.StepBYOK)
+	h.frame()
+	h.click(ActNext)
+	if h.w.scr != screenVoice {
+		t.Fatalf("Next after the agent passed: screen %d", h.w.scr)
+	}
+	h.click(ActBack)
+	if h.w.scr != screenAgent {
+		t.Fatalf("Back: screen %d", h.w.scr)
+	}
+
+	for _, tt := range []struct {
+		name   string
+		passed []readiness.Step
+		want   screen
+	}{
+		{"fresh", nil, screenAgent},
+		{"agent done", []readiness.Step{readiness.StepBYOK}, screenVoice},
+		{"voice done", []readiness.Step{readiness.StepBYOK, readiness.StepTTS, readiness.StepSTT}, screenDone},
+	} {
+		h := newHarness(t)
+		for _, st := range tt.passed {
+			h.pass(st)
+		}
+		h.frame()
+		if h.w.scr != tt.want {
+			t.Errorf("%s: starts on %d, want %d", tt.name, h.w.scr, tt.want)
 		}
 	}
 }
@@ -118,498 +98,219 @@ func TestNoForbiddenActions(t *testing.T) {
 	for _, lang := range []i18n.Lang{i18n.EN, i18n.RU} {
 		h := newHarness(t)
 		h.lang = lang
-		for _, st := range readiness.Steps {
-			h.eventually("step "+string(st), func() bool { return h.view() == st })
-			// Fresh, failed and (for the menus) expanded states.
-			assertNoBypass(t, h, string(lang)+"/"+string(st)+"/fresh")
-			h.checks.set(st, readiness.Result{Status: readiness.Failed, Code: "denied",
-				Detail: map[string]string{"global_hotkey": readiness.PermNeedsBinding, "speech": "no_speech"}})
-			if _, err := h.gate.Run(context.Background(), st); err != nil {
-				t.Fatal(err)
+		for _, sc := range []screen{screenAgent, screenVoice, screenDone} {
+			h.goScreen(sc)
+			assertNoBypass(t, h, fmt.Sprintf("%s/%d/fresh", lang, sc))
+			for _, st := range readiness.Steps {
+				h.checks.set(st, readiness.Result{Status: readiness.Failed, Code: "denied",
+					Detail: map[string]string{"global_hotkey": readiness.PermNeedsBinding, readiness.DetailSpoke: "auth"}})
+				_, _ = h.gate.Run(context.Background(), st)
 			}
-			h.eventually("failure shown", func() bool { return h.shows(i18n.T(lang, "wiz.result.failed")) })
-			h.w.stt.modelDD.SetOpen(true)
-			h.w.stt.deviceDD.SetOpen(true)
 			h.w.langDD.SetOpen(true)
+			h.w.stt.deviceDD.SetOpen(true)
 			h.frame()
-			assertNoBypass(t, h, string(lang)+"/"+string(st)+"/failed")
-			if st == readiness.StepEndToEnd {
-				break
-			}
-			h.pass(st)
+			assertNoBypass(t, h, fmt.Sprintf("%s/%d/failed", lang, sc))
+			h.w.langDD.SetOpen(false)
+			h.w.stt.deviceDD.SetOpen(false)
 		}
 	}
 }
 
-func TestFailureKeepsStepAndExplains(t *testing.T) {
+// No technical code or subsystem name reaches the user: a failure shows
+// what to do, in words.
+func TestNoTechnicalCodes(t *testing.T) {
 	h := newHarness(t)
-	h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Failed, Code: "denied",
-		Detail: map[string]string{"microphone": readiness.PermDenied, "screen_capture": readiness.PermGranted,
-			"global_hotkey": readiness.PermNeedsBinding, "overlay_click_through": readiness.PermFallback}})
-	h.frame()
-	h.click(ActCheck)
-	h.eventually("failure", func() bool { return h.idle() && h.shows("Check failed") })
-	if h.view() != readiness.StepPermissions {
-		t.Fatalf("failure moved to %s", h.view())
-	}
-	for _, want := range []string{
-		"Subsystem: permissions", "Status: denied", "How to fix:",
-		"Denied", "Works", "Action needed", "Fallback",
-		"Talk", "Cancel", "Super", "Space", "Backspace", "Apply",
-	} {
-		if !h.shows(want) {
-			t.Errorf("missing %q", want)
-		}
-	}
-	if !h.has(ActRecheck) || !h.has(ActApplyHotkeys) {
-		t.Errorf("actions = %v", h.w.frame.actions)
-	}
-}
-
-func TestOnReadyCalledOnce(t *testing.T) {
-	h := newHarness(t)
-	h.checks.passAll()
-	for _, st := range readiness.Steps[:len(readiness.Steps)-1] {
-		h.pass(st)
-	}
-	h.eventually("end-to-end step", func() bool { return h.view() == readiness.StepEndToEnd })
-	if h.ready.Load() != 0 {
-		t.Fatal("ready before the end-to-end test")
-	}
-	h.click(ActRunFull)
-	h.eventually("ready", func() bool { return h.ready.Load() == 1 })
-	for range 5 {
-		h.click(ActRunFull)
-	}
-	if _, err := h.gate.Run(context.Background(), readiness.StepEndToEnd); err != nil {
+	h.checks.set(readiness.StepBYOK, readiness.Result{Status: readiness.Failed, Code: "auth"})
+	h.provider.info = &providers.Info{ID: "p", HasKey: true, Input: providers.Input{Kind: llm.KindOpenAI, BaseURL: "https://api.openai.com/v1", Model: "m"}}
+	h.goScreen(screenAgent)
+	h.eventually("loaded", func() bool { return h.w.byok.loaded })
+	if _, err := h.gate.Run(context.Background(), readiness.StepBYOK); err != nil {
 		t.Fatal(err)
 	}
-	h.frame()
-	if n := h.ready.Load(); n != 1 {
-		t.Errorf("OnReady called %d times", n)
-	}
-}
-
-func TestEndToEndStagesShownSeparately(t *testing.T) {
-	h := newHarness(t)
-	for _, st := range readiness.Steps[:5] {
-		h.pass(st)
-	}
-	h.checks.set(readiness.StepEndToEnd, readiness.Result{Status: readiness.Failed, Code: "llm_failed",
-		Detail: map[string]string{"speech": "ok", "stt": "ok", "capture": "ok", "llm": "timeout", "tts": "skipped", "pointing": "skipped"}})
-	h.eventually("e2e", func() bool { return h.view() == readiness.StepEndToEnd })
-	h.click(ActRunFull)
-	h.eventually("result", func() bool { return h.idle() && h.shows("Status: llm_failed") })
-	for _, want := range []string{"Speech — Done", "Local STT — Done", "Screenshot — Done",
-		"Model answer — Failed (timeout)", "Speech output — Not run", "Pointing — Not run"} {
-		if !h.shows(want) {
-			t.Errorf("missing %q in %q", want, h.w.frame.texts)
+	h.eventually("failure", func() bool { return h.shows(fixText(h.lang, "auth")) })
+	for _, s := range h.w.frame.texts {
+		for _, code := range []string{"(auth)", "Status:", "Subsystem", "auth_model"} {
+			if strings.Contains(s, code) {
+				t.Errorf("technical text on screen: %q", s)
+			}
 		}
 	}
-	if h.ready.Load() != 0 || h.gate.IsReady() {
-		t.Error("failed end-to-end made the app ready")
+}
+
+// A provider tile fills the endpoint, never the model; the custom server
+// is the only one with an address and an API choice.
+func TestAgentTiles(t *testing.T) {
+	h := newHarness(t)
+	h.eventually("agent", func() bool { return h.w.byok.loaded })
+	b := &h.w.byok
+	h.pickAgent("anthropic")
+	if b.kind.Value != string(llm.KindAnthropic) || b.baseURL.Text() != "https://api.anthropic.com" || b.model.Text() != "" {
+		t.Errorf("anthropic: kind %q url %q model %q", b.kind.Value, b.baseURL.Text(), b.model.Text())
+	}
+	if h.shows(h.tr("wiz.byok.baseURL")) || h.shows(h.tr("wiz.agent.speaks")) {
+		t.Error("a preset shows the address or the API choice")
+	}
+	if !h.shows(i18n.Tf(h.lang, "wiz.agent.keyFor", "Anthropic")) {
+		t.Error("no key field named after the service")
+	}
+	h.pickAgent(customTile)
+	if b.baseURL.Text() != "" || !h.shows(h.tr("wiz.byok.baseURL")) || !h.shows(h.tr("wiz.agent.speaks")) {
+		t.Errorf("custom: url %q, fields shown %v", b.baseURL.Text(), h.shows(h.tr("wiz.byok.baseURL")))
 	}
 }
 
-func TestKeyNeverRenderedAfterSave(t *testing.T) {
-	const secret = "sk-test-SECRET-4242"
+// The form saves itself once complete and the user paused; the key never
+// shows again, and the connection check runs by itself.
+func TestAgentSavesItselfAndChecks(t *testing.T) {
 	h := newHarness(t)
-	h.pass(readiness.StepPermissions)
-	h.eventually("byok", func() bool { return h.view() == readiness.StepBYOK && h.w.byok.loaded })
+	h.eventually("agent", func() bool { return h.w.byok.loaded })
 	b := &h.w.byok
-	b.baseURL.SetText("https://llm.example.test/v1")
-	b.model.SetText("test-model")
+	h.pickAgent("openai")
+	const secret = "sk-test-secret-123"
 	b.key.SetText(secret)
-	b.hdr.SetText("X-Org: acme\n\n")
-	h.frame()
-	if h.shows(secret) {
-		t.Fatal("key shown in a label while typing")
+	b.model.SetText("gpt-test")
+	h.checks.set(readiness.StepBYOK, readiness.Result{Status: readiness.Passed})
+	h.eventually("saved", func() bool { return len(h.provider.savedKeys()) == 1 })
+	h.eventually("checked", func() bool { return h.checks.count(readiness.StepBYOK) == 1 && h.idle() })
+	if k := h.provider.savedKeys(); k[0] != secret {
+		t.Errorf("saved key %q", k[0])
 	}
-	h.click(ActSave)
-	if b.key.Text() != "" {
-		t.Error("key still in the editor after Save")
-	}
-	h.eventually("saved", func() bool { return h.shows("Saved in the system keychain") })
-	if got := h.provider.savedKeys(); !slices.Equal(got, []string{secret}) {
-		t.Errorf("backend keys = %v", got)
-	}
-	if !h.shows("go only to llm.example.test") {
-		t.Errorf("endpoint in use not shown: %q", h.w.frame.texts)
-	}
-	for _, s := range h.w.frame.texts {
-		if strings.Contains(s, secret) {
-			t.Errorf("secret rendered in %q", s)
-		}
-	}
-	// Re-saving without a key keeps it (empty APIKey on Update).
-	h.click(ActSave)
-	h.eventually("resaved", func() bool { return h.shows("Saved in the system keychain") && !h.w.byok.saving })
-	if got := h.provider.savedKeys(); len(got) != 1 {
-		t.Errorf("backend keys after resave = %v", got)
-	}
-	if h.provider.info.Input.Headers["X-Org"] != "acme" {
-		t.Errorf("headers = %v", h.provider.info.Input.Headers)
-	}
-
-	// The TTS key follows the same rule.
-	h.pass(readiness.StepBYOK)
-	h.pass(readiness.StepSTT)
-	h.eventually("tts", func() bool { return h.view() == readiness.StepTTS })
-	h.w.tts.key.SetText(secret)
-	h.frame()
-	h.click(ActSave)
-	if h.w.tts.key.Text() != "" {
-		t.Error("TTS key still in the editor after Save")
-	}
-	h.eventually("tts saved", func() bool { return h.shows("Saved in the system keychain") })
-	for _, s := range h.w.frame.texts {
-		if strings.Contains(s, secret) {
-			t.Errorf("secret rendered in %q", s)
-		}
-	}
-}
-
-func TestBYOKTestSteps(t *testing.T) {
-	h := newHarness(t)
-	h.pass(readiness.StepPermissions)
-	h.provider.info = &providers.Info{ID: "prov_1", HasKey: true,
-		Input: providers.Input{Kind: llm.KindAnthropic, BaseURL: "https://api.example.test", Model: "m1"}}
-	tr := providers.TestResult{ProviderID: "prov_1", Steps: []providers.StepResult{
-		{ID: providers.StepConnection, Status: providers.StatusOK, MessageKey: "provider.connection.ok"},
-		{ID: providers.StepAuthModel, Status: providers.StatusOK, MessageKey: "provider.auth_model.ok"},
-		{ID: providers.StepCapabilities, Status: providers.StatusOK, MessageKey: "provider.capabilities.ok"},
-	}, Capabilities: &probe.Report{Results: []probe.Result{
-		{Capability: probe.CapText, OK: true}, {Capability: probe.CapStream, OK: true},
-		{Capability: llm.CapVision, OK: false, ErrCode: "wrong_answer"}, {Capability: llm.CapTools, OK: true},
-	}}}
-	h.checks.set(readiness.StepBYOK, readiness.Result{Status: readiness.Passed, Detail: tr.Detail()})
-	// A stored provider is tested on arrival, without a click.
-	h.eventually("tested", func() bool { return h.view() == readiness.StepSTT })
-	if n := h.checks.count(readiness.StepBYOK); n != 1 {
-		t.Errorf("BYOK checks = %d, want 1", n)
-	}
-	h.w.stepBtns[1].Click()
-	h.eventually("back to byok", func() bool { return h.view() == readiness.StepBYOK && h.w.byok.baseURL.Text() != "" })
-	if h.w.byok.kind.Value != string(llm.KindAnthropic) || h.w.byok.dirty {
-		t.Errorf("prefill kind=%s dirty=%v", h.w.byok.kind.Value, h.w.byok.dirty)
-	}
-	for _, want := range []string{"Connection — The endpoint answers.", "Key and model — The key is accepted",
-		"Text — yes", "Streaming — yes", "Vision — no", "Tools — yes"} {
-		if !h.shows(want) {
-			t.Errorf("missing %q", want)
-		}
-	}
-}
-
-func TestProgressFromSubscribe(t *testing.T) {
-	h := newHarness(t)
-	h.frame()
-	// A check run elsewhere (not by a click) reaches the wizard.
-	h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Failed, Code: "unavailable"})
-	if _, err := h.gate.Run(context.Background(), readiness.StepPermissions); err != nil {
-		t.Fatal(err)
-	}
-	h.eventually("failure via subscribe", func() bool { return h.shows("Status: unavailable") })
-	h.pass(readiness.StepPermissions)
-	h.eventually("advance via subscribe", func() bool { return h.view() == readiness.StepBYOK })
-	if !h.shows("passed") {
-		t.Error("sidebar does not show the passed step")
-	}
-}
-
-func TestLeavingStepCancelsWork(t *testing.T) {
-	h := newHarness(t)
-	h.pass(readiness.StepPermissions)
-	h.pass(readiness.StepBYOK)
-	h.stt.installBlocks = true
-	h.eventually("stt loaded", func() bool { return h.view() == readiness.StepSTT && h.has(ActDownload) })
-	h.click(ActDownload)
-	h.eventually("downloading", func() bool { return h.has(ActCancel) && h.shows("MB/s") })
-	h.click(ActBack)
-	h.eventually("install cancelled", func() bool { return h.stt.canceled.Load() })
-
-	// A running check is cancelled by Close as well.
-	h2 := newHarness(t)
-	h2.checks.block[readiness.StepPermissions] = true
-	h2.frame()
-	h2.click(ActCheck)
-	h2.eventually("running", func() bool { return h2.checks.count(readiness.StepPermissions) == 1 })
-	h2.w.Close()
-	h2.eventually("check ended", h2.idle)
-	if r := h2.gate.Progress().Results[readiness.StepPermissions]; r.Status == readiness.Passed {
-		t.Errorf("cancelled check result = %+v", r)
-	}
-}
-
-func TestSTTFlow(t *testing.T) {
-	h := newHarness(t)
-	h.lang = i18n.RU
-	h.pass(readiness.StepPermissions)
-	h.pass(readiness.StepBYOK)
-	h.eventually("stt loaded", func() bool { return h.view() == readiness.StepSTT && h.has(ActDownload) })
-	if !h.shows("ГБ ОЗУ") || !h.shows("Рекомендуем") || !h.shows("Parakeet") {
-		t.Errorf("hardware/recommendation missing: %q", h.w.frame.texts)
-	}
-	if !h.shows("«Привет, это проверка микрофона»") {
-		t.Error("RU phrase missing")
-	}
-	h.click(ActDownload)
-	h.eventually("installed", func() bool { return h.shows("скачана") })
-	// Pick the second microphone and watch the level.
-	h.w.stt.deviceDD.Pick(2)
-	h.frame()
-	h.click(ActMicTest)
-	h.eventually("meter", func() bool { return h.shows("дБFS") })
-	h.checks.set(readiness.StepSTT, readiness.Result{Status: readiness.Failed, Code: "mismatch"})
-	h.click(ActCheck)
-	h.eventually("checked", func() bool { return h.idle() && h.shows("Распознано:") })
-	if h.stt.device != "mic2" {
-		t.Errorf("selected device = %q", h.stt.device)
-	}
-	if h.w.stt.meter != nil {
-		t.Error("meter still open after the check")
-	}
-	if !h.shows("Статус: mismatch") || h.view() != readiness.StepSTT {
-		t.Error("STT failure not kept on the step")
-	}
-}
-
-func TestDiagnosticsAndQuit(t *testing.T) {
-	h := newHarness(t)
-	h.frame()
-	h.click(ActDiagnostics)
-	h.click(ActQuit)
-	h.eventually("callbacks", func() bool { return h.diag.Load() == 1 && h.quit.Load() == 1 })
-	if h.view() != readiness.StepPermissions || h.gate.IsReady() {
-		t.Error("Diagnostics or Quit changed setup state")
-	}
-}
-
-// TestLayoutAllSteps renders every step in both languages, both themes and
-// the text scale extremes without a display.
-func TestLayoutAllSteps(t *testing.T) {
-	for _, lang := range []i18n.Lang{i18n.RU, i18n.EN} {
-		for _, dark := range []bool{false, true} {
-			for _, scale := range []float32{theme.MinScale, 1, theme.MaxScale} {
-				h := newHarness(t)
-				h.lang, h.th = lang, theme.New(dark, scale)
-				h.size.Y = 700 // a real window: the list scrolls
-				for i, st := range readiness.Steps {
-					h.eventually("step", func() bool { return h.view() == st })
-					h.frame()
-					h.w.stt.modelDD.SetOpen(true)
-					h.w.langDD.SetOpen(true)
-					h.frame()
-					if i < len(readiness.Steps)-1 {
-						h.pass(st)
-					}
-				}
+	for i := 0; i < 3; i++ {
+		h.frame()
+		for _, s := range h.w.frame.texts {
+			if strings.Contains(s, secret) {
+				t.Fatalf("key on screen: %q", s)
 			}
 		}
 	}
+	if !h.shows(h.tr("wiz.agent.connected")) {
+		t.Error("no connected line after a passed check")
+	}
 }
 
-// TestAutoChecks: arriving at a step starts its check without a click, and
-// only the steps that need nothing from the user do so.
-func TestAutoChecks(t *testing.T) {
+// The recommended speech model downloads by itself as setup opens; its
+// chip goes away a few seconds after it is ready.
+func TestSpeechModelDownloadsByItself(t *testing.T) {
 	h := newHarness(t)
-	h.eventually("permissions auto-run", func() bool { return h.checks.count(readiness.StepPermissions) >= 1 && h.idle() })
-	n := h.checks.count(readiness.StepPermissions)
-	for range 5 {
-		h.frame()
-	}
-	if got := h.checks.count(readiness.StepPermissions); got != n {
-		t.Errorf("permissions ran %d times across idle frames, want %d", got, n)
-	}
-
-	h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Passed})
-	h.click(ActRecheck)
-	h.eventually("byok", func() bool { return h.view() == readiness.StepBYOK })
-	// No provider saved: nothing to test yet.
-	for range 3 {
-		h.frame()
-	}
-	if c := h.checks.count(readiness.StepBYOK); c != 0 {
-		t.Errorf("BYOK ran %d times without a saved provider", c)
-	}
-
-	h.pass(readiness.StepBYOK)
-	h.eventually("stt", func() bool { return h.view() == readiness.StepSTT })
-	for range 5 {
-		h.frame()
-	}
-	if c := h.checks.count(readiness.StepSTT); c != 0 {
-		t.Errorf("STT recorded by itself %d times", c)
-	}
-	if h.has(ActRecheck) && !h.w.snap().prog.Results[readiness.StepSTT].At.IsZero() {
-		t.Error("STT has a result before the user started")
-	}
-
-	h.pass(readiness.StepSTT)
-	h.eventually("tts", func() bool { return h.view() == readiness.StepTTS })
-	for range 3 {
-		h.frame()
-	}
-	if c := h.checks.count(readiness.StepTTS); c != 0 {
-		t.Errorf("TTS played %d times before Save", c)
-	}
-	h.click(ActSave)
-	h.eventually("tts auto after save", func() bool { return h.checks.count(readiness.StepTTS) == 1 && h.idle() })
-
-	h.pass(readiness.StepTTS)
-	h.eventually("platform", func() bool { return h.view() == readiness.StepPlatform })
-	h.eventually("platform auto", func() bool { return h.checks.count(readiness.StepPlatform) >= 1 })
-	h.pass(readiness.StepPlatform)
-	h.eventually("e2e", func() bool { return h.view() == readiness.StepEndToEnd })
-	for range 5 {
-		h.frame()
-	}
-	if c := h.checks.count(readiness.StepEndToEnd); c != 0 {
-		t.Errorf("end-to-end ran by itself %d times", c)
-	}
-}
-
-// TestPermissionsRetryWhileFailing: a failing permissions check repeats on
-// its own so a fix in the system settings turns the row green.
-func TestPermissionsRetryWhileFailing(t *testing.T) {
-	h := newHarness(t)
-	h.eventually("first run", func() bool { return h.checks.count(readiness.StepPermissions) == 1 && h.idle() })
-	h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Passed})
-	// Pretend the last run was long ago instead of sleeping.
-	rec := h.w.auto[readiness.StepPermissions]
-	rec.at = rec.at.Add(-2 * autoRetry)
-	h.w.auto[readiness.StepPermissions] = rec
-	h.eventually("advance after the fix", func() bool { return h.view() == readiness.StepBYOK })
-	if c := h.checks.count(readiness.StepPermissions); c != 2 {
-		t.Errorf("permissions ran %d times, want 2", c)
-	}
-}
-
-// A failing check is repeated every few seconds; its card must stay up
-// while the next run is in flight instead of blinking.
-func TestFailureStaysWhileRechecking(t *testing.T) {
-	for _, running := range []bool{false, true} {
-		h := newHarness(t)
-		h.eventually("permissions step", func() bool { return h.view() == readiness.StepPermissions })
-		h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Failed, Code: "denied"})
-		if _, err := h.gate.Run(t.Context(), readiness.StepPermissions); err != nil {
-			t.Fatal(err)
-		}
-		h.eventually("failure", func() bool { return h.shows(i18n.T(i18n.EN, "wiz.result.failed")) })
-		h.w.mu.Lock()
-		h.w.running = running
-		h.w.mu.Unlock()
-		h.frame()
-		if !h.shows(i18n.T(i18n.EN, "wiz.result.failed")) {
-			t.Errorf("running=%v: failure card hidden", running)
-		}
-		h.w.mu.Lock()
-		h.w.running = false
-		h.w.mu.Unlock()
-	}
-}
-
-// Picking a provider preset fills the endpoint fields and never the model:
-// that stays the user's choice, across preset switches too.
-func TestProviderPresetFillsForm(t *testing.T) {
-	h := newHarness(t)
-	h.eventually("permissions step", func() bool { return h.view() == readiness.StepPermissions })
-	h.pass(readiness.StepPermissions)
-	h.eventually("BYOK step", func() bool { return h.view() == readiness.StepBYOK && h.idle() })
-	idx := func(id string) int {
-		for i, p := range providers.Presets {
-			if p.ID == id {
-				return i
-			}
-		}
-		t.Fatalf("no preset %s", id)
-		return -1
-	}
-	b := &h.w.byok
-	pick := func(i int) {
-		b.preset.SetOpen(true)
-		h.frame()
-		b.preset.Pick(i)
-		h.frame()
-		h.frame()
-	}
-	tests := []struct {
-		name           string
-		pick           int
-		typedModel     string
-		kind, url, mdl string
-	}{
-		{"anthropic", idx("anthropic"), "", string(llm.KindAnthropic), "https://api.anthropic.com", ""},
-		{"switch leaves the model empty", idx("openai"), "", string(llm.KindOpenAI), "https://api.openai.com/v1", ""},
-		{"typed model kept", idx("openrouter"), "my-model", string(llm.KindOpenAI), "https://openrouter.ai/api/v1", "my-model"},
-		{"other endpoint clears the address", len(providers.Presets), "", string(llm.KindOpenAI), "", "my-model"},
-	}
-	for _, tt := range tests {
-		if tt.typedModel != "" {
-			b.model.SetText(tt.typedModel)
-			h.frame()
-		}
-		pick(tt.pick)
-		if b.kind.Value != tt.kind || b.baseURL.Text() != tt.url || b.model.Text() != tt.mdl {
-			t.Errorf("%s: kind=%q url=%q model=%q", tt.name, b.kind.Value, b.baseURL.Text(), b.model.Text())
-		}
-		if !b.dirty {
-			t.Errorf("%s: form not marked edited", tt.name)
-		}
-		if got := b.presetIndex(); got != tt.pick {
-			t.Errorf("%s: selection = %d, want %d", tt.name, got, tt.pick)
-		}
-	}
-}
-
-// Picking a local speech server fills its address; Save hands it and the
-// model the user typed to the backend. ElevenLabs drops them again.
-func TestTTSPresetSavesEndpoint(t *testing.T) {
-	h := newHarness(t)
-	for _, st := range []readiness.Step{readiness.StepPermissions, readiness.StepBYOK, readiness.StepSTT} {
-		h.eventually(string(st), func() bool { return h.view() == st })
-		h.pass(st)
-	}
-	h.eventually("tts", func() bool { return h.view() == readiness.StepTTS })
-	idx := slices.IndexFunc(tts.Presets, func(p tts.Preset) bool { return p.ID == "kokoro" })
-	ts := &h.w.tts
-	pick := func(i int) {
-		ts.preset.SetOpen(true)
-		h.frame()
-		ts.preset.Pick(i)
-		h.frame()
-		h.frame()
-	}
-	pick(idx)
-	if ts.model.Text() != "" {
-		t.Errorf("preset filled a model: %q", ts.model.Text())
-	}
-	ts.model.SetText("kokoro")
-	h.frame()
-	if !h.shows(i18n.T(h.lang, "wiz.byok.baseURL")) || ts.presetIndex() != idx {
-		t.Fatalf("endpoint fields not shown or preset not selected (%d)", ts.presetIndex())
-	}
-	h.click(ActSave)
-	h.eventually("saved", func() bool {
-		h.tts.mu.Lock()
-		defer h.tts.mu.Unlock()
-		return h.tts.cfg.BaseURL != ""
+	h.eventually("installed", func() bool {
+		inst, _ := h.stt.Installed()
+		return len(inst) == 1
 	})
-	h.tts.mu.Lock()
-	got := h.tts.cfg
-	h.tts.mu.Unlock()
-	if got.Provider != TTSOpenAI || got.BaseURL != "http://localhost:8880/v1" || got.Model != "kokoro" {
-		t.Errorf("saved %+v", got)
+	h.eventually("ready chip", func() bool { return h.shows(h.tr("wiz.model.ready")) })
+	h.w.model.set(func() { h.w.model.readyAt = time.Now().Add(-2 * modelReadyFor) })
+	h.frame()
+	if h.shows(h.tr("wiz.model.ready")) {
+		t.Error("ready chip still shown")
 	}
+	cat, _ := models.BuiltinCatalog()
+	inst, _ := h.stt.Installed()
+	if _, ok := cat.Find(inst[0].ID); !ok {
+		t.Errorf("installed %q is not a catalogue model", inst[0].ID)
+	}
+}
 
-	pick(slices.IndexFunc(tts.Presets, func(p tts.Preset) bool { return p.ID == "elevenlabs" }))
-	if ts.endpoint() != "" || h.shows(i18n.T(h.lang, "wiz.byok.baseURL")) {
+// The voice check speaks and listens (StepTTS); when the microphone heard
+// it, StepSTT passes on that recording. When it did not, the user can read
+// the phrase instead.
+func TestVoiceCheck(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		heard string
+	}{{"heard", readiness.DetailOK}, {"headphones", readiness.HeardNoSpeech}} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.checks.set(readiness.StepTTS, readiness.Result{Status: readiness.Passed,
+				Detail: map[string]string{readiness.DetailSpoke: readiness.DetailOK, readiness.DetailHeard: tt.heard}})
+			h.checks.set(readiness.StepSTT, readiness.Result{Status: readiness.Passed})
+			h.goScreen(screenVoice)
+			h.eventually("voice check ran", func() bool { return h.checks.count(readiness.StepTTS) == 1 && h.idle() })
+			h.frame()
+			if tt.heard == readiness.DetailOK {
+				h.eventually("recognition passed", func() bool { return h.checks.count(readiness.StepSTT) == 1 })
+				h.eventually("works", func() bool { return h.shows(h.tr("wiz.voice.works")) })
+				return
+			}
+			if h.checks.count(readiness.StepSTT) != 0 || !h.has(ActReadSelf) {
+				t.Fatalf("not heard: STT runs %d, read-self offered %v", h.checks.count(readiness.StepSTT), h.has(ActReadSelf))
+			}
+			h.click(ActReadSelf)
+			h.eventually("read self", func() bool { return h.checks.count(readiness.StepSTT) == 1 && h.idle() })
+		})
+	}
+}
+
+// The voice screen starts on Edge (no key) and shows no key field for it.
+func TestVoiceStartsOnEdge(t *testing.T) {
+	h := newHarness(t)
+	h.tts.cfg = TTSConfig{Provider: tts.EdgeProviderID, Speed: 1}
+	h.goScreen(screenVoice)
+	h.eventually("loaded", func() bool { return h.w.tts.loaded && h.w.tts.tile.Value == tts.EdgeProviderID })
+	if h.shows(h.tr("wiz.tts.key")) {
+		t.Error("key field for Edge")
+	}
+	h.pickVoice("openai")
+	if !h.shows(h.tr("wiz.tts.key")) {
+		t.Error("no key field for OpenAI")
+	}
+}
+
+// Picking a local speech server fills its address; ElevenLabs drops it.
+func TestVoiceServerTiles(t *testing.T) {
+	h := newHarness(t)
+	h.goScreen(screenVoice)
+	ts := &h.w.tts
+	h.pickVoice("kokoro")
+	if ts.endpoint() != "http://localhost:8880/v1" || ts.model.Text() != "" {
+		t.Errorf("kokoro: %q model %q", ts.endpoint(), ts.model.Text())
+	}
+	h.pickVoice("elevenlabs")
+	if ts.endpoint() != "" {
 		t.Errorf("ElevenLabs keeps an endpoint: %q", ts.endpoint())
 	}
 }
 
-// Hundreds of voices (Edge) are a dropdown, not a wall of cards; picking
-// one marks the form edited.
+// The finish runs the full test by itself once everything else passed,
+// and opens Companion only on the user's click, once.
+func TestDoneRunsFullTestAndOpens(t *testing.T) {
+	h := newHarness(t)
+	for _, st := range readiness.Steps[:len(readiness.Steps)-1] {
+		h.pass(st)
+	}
+	h.checks.set(readiness.StepEndToEnd, readiness.Result{Status: readiness.Passed})
+	h.frame()
+	if h.w.scr != screenDone {
+		t.Fatalf("screen %d", h.w.scr)
+	}
+	h.eventually("full test", func() bool { return h.checks.count(readiness.StepEndToEnd) == 1 && h.idle() })
+	h.eventually("ready", func() bool { return h.w.snap().prog.State == readiness.Ready })
+	if h.ready.Load() != 0 {
+		t.Fatal("opened Companion without a click")
+	}
+	h.click(ActOpen)
+	h.eventually("opened", func() bool { return h.ready.Load() == 1 })
+	h.click(ActOpen)
+	time.Sleep(20 * time.Millisecond)
+	if h.ready.Load() != 1 {
+		t.Errorf("OnReady ran %d times", h.ready.Load())
+	}
+}
+
+// Permissions are checked in the background; one that needs the user
+// shows on the finish with what to do, shortcuts with their editor.
+func TestDoneShowsPermissionIssue(t *testing.T) {
+	h := newHarness(t)
+	h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Failed, Code: readiness.PermNeedsBinding,
+		Detail: map[string]string{"microphone": readiness.PermGranted, "global_hotkey": readiness.PermNeedsBinding}})
+	h.goScreen(screenDone)
+	h.eventually("background check", func() bool { return h.checks.count(readiness.StepPermissions) >= 1 })
+	h.eventually("issue", func() bool { return h.shows(h.tr("wiz.perm.global_hotkey")) && h.has(ActApplyHotkeys) })
+	if h.shows(h.tr("wiz.perm.microphone")) {
+		t.Error("a working permission listed as an issue")
+	}
+}
+
+// Hundreds of voices (Edge) are a dropdown; picking one marks the form
+// edited.
 func TestManyVoicesAreADropdown(t *testing.T) {
 	h := newHarness(t)
 	var many []tts.Voice
@@ -621,24 +322,13 @@ func TestManyVoicesAreADropdown(t *testing.T) {
 	h.tts.voices = many
 	h.tts.cfg = TTSConfig{Provider: tts.EdgeProviderID, Speed: 1}
 	h.tts.mu.Unlock()
-	for _, st := range []readiness.Step{readiness.StepPermissions, readiness.StepBYOK, readiness.StepSTT} {
-		h.eventually(string(st), func() bool { return h.view() == st })
-		h.pass(st)
-	}
-	h.eventually("tts", func() bool { return h.view() == readiness.StepTTS })
+	h.goScreen(screenVoice)
 	ts := &h.w.tts
 	h.eventually("voices", func() bool {
 		h.w.mu.Lock()
 		defer h.w.mu.Unlock()
 		return len(ts.voices) == 20
 	})
-	h.frame()
-	if h.shows("Voice v05") {
-		t.Fatal("voices drawn as cards")
-	}
-	if !h.shows(i18n.T(h.lang, "wiz.tts.pickVoice")) {
-		t.Fatal("no voice dropdown")
-	}
 	ts.voiceDD.SetOpen(true)
 	h.frame()
 	ts.voiceDD.Pick(5)
@@ -652,26 +342,18 @@ func TestManyVoicesAreADropdown(t *testing.T) {
 	}
 }
 
-// The full test says what to read before it listens, and after a mismatch
-// shows what it heard.
-func TestEndToEndTellsWhatToSay(t *testing.T) {
+// Leaving a screen cancels its work, so nothing keeps running unseen.
+func TestLeavingScreenCancelsWork(t *testing.T) {
 	h := newHarness(t)
+	h.pass(readiness.StepBYOK)
+	h.checks.mu.Lock()
+	h.checks.block[readiness.StepEndToEnd] = true
+	h.checks.mu.Unlock()
 	for _, st := range readiness.Steps[:len(readiness.Steps)-1] {
-		h.eventually(string(st), func() bool { return h.view() == st })
 		h.pass(st)
 	}
-	h.eventually("e2e", func() bool { return h.view() == readiness.StepEndToEnd })
-	phrase := readiness.MicPhrase(string(h.lang))
-	if !h.shows(i18n.T(h.lang, "wiz.e2e.sayAfterStart")) || !h.shows(phrase) {
-		t.Fatal("no prompt with the phrase before the run")
-	}
-	if h.shows("thanks for watching") {
-		t.Error("transcript shown before any run")
-	}
-	h.checks.set(readiness.StepEndToEnd, readiness.Result{Status: readiness.Failed, Code: "mismatch",
-		Detail: map[string]string{"speech": "ok", "stt": "mismatch"}})
-	if _, err := h.gate.Run(t.Context(), readiness.StepEndToEnd); err != nil {
-		t.Fatal(err)
-	}
-	h.eventually("heard", func() bool { return h.shows("thanks for watching") })
+	h.frame()
+	h.eventually("running", func() bool { return h.checks.count(readiness.StepEndToEnd) == 1 })
+	h.w.enterScreen(screenVoice)
+	h.eventually("cancelled", h.idle)
 }

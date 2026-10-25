@@ -7,23 +7,26 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"gioui.org/io/key"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/widget"
 
 	"github.com/xlsft/companion/internal/llm"
 	"github.com/xlsft/companion/internal/providers"
-	"github.com/xlsft/companion/internal/readiness"
-	"github.com/xlsft/companion/internal/ui/kit"
 )
 
 // byokState is the provider form. Widgets are UI-goroutine only; the
 // fields under "async" are guarded by Wizard.mu.
 type byokState struct {
 	kind                     widget.Enum
-	preset                   kit.Dropdown
-	custom                   bool // "Other endpoint" picked: no preset matches on purpose
+	tile                     widget.Enum // the chosen service: a preset's ID or customTile
+	tileList                 widget.List
+	custom                   bool // the custom server is picked: no preset matches on purpose
+	lastSig                  string
+	editedAt                 time.Time // the form last changed; it saves itself after a pause
 	baseURL, model, key, hdr widget.Editor
 	dirty                    bool // edited since the last save
 	replacing                bool // the key editor is shown over a stored key
@@ -119,8 +122,19 @@ func (b *byokState) update(w *Wizard, gtx layout.Context, s snapshot) {
 		b.showHeaders = b.showHeaders || len(info.Input.Headers) > 0
 		b.models.soon = true
 	}
-	if i := b.preset.Update(gtx, len(providers.Presets)+1); i >= 0 {
+	if b.tile.Update(gtx) {
+		i := slices.IndexFunc(providers.Presets, func(p providers.Preset) bool { return p.ID == b.tile.Value })
+		if i < 0 {
+			i = len(providers.Presets) // the custom server
+		}
 		b.pickPreset(gtx, i)
+	} else if i := b.presetIndex(); i >= 0 {
+		// Follow the form: a saved provider shows its tile.
+		if i < len(providers.Presets) {
+			b.tile.Value = providers.Presets[i].ID
+		} else {
+			b.tile.Value = customTile
+		}
 	}
 	if b.kind.Update(gtx) {
 		b.dirty = true
@@ -138,13 +152,44 @@ func (b *byokState) update(w *Wizard, gtx layout.Context, s snapshot) {
 	if w.clicked(gtx, ActHeaders) {
 		b.showHeaders = !b.showHeaders
 	}
-	if w.clicked(gtx, ActSave) {
-		b.save(w, gtx)
-	}
-	if w.clicked(gtx, ActTest) {
-		w.runCheck(readiness.StepBYOK, nil, nil)
-	}
 	b.models.follow(w, gtx, b.modelQuery(w))
+	b.autoSave(w, gtx, s)
+}
+
+// agentSaveAfter is the pause after the last edit before the form saves
+// itself; there is no Save button.
+const agentSaveAfter = 700 * time.Millisecond
+
+// autoSave stores the form once it is complete and the user stopped
+// typing; the connection check then runs by itself (autoSig).
+func (b *byokState) autoSave(w *Wizard, gtx layout.Context, s snapshot) {
+	sig := strings.Join([]string{b.kind.Value, b.baseURL.Text(), b.model.Text(), b.key.Text(), b.hdr.Text()}, "\x00")
+	if sig != b.lastSig {
+		b.lastSig, b.editedAt = sig, gtx.Now
+	}
+	w.mu.Lock()
+	info, saving := b.info, b.saving
+	w.mu.Unlock()
+	if !b.dirty || saving || s.running || !b.complete(info) {
+		return
+	}
+	if due := b.editedAt.Add(agentSaveAfter); gtx.Now.Before(due) {
+		gtx.Execute(op.InvalidateCmd{At: due})
+		return
+	}
+	b.save(w, gtx)
+}
+
+// complete reports a form that can be saved: an address, a model, and a
+// key unless the endpoint takes none or one is stored.
+func (b *byokState) complete(info *providers.Info) bool {
+	if strings.TrimSpace(b.baseURL.Text()) == "" || strings.TrimSpace(b.model.Text()) == "" {
+		return false
+	}
+	if strings.TrimSpace(b.key.Text()) != "" || (info != nil && info.HasKey) {
+		return true
+	}
+	return !providers.NeedsKey(llm.Kind(b.kind.Value), b.baseURL.Text())
 }
 
 // modelQuery asks for the models of the endpoint as typed, once that is

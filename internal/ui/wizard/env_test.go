@@ -22,18 +22,13 @@ func TestNoEnvironmentNames(t *testing.T) {
 		if _, err := h.gate.Run(context.Background(), readiness.StepPermissions); err != nil {
 			t.Fatal(err)
 		}
-		for i, st := range readiness.Steps {
-			if i > 0 {
-				h.pass(readiness.Steps[i-1])
-			}
-			h.eventually("step "+string(st), func() bool { return h.view() == st })
-			if st == readiness.StepPlatform {
-				h.eventually("report", func() bool { return h.shows(i18n.T(lang, "cap.col.means")) })
-			}
+		for _, sc := range []screen{screenAgent, screenVoice, screenDone} {
+			h.goScreen(sc)
+			h.frame()
 			for _, s := range h.w.frame.texts {
 				for _, n := range environmentNames {
 					if contains(s, n) {
-						t.Errorf("%s/%s: %q names %q", lang, st, s, n)
+						t.Errorf("%s/%d: %q names %q", lang, sc, s, n)
 					}
 				}
 			}

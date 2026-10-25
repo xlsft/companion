@@ -1,13 +1,10 @@
 package wizard
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/xlsft/companion/internal/llm"
 	"github.com/xlsft/companion/internal/providers"
-	"github.com/xlsft/companion/internal/readiness"
-	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui/i18n"
 )
 
@@ -15,8 +12,7 @@ func byokHarness(t *testing.T, info *providers.Info, models []string, listErr er
 	t.Helper()
 	h := newHarness(t)
 	h.provider.info, h.provider.models, h.provider.listErr = info, models, listErr
-	h.pass(readiness.StepPermissions)
-	h.eventually("byok", func() bool { return h.view() == readiness.StepBYOK && h.w.byok.loaded })
+	h.eventually("agent", func() bool { return h.w.scr == screenAgent && h.w.byok.loaded })
 	return h
 }
 
@@ -44,6 +40,7 @@ func (h *harness) pickModel(m *modelList, i int) {
 func TestModelListOffersFetchedModels(t *testing.T) {
 	h := byokHarness(t, nil, []string{"llama3", "qwen3"}, nil)
 	b := &h.w.byok
+	h.pickAgent(customTile)
 	b.baseURL.SetText("http://localhost:11434/v1")
 	h.frame()
 	if n := len(h.provider.listQueries()); n != 0 {
@@ -71,9 +68,9 @@ func TestModelListOffersFetchedModels(t *testing.T) {
 		t.Errorf("back to the list: typing %v", b.models.typing)
 	}
 
-	// Saving asks again: the endpoint may answer differently now.
+	// The form saves itself, and that asks again: the endpoint may answer
+	// differently now.
 	b.models.dd.SetOpen(false)
-	h.click(ActSave)
 	h.eventually("listed after save", func() bool { return len(h.provider.listQueries()) == 2 })
 }
 
@@ -93,9 +90,8 @@ func TestModelListFallsBackToTyping(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := byokHarness(t, nil, tt.models, tt.err)
 			b := &h.w.byok
-			b.preset.SetOpen(true)
 			h.frame()
-			b.preset.Pick(slices.IndexFunc(providers.Presets, func(p providers.Preset) bool { return p.ID == "ollama" }))
+			h.pickAgent("ollama")
 			h.eventually("fetched", func() bool {
 				h.w.mu.Lock()
 				defer h.w.mu.Unlock()
@@ -134,9 +130,8 @@ func TestModelListUsesStoredKey(t *testing.T) {
 		t.Errorf("saved model not selected in the list")
 	}
 
-	b.preset.SetOpen(true)
 	h.frame()
-	b.preset.Pick(slices.IndexFunc(providers.Presets, func(p providers.Preset) bool { return p.ID == "openrouter" }))
+	h.pickAgent("openrouter")
 	h.frame()
 	h.frame()
 	if h.listed(&b.models) || len(h.provider.listQueries()) != 1 {
@@ -166,18 +161,13 @@ func TestModelListKeepsUnlistedModel(t *testing.T) {
 func TestTTSModelList(t *testing.T) {
 	h := newHarness(t)
 	h.tts.models = []string{"kokoro", "tts-1"}
-	for _, st := range []readiness.Step{readiness.StepPermissions, readiness.StepBYOK, readiness.StepSTT} {
-		h.eventually(string(st), func() bool { return h.view() == st })
-		h.pass(st)
-	}
-	h.eventually("tts", func() bool { return h.view() == readiness.StepTTS })
+	h.goScreen(screenVoice)
 	ts := &h.w.tts
 	if h.listed(&ts.models) {
 		t.Fatal("listed before a server was chosen")
 	}
-	ts.preset.SetOpen(true)
 	h.frame()
-	ts.preset.Pick(slices.IndexFunc(tts.Presets, func(p tts.Preset) bool { return p.ID == "kokoro" }))
+	h.pickVoice("kokoro")
 	h.eventually("model list", func() bool { return h.shows(h.tr("wiz.byok.model.pick")) })
 	ts.dirty = false
 	h.pickModel(&ts.models, 0)

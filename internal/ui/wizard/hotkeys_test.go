@@ -18,9 +18,8 @@ func needsBinding() readiness.Result {
 func TestHotkeyEditorRecordsAndApplies(t *testing.T) {
 	h := newHarness(t)
 	h.checks.set(readiness.StepPermissions, needsBinding())
-	h.frame()
-	h.click(ActCheck)
-	h.eventually("needs binding", func() bool { return h.idle() && h.shows("Action needed") })
+	h.goScreen(screenDone)
+	h.eventually("needs binding", func() bool { return h.shows("Action needed") && h.w.perm.hotkeys != nil })
 	if h.shows("niri") || h.shows("binds {") {
 		t.Fatal("a config snippet is on screen")
 	}
@@ -44,7 +43,10 @@ func TestHotkeyEditorRecordsAndApplies(t *testing.T) {
 	// Applying passes the check on its own: no test press needed.
 	h.checks.set(readiness.StepPermissions, readiness.Result{Status: readiness.Passed})
 	h.click(ActApplyHotkeys)
-	h.eventually("check re-ran", func() bool { return h.view() == readiness.StepBYOK })
+	h.eventually("check re-ran", func() bool {
+		r, ok := h.w.snap().result(readiness.StepPermissions)
+		return ok && r.Status == readiness.Passed
+	})
 	h.perm.mu.Lock()
 	got, n := h.perm.st, h.perm.applies
 	h.perm.mu.Unlock()
@@ -69,7 +71,7 @@ func TestHotkeyEditorValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newHarness(t)
-			h.frame()
+			h.openKeys()
 			talk, _ := h.w.perm.hotkeys.Recorders()
 			talk.Record()
 			talk.Press(tt.key, tt.mods)
@@ -113,7 +115,7 @@ func TestHotkeyEditorOutcomes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newHarness(t)
 			h.perm.result = tt.result
-			h.frame()
+			h.openKeys()
 			h.click(ActApplyHotkeys)
 			h.eventually("outcome", func() bool { return h.shows(tt.want[0]) })
 			for _, w := range tt.want {
@@ -128,4 +130,12 @@ func TestHotkeyEditorOutcomes(t *testing.T) {
 			}
 		})
 	}
+}
+
+// openKeys shows the shortcut editor on the finish, as «Change» does.
+func (h *harness) openKeys() {
+	h.goScreen(screenDone)
+	h.w.keysShown = true
+	h.frame()
+	h.frame()
 }

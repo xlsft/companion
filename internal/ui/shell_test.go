@@ -457,8 +457,25 @@ func TestReadyGateEntersMainOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// Ready shows the finish; the main window opens on the user's click.
+	time.Sleep(20 * time.Millisecond)
+	if h.sh.Mode() != ModeSetup {
+		t.Fatal("left setup before Open Companion")
+	}
+	var wiz *wizardUI
+	for _, w := range h.wins.all() {
+		if c, ok := w.spec.Content.(*wizardUI); ok {
+			wiz = c
+		}
+	}
+	if wiz == nil {
+		t.Fatal("no setup window")
+	}
+	wiz.wiz.Open()
+	wiz.wiz.Open()
+	// EnterMain switches the mode before it builds the window: wait for both.
 	deadline := time.Now().Add(2 * time.Second)
-	for h.sh.Mode() != ModeMain {
+	for _, n := h.mainBuilt(); h.sh.Mode() != ModeMain || n == 0; _, n = h.mainBuilt() {
 		if time.Now().After(deadline) {
 			t.Fatal("ready gate did not enter main mode")
 		}

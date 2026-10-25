@@ -6,12 +6,13 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"gioui.org/io/key"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/widget"
 
-	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui/kit"
 )
@@ -20,14 +21,16 @@ import (
 // async fields are guarded by Wizard.mu.
 type ttsState struct {
 	provider  widget.Enum
-	preset    kit.Dropdown
-	custom    bool // "Other endpoint" picked: no preset matches on purpose
+	tile      widget.Enum // the chosen service: a preset's ID or customTile
+	tileList  widget.List
+	custom    bool // the custom server is picked: no preset matches on purpose
+	lastSig   string
+	editedAt  time.Time
 	baseURL   widget.Editor
 	model     widget.Editor
 	key       widget.Editor
 	speed     kit.Slider
-	voiceEnum widget.Enum
-	voiceDD   kit.Dropdown // the voice picker once there are too many for cards
+	voiceDD   kit.Dropdown
 	dirty     bool
 	replacing bool // the key editor is shown over a stored key
 	models    modelList
@@ -124,8 +127,18 @@ func (t *ttsState) update(w *Wizard, gtx layout.Context, s snapshot) {
 		t.dirty = false
 		t.models.soon = true
 	}
-	if i := t.preset.Update(gtx, len(tts.Presets)+1); i >= 0 {
+	if t.tile.Update(gtx) {
+		i := slices.IndexFunc(tts.Presets, func(p tts.Preset) bool { return p.ID == t.tile.Value })
+		if i < 0 {
+			i = len(tts.Presets) // the custom server
+		}
 		t.pickPreset(w, gtx, i)
+	} else if i := t.presetIndex(); i >= 0 {
+		if i < len(tts.Presets) {
+			t.tile.Value = tts.Presets[i].ID
+		} else {
+			t.tile.Value = customTile
+		}
 	}
 	if t.provider.Update(gtx) {
 		t.dirty = true
@@ -159,12 +172,6 @@ func (t *ttsState) update(w *Wizard, gtx layout.Context, s snapshot) {
 		w.mu.Unlock()
 		t.dirty = true
 	}
-	if t.voiceEnum.Update(gtx) {
-		w.mu.Lock()
-		t.voice = t.voiceEnum.Value
-		w.mu.Unlock()
-		t.dirty = true
-	}
 	if w.clicked(gtx, ActReplaceKey) {
 		t.replacing = true
 		gtx.Execute(key.FocusCmd{Tag: &t.key})
@@ -172,13 +179,42 @@ func (t *ttsState) update(w *Wizard, gtx layout.Context, s snapshot) {
 	if w.clicked(gtx, ActLoadVoices) {
 		t.loadVoices(w)
 	}
-	if w.clicked(gtx, ActSave) {
-		t.save(w, gtx)
-	}
-	if w.checkClicked(gtx) {
-		w.runCheck(readiness.StepTTS, nil, nil)
-	}
 	t.models.follow(w, gtx, t.modelQuery(w))
+	t.autoSave(w, gtx, s)
+}
+
+// autoSave stores the voice once the form is complete and the user stopped
+// changing it, like the agent; the voice check then runs by itself.
+func (t *ttsState) autoSave(w *Wizard, gtx layout.Context, s snapshot) {
+	w.mu.Lock()
+	voice, cfg, saving := t.voice, t.cfg, t.saving
+	w.mu.Unlock()
+	sig := strings.Join([]string{t.provider.Value, t.baseURL.Text(), t.model.Text(), t.key.Text(), voice}, "\x00")
+	if sig != t.lastSig {
+		t.lastSig, t.editedAt = sig, gtx.Now
+	}
+	if !t.dirty || saving || s.running || !t.complete(cfg) {
+		return
+	}
+	if due := t.editedAt.Add(agentSaveAfter); gtx.Now.Before(due) {
+		gtx.Execute(op.InvalidateCmd{At: due})
+		return
+	}
+	t.save(w, gtx)
+}
+
+// complete reports a voice that can be saved: Edge always, a hosted
+// service with its key, a server of the user's own with an address.
+func (t *ttsState) complete(cfg TTSConfig) bool {
+	p := t.provider.Value
+	if p == TTSOpenAI && t.custom && strings.TrimSpace(t.baseURL.Text()) == "" {
+		return false
+	}
+	if !tts.NeedsKey(p, t.endpoint()) {
+		return true
+	}
+	stored := cfg.HasKey && cfg.Provider == p
+	return strings.TrimSpace(t.key.Text()) != "" || stored
 }
 
 // modelQuery asks an OpenAI-compatible speech server for its models once

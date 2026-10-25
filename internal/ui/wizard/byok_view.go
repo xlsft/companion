@@ -1,6 +1,8 @@
 package wizard
 
 import (
+	"strings"
+
 	"gioui.org/layout"
 
 	"github.com/xlsft/companion/internal/llm"
@@ -12,206 +14,137 @@ import (
 	"github.com/xlsft/companion/internal/ui/theme"
 )
 
+// customTile is the tile of a server of the user's own; it is the only
+// place that shows the address and the API it speaks.
+const customTile = "custom"
+
+// agentLogos are the services with a logo; the rest show an initial.
+var agentLogos = map[string]icon.Name{
+	"anthropic": icon.BrandAnthropic, "openai": icon.BrandOpenAI, "gemini": icon.BrandGemini,
+	"openrouter": icon.BrandOpenRouter, "mistral": icon.BrandMistral, "ollama": icon.BrandOllama,
+}
+
+// agentMarks are the initials of services without a logo.
+var agentMarks = map[string]string{"xai": "X", "groq": "Q", "deepseek": "D", "lmstudio": "LM", "vllm": "vL", customTile: "+"}
+
+// agentTiles are the provider tiles: every preset, then the custom server.
+func agentTiles(l i18n.Lang) ([]string, []kit.Tile) {
+	keys := make([]string, 0, len(providers.Presets)+1)
+	tiles := make([]kit.Tile, 0, len(providers.Presets)+1)
+	for _, p := range providers.Presets {
+		t := kit.Tile{Logo: agentLogos[p.ID], Mark: agentMarks[p.ID], Title: p.Name}
+		switch {
+		case p.Local:
+			t.Sub = i18n.T(l, "wiz.tile.local")
+		case i18n.Has("wiz.tile." + p.ID):
+			t.Sub = i18n.T(l, "wiz.tile."+p.ID)
+		}
+		keys, tiles = append(keys, p.ID), append(tiles, t)
+	}
+	keys = append(keys, customTile)
+	tiles = append(tiles, kit.Tile{Mark: agentMarks[customTile], Title: i18n.T(l, "wiz.tile.custom"), Sub: i18n.T(l, "wiz.tile.custom.d")})
+	return keys, tiles
+}
+
 func (b *byokState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) stepBody {
 	w.mu.Lock()
 	info, saving, saveErr, loaded := b.info, b.saving, b.saveErr, b.loaded
 	w.mu.Unlock()
-	enabled := w.cfg.Backends.Provider != nil && !saving && !s.running
-	return stepBody{rows: []layout.Widget{
-		kit.Columns(th, 360, 40, 840, b.form(w, th, l, info, enabled, loaded, saveErr), b.side(w, th, l, s, info)),
-	}}
-}
-
-func (b *byokState) form(w *Wizard, th *theme.Theme, l i18n.Lang, info *providers.Info, enabled, loaded bool, saveErr string) layout.Widget {
-	kind := func(k llm.Kind) layout.Widget {
-		id := "openai"
-		if k == llm.KindAnthropic {
-			id = "anthropic"
-		}
-		title, sub := i18n.T(l, "wiz.byok.kind."+id), i18n.T(l, "wiz.byok.kind."+id+".d")
-		w.frame.texts = append(w.frame.texts, title, sub)
-		return func(gtx layout.Context) layout.Dimensions {
-			if !enabled {
-				gtx = gtx.Disabled()
-			}
-			return kit.RadioCard(gtx, th, &b.kind, string(k), title, sub)
-		}
+	enabled := w.cfg.Backends.Provider != nil && !saving
+	keys, tiles := agentTiles(l)
+	card := []layout.Widget{}
+	custom := b.tile.Value == customTile
+	name := ""
+	if p, ok := providers.PresetFor(llm.Kind(b.kind.Value), b.baseURL.Text()); ok && !custom {
+		name = p.Name
+	}
+	if custom {
+		card = append(card,
+			field(w, th, i18n.T(l, "wiz.byok.baseURL"), "http://192.168.1.20:8000/v1", &b.baseURL, enabled),
+			kit.Labeled(th, w.label(i18n.T(l, "wiz.agent.speaks")), func(gtx layout.Context) layout.Dimensions {
+				if !enabled {
+					gtx = gtx.Disabled()
+				}
+				w.frame.actions = append(w.frame.actions, ActChoose)
+				return kit.Segmented(gtx, th, &b.kind, []kit.Option{
+					{Key: string(llm.KindOpenAI), Label: "OpenAI"},
+					{Key: string(llm.KindAnthropic), Label: "Anthropic"},
+				})
+			}),
+		)
+	}
+	keyLabel := i18n.T(l, "wiz.byok.key")
+	if name != "" {
+		keyLabel = i18n.Tf(l, "wiz.agent.keyFor", name)
 	}
 	keyHint := i18n.T(l, "wiz.byok.key.hint")
-	if p, ok := providers.PresetFor(llm.Kind(b.kind.Value), b.baseURL.Text()); ok && p.Local {
-		keyHint = i18n.T(l, "wiz.byok.key.local")
+	if !providers.NeedsKey(llm.Kind(b.kind.Value), b.baseURL.Text()) {
+		keyHint = i18n.T(l, "wiz.agent.keyOptional")
 	}
-	keyField := field(w, th, i18n.T(l, "wiz.byok.key"), keyHint, &b.key, enabled)
+	keyField := field(w, th, keyLabel, keyHint, &b.key, enabled)
 	if info != nil && info.HasKey && !b.replacing {
-		keyField = storedKey(w, th, l, i18n.T(l, "wiz.byok.key"), enabled)
+		keyField = storedKey(w, th, l, keyLabel, enabled)
 	}
-	hdrB := kit.ButtonStyle{Kind: kit.Ghost, Small: true, Label: i18n.T(l, "wiz.byok.headers"), Icon: icon.Add}
-	var headers layout.Widget
-	if b.showHeaders {
-		hdrB.Icon = icon.Up
-		headers = field(w, th, i18n.T(l, "wiz.byok.headers.hint"), "X-Header: value", &b.hdr, enabled)
+	modelField := b.models.field(w, th, l, i18n.T(l, "wiz.byok.model.hint"), &b.model, enabled)
+	if custom {
+		card = append(card, kit.Flow(th, 200, 12, keyField, modelField))
+		hdrB := kit.ButtonStyle{Kind: kit.Ghost, Small: true, Label: i18n.T(l, "wiz.byok.headers"), Icon: icon.Add}
+		if b.showHeaders {
+			hdrB.Icon = icon.Up
+			card = append(card, field(w, th, i18n.T(l, "wiz.byok.headers.hint"), "X-Header: value", &b.hdr, enabled))
+		}
+		card = append(card, func(gtx layout.Context) layout.Dimensions {
+			return w.btn(gtx, th, ActHeaders, hdrB, enabled)
+		})
+	} else if b.tile.Value != "" {
+		card = append(card, keyField, modelField)
 	}
-	var status layout.Widget
+	rows := []layout.Widget{w.tileGrid(th, &b.tile, &b.tileList, keys, tiles, 4, enabled)}
+	if len(card) > 0 {
+		card = append(card, b.status(w, th, l, s, info, saving, saveErr, loaded))
+		rows = append(rows, panel(th, kit.VStack(th, 14, card...)))
+		note := "wiz.agent.note"
+		if name != "" && !custom {
+			rows = append(rows, w.text(kit.Muted(th, i18n.Tf(l, "wiz.agent.noteFor", name))))
+		} else {
+			rows = append(rows, w.text(kit.Muted(th, i18n.T(l, note))))
+		}
+	}
+	return stepBody{rows: rows}
+}
+
+// status is the one line under the form: what is happening or what to do,
+// in plain words.
+func (b *byokState) status(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot, info *providers.Info, saving bool, saveErr string, loaded bool) layout.Widget {
+	r, ok := s.result(readiness.StepBYOK)
 	switch {
 	case w.cfg.Backends.Provider == nil:
-		status = alert(w, th, theme.StatusError, i18n.T(l, "wiz.notWired"), "")
-	case saveErr != "":
-		status = alert(w, th, theme.StatusError, i18n.Tf(l, "wiz.byok.saveFailed", saveErr), fixText(l, saveErr))
+		return statusText(w, th, theme.StatusError, i18n.T(l, "wiz.notWired"))
 	case !loaded:
-		status = w.text(kit.Muted(th, i18n.T(l, "wiz.loading")))
-	}
-	return kit.VStack(th, 22,
-		b.presetPicker(w, th, l, enabled),
-		kit.Flow(th, 220, 8, kind(llm.KindAnthropic), kind(llm.KindOpenAI)),
-		kit.VStack(th, 14,
-			field(w, th, i18n.T(l, "wiz.byok.baseURL"), "https://api.example.com/v1", &b.baseURL, enabled),
-			kit.Flow(th, 200, 12,
-				b.models.field(w, th, l, i18n.T(l, "wiz.byok.model.hint"), &b.model, enabled),
-				keyField),
-			headers,
-		),
-		kit.Spread(func(gtx layout.Context) layout.Dimensions {
-			return w.btn(gtx, th, ActHeaders, hdrB, enabled)
-		}, func(gtx layout.Context) layout.Dimensions {
-			return w.btn(gtx, th, ActSave, kit.ButtonStyle{Kind: kit.Secondary, Label: i18n.T(l, "wiz.save")}, enabled)
-		}),
-		status,
-	)
-}
-
-// presetOptions are the dropdown rows: every preset with its address, then
-// "Other endpoint" for any compatible API.
-func presetOptions(l i18n.Lang) []kit.RichOption {
-	opts := make([]kit.RichOption, 0, len(providers.Presets)+1)
-	for _, p := range providers.Presets {
-		o := kit.RichOption{Title: p.Name, Desc: hostOf(p.BaseURL)}
-		if p.Local {
-			o.Tags = []kit.RichTag{{Text: i18n.T(l, "wiz.byok.provider.local"), Kind: kit.TagNeutral}}
-		}
-		opts = append(opts, o)
-	}
-	return append(opts, kit.RichOption{Title: i18n.T(l, "wiz.byok.provider.custom"), Desc: i18n.T(l, "wiz.byok.provider.custom.d")})
-}
-
-// presetPicker is the provider dropdown; picking one fills the fields
-// under it (byokState.pickPreset).
-func (b *byokState) presetPicker(w *Wizard, th *theme.Theme, l i18n.Lang, enabled bool) layout.Widget {
-	return providerPicker(w, th, l, &b.preset, presetOptions(l), b.presetIndex(), enabled)
-}
-
-// providerSteps are the provider test steps shown as rows; the
-// capability step is the rows under the divider.
-var providerSteps = []string{providers.StepConnection, providers.StepAuthModel}
-
-// providerCaps are the probed capabilities shown under the divider.
-var providerCaps = []string{"text", "stream", "vision", "tools"}
-
-// stepMark maps a provider test status to its status.
-func stepMark(v string) theme.Status {
-	switch providers.Status(v) {
-	case providers.StatusOK:
-		return theme.StatusOK
-	case providers.StatusFailed:
-		return theme.StatusError
-	}
-	return theme.StatusUnknown
-}
-
-// checkLine is a recorded kit.CheckLine; its accessible text is
-// "name — detail".
-func checkLine(w *Wizard, th *theme.Theme, h float32, ds theme.Status, name, right string) layout.Widget {
-	w.frame.texts = append(w.frame.texts, name+" — "+right)
-	return kit.CheckLine(th, h, ds, name, right)
-}
-
-// side is the connection check panel and the privacy note.
-func (b *byokState) side(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot, info *providers.Info) layout.Widget {
-	r, ok := s.result(readiness.StepBYOK)
-	detail := map[string]string{}
-	if ok && r.Detail != nil {
-		detail = r.Detail
-	}
-	head := w.text(kit.Subheading(th, i18n.T(l, "wiz.byok.panel")))
-	word := i18n.T(l, "wiz.state.todo")
-	switch {
+		return statusText(w, th, theme.StatusUnknown, i18n.T(l, "wiz.loading"))
+	case saveErr != "":
+		return statusText(w, th, theme.StatusError, fixText(l, saveErr))
+	case saving:
+		return statusText(w, th, theme.StatusUnknown, i18n.T(l, "wiz.agent.saving"))
 	case s.running:
-		word = i18n.T(l, "wiz.state.checking")
+		return statusText(w, th, theme.StatusUnknown, i18n.T(l, "wiz.agent.checking"))
+	case b.dirty || info == nil:
+		return statusText(w, th, theme.StatusUnknown, i18n.T(l, "wiz.agent.fill"))
 	case ok && r.Status == readiness.Passed:
-		word = i18n.T(l, "wiz.state.passed")
+		var caps []string
+		if r.Detail[providers.DetailCapPrefix+"vision"] == string(providers.StatusOK) {
+			caps = append(caps, i18n.T(l, "wiz.agent.seesScreen"))
+		}
+		if r.Detail[providers.DetailCapPrefix+"tools"] == string(providers.StatusOK) {
+			caps = append(caps, i18n.T(l, "wiz.agent.points"))
+		}
+		txt := i18n.T(l, "wiz.agent.connected")
+		if len(caps) > 0 {
+			txt += " · " + strings.Join(caps, " · ")
+		}
+		return statusText(w, th, theme.StatusOK, txt)
 	case ok:
-		word = i18n.T(l, "wiz.state.failed")
+		return statusText(w, th, theme.StatusError, fixText(l, r.Code))
 	}
-	state := w.text(kit.Muted(th, word))
-
-	var steps, caps []layout.Widget
-	for _, id := range providerSteps {
-		right := i18n.T(l, "wiz.state.todo")
-		if ok {
-			right = i18n.T(l, "wiz.state.skipped")
-		}
-		if k := detail[id+providers.DetailMessage]; k != "" {
-			right = i18n.T(l, k)
-		}
-		if c := detail[id+providers.DetailCode]; c != "" {
-			right += " (" + c + ")"
-		}
-		steps = append(steps, checkLine(w, th, 38, stepMark(detail[id]), i18n.T(l, "wiz.byok.step."+id), right))
-	}
-	// A failed capability probe as a whole shows its reason above the rows.
-	if stepMark(detail[providers.StepCapabilities]) == theme.StatusError {
-		msg := i18n.T(l, "wiz.state.failed")
-		if k := detail[providers.StepCapabilities+providers.DetailMessage]; k != "" {
-			msg = i18n.T(l, k)
-		}
-		caps = append(caps, func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Top: th.Dp(8), Bottom: th.Dp(4)}.Layout(gtx, alert(w, th, theme.StatusError, msg, ""))
-		})
-	}
-	for _, c := range providerCaps {
-		ds := stepMark(detail[providers.DetailCapPrefix+c])
-		right := "—"
-		switch ds {
-		case theme.StatusOK:
-			right = i18n.T(l, "wiz.byok.yes")
-		case theme.StatusError:
-			right = i18n.T(l, "wiz.byok.no")
-		}
-		caps = append(caps, checkLine(w, th, 34, ds, i18n.T(l, "wiz.byok.cap."+c), right))
-	}
-	pad := func(top, bottom float32, wd layout.Widget) layout.Widget {
-		return func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Top: th.Dp(top), Bottom: th.Dp(bottom), Left: th.Dp(16), Right: th.Dp(16)}.Layout(gtx, wd)
-		}
-	}
-	panel := rows(th,
-		pad(14, 14, kit.Spread(head, state)),
-		pad(6, 6, kit.VStack(th, 0, steps...)),
-		pad(6, 14, kit.VStack(th, 0, caps...)),
-	)
-	var note layout.Widget
-	if info != nil && info.Input.BaseURL != "" {
-		note = card(th, w.text(kit.Muted(th, i18n.Tf(l, "wiz.byok.privacy", hostOf(info.Input.BaseURL)))))
-	}
-	return kit.VStack(th, 12, panel, note)
-}
-
-func (b *byokState) footer(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) footerSpec {
-	w.mu.Lock()
-	saved, saving := b.info != nil, b.saving
-	w.mu.Unlock()
-	enabled := w.cfg.Backends.Provider != nil && !saving && saved && !b.dirty && !s.running
-	key := "wiz.check"
-	if _, ok := s.result(readiness.StepBYOK); ok {
-		key = "wiz.recheck"
-	}
-	f := footerSpec{
-		primary: w.next(th, l, s),
-		secondary: func(gtx layout.Context) layout.Dimensions {
-			return w.btn(gtx, th, ActTest, kit.ButtonStyle{Kind: kit.Secondary, Label: i18n.T(l, key)}, enabled)
-		},
-	}
-	if b.dirty && saved && !s.running {
-		f.status = i18n.T(l, "wiz.byok.saveFirst")
-	}
-	return f
+	return statusText(w, th, theme.StatusUnknown, i18n.T(l, "wiz.agent.checking"))
 }
