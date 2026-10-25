@@ -103,6 +103,7 @@ type core struct {
 	dictation *dictation.Service
 
 	sttCheck *setupcheck.STT // keeps the last setup transcript in memory
+	e2eHeard atomic.Value    // string: what the full setup test heard; memory only
 
 	talk *session.Manager
 	orch *talk.Orchestrator

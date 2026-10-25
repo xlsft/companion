@@ -119,6 +119,12 @@ type STT interface {
 	LastTranscript() string
 }
 
+// EndToEndTranscript is implemented by an STT backend that also keeps what
+// the full test heard, so the step can show it next to a mismatch.
+type EndToEndTranscript interface {
+	LastEndToEndTranscript() string
+}
+
 // TTS provider identifiers.
 const (
 	TTSOpenAI     = "openai"     // OpenAI-compatible speech endpoint

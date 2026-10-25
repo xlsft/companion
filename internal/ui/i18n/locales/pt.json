@@ -548,5 +548,7 @@
   "update.chip.ready": "%s está pronta",
   "update.chip.restart": "Reiniciar",
   "update.chip.reopen": "Abra o Companion de novo",
-  "update.chip.failed": "Falha ao atualizar"
+  "update.chip.failed": "Falha ao atualizar",
+  "wiz.e2e.sayAfterStart": "Depois de clicar em «Executar a verificação», leia em voz alta",
+  "wiz.e2e.sayNow": "Ouvindo — leia em voz alta agora"
 }

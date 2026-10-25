@@ -548,5 +548,7 @@
   "update.chip.ready": "%s jest gotowa",
   "update.chip.restart": "Uruchom ponownie",
   "update.chip.reopen": "Otwórz Companion ponownie",
-  "update.chip.failed": "Nie udało się zaktualizować"
+  "update.chip.failed": "Nie udało się zaktualizować",
+  "wiz.e2e.sayAfterStart": "Po naciśnięciu „Uruchom sprawdzanie” przeczytaj na głos",
+  "wiz.e2e.sayNow": "Słucham — przeczytaj teraz na głos"
 }

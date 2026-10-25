@@ -651,3 +651,27 @@ func TestManyVoicesAreADropdown(t *testing.T) {
 		t.Errorf("voice = %q, dirty %v", got, ts.dirty)
 	}
 }
+
+// The full test says what to read before it listens, and after a mismatch
+// shows what it heard.
+func TestEndToEndTellsWhatToSay(t *testing.T) {
+	h := newHarness(t)
+	for _, st := range readiness.Steps[:len(readiness.Steps)-1] {
+		h.eventually(string(st), func() bool { return h.view() == st })
+		h.pass(st)
+	}
+	h.eventually("e2e", func() bool { return h.view() == readiness.StepEndToEnd })
+	phrase := readiness.MicPhrase(string(h.lang))
+	if !h.shows(i18n.T(h.lang, "wiz.e2e.sayAfterStart")) || !h.shows(phrase) {
+		t.Fatal("no prompt with the phrase before the run")
+	}
+	if h.shows("thanks for watching") {
+		t.Error("transcript shown before any run")
+	}
+	h.checks.set(readiness.StepEndToEnd, readiness.Result{Status: readiness.Failed, Code: "mismatch",
+		Detail: map[string]string{"speech": "ok", "stt": "mismatch"}})
+	if _, err := h.gate.Run(t.Context(), readiness.StepEndToEnd); err != nil {
+		t.Fatal(err)
+	}
+	h.eventually("heard", func() bool { return h.shows("thanks for watching") })
+}

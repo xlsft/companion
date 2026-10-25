@@ -548,5 +548,7 @@
   "update.chip.ready": "%s готова",
   "update.chip.restart": "Перезапустити",
   "update.chip.reopen": "Відкрийте Companion знову",
-  "update.chip.failed": "Не вдалося оновити"
+  "update.chip.failed": "Не вдалося оновити",
+  "wiz.e2e.sayAfterStart": "Після «Запустити перевірку» прочитайте вголос",
+  "wiz.e2e.sayNow": "Слухаю — прочитайте вголос"
 }

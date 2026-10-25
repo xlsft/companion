@@ -89,6 +89,12 @@ func (s setupSTT) SelectDevice(ctx context.Context, id string) error {
 	return s.c.settings.Update(ctx, func(st *settings.Settings) { st.Voice.Microphone = id })
 }
 
+// LastEndToEndTranscript is what the full test last heard.
+func (s setupSTT) LastEndToEndTranscript() string {
+	t, _ := s.c.e2eHeard.Load().(string)
+	return t
+}
+
 func (s setupSTT) LastTranscript() string {
 	if s.c.sttCheck == nil {
 		return ""

@@ -548,5 +548,7 @@
   "update.chip.ready": "%s est prête",
   "update.chip.restart": "Redémarrer",
   "update.chip.reopen": "Rouvrez Companion",
-  "update.chip.failed": "Échec de la mise à jour"
+  "update.chip.failed": "Échec de la mise à jour",
+  "wiz.e2e.sayAfterStart": "Après « Lancer la vérification », lisez à voix haute",
+  "wiz.e2e.sayNow": "À l'écoute — lisez à voix haute maintenant"
 }

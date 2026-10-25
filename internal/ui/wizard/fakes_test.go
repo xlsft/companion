@@ -245,6 +245,8 @@ func (f *fakeSTT) LastTranscript() string {
 	return "привет это проверка микрофона"
 }
 
+func (f *fakeSTT) LastEndToEndTranscript() string { return "thanks for watching" }
+
 type fakeTTS struct {
 	mu      sync.Mutex
 	cfg     TTSConfig

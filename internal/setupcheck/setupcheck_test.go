@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -397,6 +398,32 @@ func TestEndToEnd(t *testing.T) {
 				if n := len(h.cmds); n == 0 || h.cmds[n-1].Op != overlay.OpClearSession {
 					t.Errorf("commands %v: the hint must be cleared", h.cmds)
 				}
+			}
+		})
+	}
+}
+
+// The full test hands over what it heard, cleared at the start, so a
+// mismatch shows the user what was recognised instead.
+func TestEndToEndReportsWhatItHeard(t *testing.T) {
+	tests := []struct {
+		name string
+		stt  *fakeSTT
+		want []string
+	}{
+		{"mismatch", &fakeSTT{final: speech("thanks for watching")}, []string{"", "thanks for watching"}},
+		{"nobody spoke", &fakeSTT{}, []string{""}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []string
+			e := EndToEnd{
+				Listener: listener(&fakeMic{frames: 20, hold: true}, tt.stt), Lang: func() string { return "en" },
+				Heard: func(s string) { got = append(got, s) },
+			}
+			e.Run(context.Background())
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("heard %q, want %q", got, tt.want)
 			}
 		})
 	}

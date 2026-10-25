@@ -27,6 +27,9 @@ type Hinter interface {
 type EndToEnd struct {
 	Listener *Listener
 	Lang     func() string // UI language
+	// Heard, when set, gets what the run heard ("" as a run starts), so the
+	// step can show it next to a mismatch. User content: memory only.
+	Heard func(text string)
 
 	Capturer contracts.ScreenCapturer // nil: capture is unavailable
 	Target   contracts.CaptureRequest
@@ -52,6 +55,9 @@ var e2eSession = contracts.SessionRef{ID: "setup-end-to-end", Generation: 1}
 func (e EndToEnd) Run(ctx context.Context) readiness.Result {
 	r := &stages{detail: map[string]string{}}
 	lang := e.Lang()
+	if e.Heard != nil {
+		e.Heard("")
+	}
 
 	heard, f := e.Listener.Listen(ctx, readiness.PhraseLanguage(lang))
 	switch {
@@ -62,6 +68,9 @@ func (e EndToEnd) Run(ctx context.Context) readiness.Result {
 		return r.fail(StageSTT, f.Code)
 	}
 	r.ok(StageSpeech)
+	if e.Heard != nil {
+		e.Heard(heard.Text)
+	}
 	if !readiness.PhraseMatches(readiness.MicPhrase(lang), heard.Text) {
 		return r.fail(StageSTT, CodeMismatch)
 	}

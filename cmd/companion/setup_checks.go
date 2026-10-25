@@ -33,6 +33,7 @@ func (c *core) setupChecks() map[readiness.Step]readiness.Check {
 	e2e := setupcheck.EndToEnd{
 		Listener:   listener,
 		Lang:       lang,
+		Heard:      func(t string) { c.e2eHeard.Store(t) },
 		Target:     captureRequest(c.settings.Get()),
 		Provider:   c.talkProvider,
 		Speaker:    c.speaker,
