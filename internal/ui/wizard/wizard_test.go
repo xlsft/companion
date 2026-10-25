@@ -77,7 +77,7 @@ func TestStepLocking(t *testing.T) {
 // allowedActions is everything the wizard may ever offer (FR-ONB-004).
 var allowedActions = []Action{ActBack, ActCheck, ActRecheck, ActDiagnostics, ActQuit, ActSelectStep, ActApplyHotkeys,
 	ActSave, ActTest, ActDownload, ActCancel, ActMicTest, ActLoadVoices, ActChoose, ActRunFull,
-	ActNext, ActLanguage, ActReplaceKey, ActHeaders}
+	ActNext, ActLanguage, ActReplaceKey, ActHeaders, ActModelList}
 
 // forbiddenWords match at the start of a word, so "Скачать" is not "чат".
 var forbiddenWords = []string{"skip", "later", "chat", "try without", "open chat", "пропуст", "позже", "чат", "без настройки"}

@@ -264,6 +264,19 @@ func (p *provider) save(id string, in providers.Input) (*providers.Info, error) 
 	return p.info, nil
 }
 
+// ListModels answers like a real endpoint would, after a moment.
+func (p *provider) ListModels(ctx context.Context, q providers.ModelQuery) ([]string, error) {
+	select {
+	case <-time.After(400 * time.Millisecond):
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	if q.Kind == llm.KindAnthropic {
+		return []string{"claude-haiku-4-5", "claude-opus-5-5", "claude-sonnet-5-5"}, nil
+	}
+	return []string{"gemma4:e4b", "gpt-oss:20b", "llama3.3:70b", "qwen3:8b"}, nil
+}
+
 func (p *provider) Create(_ context.Context, in providers.Input) (*providers.Info, error) {
 	return p.save("prov_1", in)
 }

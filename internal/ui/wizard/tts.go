@@ -29,6 +29,7 @@ type ttsState struct {
 	voiceEnum widget.Enum
 	dirty     bool
 	replacing bool // the key editor is shown over a stored key
+	models    modelList
 
 	// async
 	loaded   bool
@@ -66,6 +67,7 @@ func (t *ttsState) load(w *Wizard, _ context.Context) {
 	if b == nil {
 		return
 	}
+	t.models.reset(w)
 	w.goStep(func(ctx context.Context) {
 		cfg, err := b.Config(ctx)
 		w.mu.Lock()
@@ -119,6 +121,7 @@ func (t *ttsState) update(w *Wizard, gtx layout.Context, s snapshot) {
 			t.speed.Float.Value = speedToSlider(cfg.Speed)
 		}
 		t.dirty = false
+		t.models.soon = true
 	}
 	if i := t.preset.Update(gtx, len(tts.Presets)+1); i >= 0 {
 		t.pickPreset(w, gtx, i)
@@ -129,6 +132,7 @@ func (t *ttsState) update(w *Wizard, gtx layout.Context, s snapshot) {
 		t.voices, t.voice = nil, ""
 		w.mu.Unlock()
 	}
+	t.models.pick(w, gtx, &t.model)
 	for _, e := range []*widget.Editor{&t.baseURL, &t.model} {
 		if changed(gtx, e) {
 			t.dirty = true
@@ -164,6 +168,30 @@ func (t *ttsState) update(w *Wizard, gtx layout.Context, s snapshot) {
 	if w.checkClicked(gtx) {
 		w.runCheck(readiness.StepTTS, nil, nil)
 	}
+	t.models.follow(w, gtx, t.modelQuery(w))
+}
+
+// modelQuery asks an OpenAI-compatible speech server for its models once
+// that is worth asking: OpenAI needs its key first (typed or stored), a
+// server of the user's own may take none. Other providers have no model.
+func (t *ttsState) modelQuery(w *Wizard) modelQuery {
+	lister, ok := w.cfg.Backends.TTS.(TTSModels)
+	base := t.endpoint()
+	if !ok || t.provider.Value != TTSOpenAI || base != "" && !hasHost(base) {
+		return modelQuery{}
+	}
+	key := strings.TrimSpace(t.key.Text())
+	w.mu.Lock()
+	cfg := t.cfg
+	w.mu.Unlock()
+	stored := cfg.HasKey && cfg.Provider == TTSOpenAI && (cfg.BaseURL == base || sameHost(cfg.BaseURL, base))
+	_, service := tts.PresetFor(TTSOpenAI, base)
+	if key == "" && !stored && (base == "" || service && !localAddr(base)) {
+		return modelQuery{}
+	}
+	q := TTSModelQuery{BaseURL: base, APIKey: key}
+	sig := strings.Join([]string{base, key, strconv.FormatBool(stored)}, "\x00")
+	return modelQuery{sig: sig, fetch: func(ctx context.Context) ([]string, error) { return lister.ListModels(ctx, q) }}
 }
 
 // endpoint is the form's Base URL, only for an OpenAI-compatible provider:
@@ -207,6 +235,7 @@ func (t *ttsState) pickPreset(w *Wizard, gtx layout.Context, i int) {
 		return
 	}
 	p := tts.Presets[i]
+	t.models.soon = true
 	t.custom = false
 	t.provider.Value = p.Provider
 	t.baseURL.SetText(p.BaseURL)
@@ -253,6 +282,7 @@ func (t *ttsState) save(w *Wizard, gtx layout.Context) {
 		}
 		t.cfg, t.saved, t.voice = out, true, out.Voice
 		t.saveGen++
+		t.models.refresh()
 		w.mu.Unlock()
 		// A new provider or key has other voices.
 		if providerChanged || apiKey != "" {

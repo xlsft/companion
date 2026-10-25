@@ -50,6 +50,7 @@ const (
 	ActLanguage     Action = "language"
 	ActReplaceKey   Action = "replace_key" // show the key editor over a stored key
 	ActHeaders      Action = "headers"     // expand the extra headers field
+	ActModelList    Action = "model_list"  // back from typing a model to the fetched list
 )
 
 // Config wires the wizard. Gate is required; the callbacks may be nil.
