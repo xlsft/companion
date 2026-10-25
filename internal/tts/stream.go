@@ -57,7 +57,10 @@ func newReaderStream(streamCtx context.Context, cancel context.CancelFunc, paren
 			}
 		}
 		fail := func(err error) {
+			var te *Error
 			switch {
+			case errors.As(err, &te) && parent.Err() == nil && streamCtx.Err() == nil:
+				// A body that already classified its failure (Edge's socket).
 			case parent.Err() != nil:
 				err = parent.Err()
 			case streamCtx.Err() != nil:

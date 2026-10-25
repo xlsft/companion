@@ -5,8 +5,10 @@ go 1.27.3
 require (
 	fyne.io/systray v1.12.2
 	gioui.org v0.10.3
+	github.com/coder/websocket v1.8.15
 	github.com/gen2brain/malgo v0.11.26
 	github.com/godbus/dbus/v5 v5.2.4
+	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/jezek/xgb v1.3.1
 	github.com/k2-fsa/sherpa-onnx-go v1.13.8
 	github.com/sigstore/protobuf-specs v0.5.2
