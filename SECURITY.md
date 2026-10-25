@@ -18,12 +18,15 @@ socket (`$XDG_RUNTIME_DIR/openclick/control.sock`).
 
 ## What leaves your computer
 
-- **No backend, no account, no telemetry.** Companion talks only to the endpoints you configure.
+- **No backend, no account, no telemetry.** Companion talks only to the endpoints you configure, plus
+  Microsoft's Edge voices as described below.
 - **Audio never leaves the computer.** Speech recognition is local; only the recognised text is sent to your model.
 - **Screenshots** are taken only when you ask, one frame, and sent only to your model endpoint. By default they are kept
   in memory and never written to disk; storing them with the chat history is an opt-in setting.
 - **Spoken answers**: the answer text goes to the speech provider you picked (ElevenLabs or an OpenAI-compatible
-  endpoint); with answers as text, nothing does.
+  endpoint).
+- **Microsoft Edge voices**: when you pick them, when no speech provider is set up, or when yours is unreachable, the
+  answer text goes to Microsoft's Edge Read aloud service (speech.platform.bing.com); no key or account is involved.
 - **Keys** are stored in the system keychain (Secret Service), never in the database or config files.
 - **Logs** contain technical codes only: no prompts, transcripts, screen content, audio or keys. The diagnostics report
   you can copy follows the same rule.

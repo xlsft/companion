@@ -522,9 +522,9 @@ func (s *speakerSwitch) Prefetch(ctx context.Context, text string) {
 func ttsSecret(provider string) contracts.SecretRef { return secrets.NewRef("tts", provider) }
 
 // rebuildSpeaker builds the speaker from the TTS settings and key; with
-// either missing replies are text only.
+// either missing Edge speaks (tts_edge.go).
 func (c *core) rebuildSpeaker(ctx context.Context, s settings.Settings) {
-	prov, name := c.ttsProvider(ctx, s)
+	prov, name := c.speechProvider(ctx, s)
 	var sp *talk.TTSSpeaker
 	if prov != nil {
 		sp = &talk.TTSSpeaker{

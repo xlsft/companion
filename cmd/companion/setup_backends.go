@@ -121,7 +121,7 @@ func (t setupTTS) Save(ctx context.Context, cfg wizard.TTSConfig, apiKey string)
 
 func saveTTS(ctx context.Context, sec contracts.SecretStore, svc *settings.Service, cfg wizard.TTSConfig, apiKey string) error {
 	switch cfg.Provider {
-	case ttsOpenAI, ttsElevenLabs:
+	case ttsOpenAI, ttsElevenLabs, ttsEdge:
 	default:
 		return fmt.Errorf("%w: %q", errUnknownTTS, cfg.Provider)
 	}
@@ -145,7 +145,7 @@ func saveTTS(ctx context.Context, sec contracts.SecretStore, svc *settings.Servi
 
 // Voices lists the saved provider's voices with the stored key.
 func (t setupTTS) Voices(ctx context.Context) ([]tts.Voice, error) {
-	prov, _ := t.c.ttsProvider(ctx, t.c.settings.Get())
+	prov := t.c.voicesProvider(ctx, t.c.settings.Get())
 	if prov == nil {
 		return nil, errNoVoice
 	}
