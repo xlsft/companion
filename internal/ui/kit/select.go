@@ -70,6 +70,7 @@ func (d *Dropdown) LayoutRich(gtx layout.Context, th *theme.Theme, opts []RichOp
 		return richLine(gtx, th, cur, fg, false, false)
 	})
 	if d.open {
+		d.typeAhead(gtx, func(i int) string { return opts[i].Title }, len(opts))
 		d.popup(gtx, th, len(opts), sel, dims.Size, true, func(gtx layout.Context, i int) layout.Dimensions {
 			return d.richOption(gtx, th, i, opts[i], i == sel)
 		})

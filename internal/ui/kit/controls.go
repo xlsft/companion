@@ -3,6 +3,10 @@ package kit
 import (
 	"image"
 	"image/color"
+	"strings"
+	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"gioui.org/font"
 	"gioui.org/io/event"
@@ -197,8 +201,9 @@ func Labeled(th *theme.Theme, caption string, w layout.Widget) layout.Widget {
 
 // Dropdown is the select box: a 36px box showing the current value that
 // opens a list of options over the page; Gio has no native select. Esc or
-// a click outside closes it, Up/Down move between options. UI goroutine
-// only.
+// a click outside closes it, Up/Down move between options and typing jumps
+// to the first option that starts with (or else contains) what was typed,
+// so a long list stays usable. UI goroutine only.
 type Dropdown struct {
 	// Up opens the list above the box, for a box at the bottom of a column.
 	Up bool
@@ -209,7 +214,14 @@ type Dropdown struct {
 	options   []widget.Clickable
 	list      widget.List
 	outside   int // pointer target covering the window while open
+
+	typed   string    // type-ahead text, reset after a pause
+	typedAt time.Time // last type-ahead key
+	jump    bool      // typed changed: the next layout focuses its match
 }
+
+// typeAheadPause ends a type-ahead word.
+const typeAheadPause = time.Second
 
 // Opened reports whether the option list is showing.
 func (d *Dropdown) Opened() bool { return d.open }
@@ -257,6 +269,8 @@ func (d *Dropdown) Update(gtx layout.Context, n int) int {
 				key.Filter{Focus: &d.options[i], Name: key.NameUpArrow},
 				key.Filter{Focus: &d.options[i], Name: key.NameDownArrow},
 				key.Filter{Focus: &d.options[i], Name: key.NameEscape},
+				// The empty name takes every other key, for type-ahead.
+				key.Filter{Focus: &d.options[i], Optional: key.ModShift},
 			)
 			if !ok {
 				break
@@ -272,10 +286,62 @@ func (d *Dropdown) Update(gtx layout.Context, n int) int {
 				gtx.Execute(key.FocusCmd{Tag: &d.options[max(0, i-1)]})
 			case key.NameDownArrow:
 				gtx.Execute(key.FocusCmd{Tag: &d.options[min(n-1, i+1)]})
+			default:
+				d.typeKey(gtx, e.Name)
 			}
 		}
 	}
 	return -1
+}
+
+// typeKey adds a printable key to the type-ahead text.
+func (d *Dropdown) typeKey(gtx layout.Context, name key.Name) {
+	r, size := utf8.DecodeRuneInString(string(name))
+	if size != len(name) || !unicode.IsPrint(r) {
+		return
+	}
+	if gtx.Now.Sub(d.typedAt) > typeAheadPause {
+		d.typed = ""
+	}
+	d.typed += string(unicode.ToLower(r))
+	d.typedAt, d.jump = gtx.Now, true
+	gtx.Execute(op.InvalidateCmd{})
+}
+
+// typeAhead focuses and scrolls to the option the typed text matches.
+func (d *Dropdown) typeAhead(gtx layout.Context, labels func(i int) string, n int) {
+	if !d.jump {
+		return
+	}
+	d.jump = false
+	i := TypeAheadMatch(labels, n, d.typed)
+	if i < 0 {
+		return
+	}
+	gtx.Execute(key.FocusCmd{Tag: &d.options[i]})
+	if p := d.list.Position; i < p.First || i >= p.First+p.Count {
+		d.list.ScrollTo(i)
+	}
+}
+
+// TypeAheadMatch is the first of n labels that starts with typed, else
+// the first that contains it, ignoring case; -1 for none.
+func TypeAheadMatch(labels func(i int) string, n int, typed string) int {
+	if typed == "" {
+		return -1
+	}
+	typed = strings.ToLower(typed)
+	contains := -1
+	for i := range n {
+		l := strings.ToLower(labels(i))
+		if strings.HasPrefix(l, typed) {
+			return i
+		}
+		if contains < 0 && strings.Contains(l, typed) {
+			contains = i
+		}
+	}
+	return contains
 }
 
 func (d *Dropdown) close(gtx layout.Context) {
@@ -298,6 +364,7 @@ func (d *Dropdown) Layout(gtx layout.Context, th *theme.Theme, labels []string, 
 		return l.Layout(gtx)
 	})
 	if d.open {
+		d.typeAhead(gtx, func(i int) string { return labels[i] }, len(labels))
 		d.popup(gtx, th, len(labels), sel, dims.Size, false, func(gtx layout.Context, i int) layout.Dimensions {
 			return d.option(gtx, th, i, labels[i], i == sel)
 		})
