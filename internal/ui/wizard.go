@@ -28,11 +28,11 @@ type wizardUI struct {
 	backBtn widget.Clickable
 	diag    *diagView
 	list    widget.List
-	update  *updateBanner
+	update  *updateChip
 }
 
 func newWizardUI(sh *Shell) *wizardUI {
-	w := &wizardUI{sh: sh, update: newUpdateBanner(sh.opts.Updates)}
+	w := &wizardUI{sh: sh, update: newUpdateChip(sh.opts.Updates)}
 	w.wiz = wizard.New(wizard.Config{
 		Gate:     sh.opts.Gate,
 		Backends: sh.opts.Setup,
@@ -58,7 +58,10 @@ func newWizardUI(sh *Shell) *wizardUI {
 				sh.log.Warn("language change failed", "err", err)
 			}
 		},
-		Version:    sh.opts.Version,
+		Version: sh.opts.Version,
+		AsideExtra: func(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
+			return w.update.Layout(gtx, th, l)
+		},
 		Invalidate: sh.invalidateAll,
 		Log:        sh.log,
 	})
@@ -82,7 +85,7 @@ func (w *wizardUI) diagnosticsShown() bool {
 }
 
 func (w *wizardUI) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
-	return w.update.wrap(gtx, th, l, func(gtx layout.Context) layout.Dimensions { return w.content(gtx, th, l) })
+	return w.content(gtx, th, l)
 }
 
 func (w *wizardUI) content(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {

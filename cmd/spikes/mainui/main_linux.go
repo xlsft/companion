@@ -38,6 +38,7 @@ import (
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/store"
 	"github.com/xlsft/companion/internal/ui"
+	"github.com/xlsft/companion/internal/update"
 	"github.com/xlsft/companion/internal/walkthrough"
 	"github.com/xlsft/companion/pkg/contracts"
 )
@@ -49,6 +50,7 @@ func main() {
 	route := flag.String("route", "home", "page to open: home or settings")
 	section := flag.String("section", "general", "settings section: general, voice, screen, privacy, diagnostics")
 	guideState := flag.String("guide", "none", "walkthrough card: running, paused or none")
+	updState := flag.String("update", "none", "update chip: none, available, downloading, ready or failed")
 	flag.Parse()
 	lines = scripts[*lang == "ru"]
 	routes := map[string]ui.Route{"home": ui.RouteHome, "settings": ui.RouteSettings}
@@ -100,7 +102,11 @@ func main() {
 		guide = newDemoGuide(walkthrough.Status(*guideState))
 	}
 	diagnose := func(ctx context.Context) (contracts.CapabilityReport, error) { return detect.New().Detect(ctx) }
-	shell := ui.New(ui.Options{Mode: ui.ModeMain, Settings: svc, Chat: be, Guide: guide, Diagnose: diagnose, Quit: stop, Log: log, Appearance: scheme, Version: buildinfo.Version})
+	opts := ui.Options{Mode: ui.ModeMain, Settings: svc, Chat: be, Guide: guide, Diagnose: diagnose, Quit: stop, Log: log, Appearance: scheme, Version: buildinfo.Version}
+	if u := demoUpdates(*updState); u != nil {
+		opts.Updates = u
+	}
+	shell := ui.New(opts)
 	go func() {
 		// The main window exists once the app has started the shell.
 		time.Sleep(300 * time.Millisecond)
@@ -333,4 +339,32 @@ func (d *demoGuide) Do(_ context.Context, cmd walkthrough.Command) error {
 		ch <- v
 	}
 	return nil
+}
+
+// demoUpdate is a fixed updater state for screenshots of the update chip.
+type demoUpdate struct{ st update.State }
+
+func (d *demoUpdate) State() update.State          { return d.st }
+func (d *demoUpdate) CheckNow()                    {}
+func (d *demoUpdate) Install()                     {}
+func (d *demoUpdate) RestartNow()                  {}
+func (d *demoUpdate) OpenNotes()                   {}
+func (d *demoUpdate) Watch(func()) (cancel func()) { return func() {} }
+
+func demoUpdates(state string) *demoUpdate {
+	cur, _ := update.ParseVersion("0.0.2")
+	next, _ := update.ParseVersion("0.0.3")
+	st := update.State{Current: cur, Latest: &update.Release{Tag: "v0.0.3", Version: next}, CanRestart: true}
+	switch state {
+	case "available":
+	case "downloading":
+		st.Phase, st.Done, st.Total = update.PhaseDownloading, 19<<20, 38<<20
+	case "ready":
+		st.Phase = update.PhaseRestartNeeded
+	case "failed":
+		st.Phase, st.Err = update.PhaseFailed, "offline"
+	default:
+		return nil
+	}
+	return &demoUpdate{st: st}
 }

@@ -152,6 +152,15 @@ func (w *Wizard) aside(gtx layout.Context, th *theme.Theme, l i18n.Lang, s snaps
 				return w.asideFoot(gtx, th, l)
 			})
 		}),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			if w.cfg.AsideExtra == nil {
+				return layout.Dimensions{}
+			}
+			// With its own 8dp margins it lines up with the 12dp footer above.
+			return layout.Inset{Left: th.Dp(4), Right: th.Dp(4)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return w.cfg.AsideExtra(gtx, th, l)
+			})
+		}),
 	)
 }
 

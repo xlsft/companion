@@ -8,7 +8,6 @@ import (
 	"gioui.org/widget"
 
 	"github.com/xlsft/companion/internal/ui/i18n"
-	"github.com/xlsft/companion/internal/ui/icon"
 	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
 	"github.com/xlsft/companion/internal/update"
@@ -19,115 +18,110 @@ type UpdateBackend interface {
 	State() update.State
 	CheckNow()
 	Install()
+	// RestartNow restarts into an installed update.
+	RestartNow()
 	OpenNotes()
 	// Watch calls fn after every state change until cancelled.
 	Watch(fn func()) (cancel func())
 }
 
-// updateBanner is the update notice at the top of a window. Each window
-// content owns one, so their buttons are independent widgets.
-type updateBanner struct {
-	be             UpdateBackend
-	install, notes widget.Clickable
+// updateChip is the update notice at the bottom of a window's sidebar:
+// one line, one action, never in the way of the content. Each window owns
+// one, so their buttons are independent widgets.
+type updateChip struct {
+	be           UpdateBackend
+	body, action widget.Clickable
 }
 
-func newUpdateBanner(be UpdateBackend) *updateBanner { return &updateBanner{be: be} }
+func newUpdateChip(be UpdateBackend) *updateChip { return &updateChip{be: be} }
 
-// wrap puts the banner, when there is one, above the window content.
-func (b *updateBanner) wrap(gtx layout.Context, th *theme.Theme, l Lang, content layout.Widget) layout.Dimensions {
-	gtx.Constraints.Min = gtx.Constraints.Max
-	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return b.Layout(gtx, th, l) }),
-		layout.Flexed(1, content),
-	)
-}
-
-func (b *updateBanner) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
-	if b == nil || b.be == nil {
+// Layout draws the chip with its sidebar margins, or nothing when there is
+// no update.
+func (c *updateChip) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
+	if c == nil || c.be == nil {
 		return layout.Dimensions{}
 	}
-	st := b.be.State()
-	// Only act on what the last frame offered: a stale click must not
-	// start an install the state no longer allows.
-	canInstall := st.Latest != nil && st.Managed == "" && (st.Phase == update.PhaseIdle || st.Phase == update.PhaseFailed)
-	if b.install.Clicked(gtx) && canInstall {
-		b.be.Install()
-		st = b.be.State()
-	}
-	if b.notes.Clicked(gtx) {
-		b.be.OpenNotes()
-	}
-	bn, ok := bannerFor(l, st)
+	st := c.be.State()
+	p, act, ok := chipFor(l, st)
 	if !ok {
 		return layout.Dimensions{}
 	}
-	notes := func(gtx layout.Context) layout.Dimensions {
-		return kit.ButtonStyle{Kind: kit.Secondary, Small: true, Label: T(l, "update.notes")}.Layout(gtx, th, &b.notes)
-	}
-	upd := func(label string) layout.Widget {
-		return func(gtx layout.Context) layout.Dimensions {
-			return kit.ButtonStyle{Kind: kit.Primary, Small: true, Label: label}.Layout(gtx, th, &b.install)
+	// Only act on what the last frame offered: a stale click must not
+	// start an install the state no longer allows.
+	if c.action.Clicked(gtx) {
+		switch act {
+		case chipInstall:
+			c.be.Install()
+		case chipRestart:
+			c.be.RestartNow()
+		}
+		st = c.be.State()
+		if p, act, ok = chipFor(l, st); !ok {
+			return layout.Dimensions{}
 		}
 	}
-	switch {
-	case st.Phase == update.PhaseFailed:
-		if st.Managed == "" {
-			bn.Actions = append(bn.Actions, upd(T(l, "update.retry")))
-		}
-		bn.Actions = append(bn.Actions, notes)
-	case st.Phase == update.PhaseIdle:
-		if st.Managed == "" {
-			bn.Actions = append(bn.Actions, upd(T(l, "update.install")))
-		}
-		bn.Actions = append(bn.Actions, notes)
-	case st.Phase == update.PhaseRestartNeeded:
-		bn.Actions = append(bn.Actions, notes)
+	if c.body.Clicked(gtx) {
+		c.be.OpenNotes()
 	}
-	return bn.Layout(gtx, th)
+	var action *widget.Clickable
+	if act != chipNone {
+		action = &c.action
+	}
+	return layout.Inset{Left: th.Dp(8), Right: th.Dp(8), Bottom: th.Dp(12)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return p.Layout(gtx, th, &c.body, action)
+	})
 }
 
-// bannerFor is the banner's look and text for a state; false when there
-// is nothing to show.
-func bannerFor(l Lang, st update.State) (kit.Banner, bool) {
+type chipAction int
+
+const (
+	chipNone chipAction = iota
+	chipInstall
+	chipRestart
+)
+
+// chipFor is the chip for a state and what its button does; false when
+// there is nothing to show.
+func chipFor(l Lang, st update.State) (kit.Pill, chipAction, bool) {
 	if st.Latest == nil {
-		return kit.Banner{}, false
+		return kit.Pill{}, chipNone, false
 	}
 	v := st.Latest.Version.String()
-	b := kit.Banner{Icon: icon.Sparkles, Progress: -1}
 	switch st.Phase {
 	case update.PhaseIdle:
-		b.Title = Tf(l, "update.available", v)
+		p := kit.Pill{Lead: kit.LeadDot, Text: Tf(l, "update.chip.available", v)}
 		if st.Managed != "" {
-			b.Detail = T(l, "update.managed."+st.Managed)
+			return p, chipNone, true // the package manager updates it
 		}
-	case update.PhaseVerifying, update.PhaseDownloading, update.PhaseInstalling, update.PhaseRestarting:
-		b.Icon = icon.Time
-		b.Title = Tf(l, "update.progress", v)
-		switch st.Phase {
-		case update.PhaseVerifying:
-			b.Detail = T(l, "update.verifying")
-		case update.PhaseDownloading:
-			b.Detail = T(l, "update.downloading")
-			b.Progress = 0
-			if st.Total > 0 {
-				b.Progress = float32(st.Done) / float32(st.Total)
-				b.Detail = Tf(l, "update.downloadingOf", megabytes(st.Done), megabytes(st.Total))
-			}
-		case update.PhaseInstalling:
-			b.Detail = T(l, "update.installing")
-		default:
-			b.Detail = T(l, "update.restarting")
+		p.Action = T(l, "update.install")
+		return p, chipInstall, true
+	case update.PhaseVerifying:
+		return kit.Pill{Lead: kit.LeadRing, Text: T(l, "update.chip.checking")}, chipNone, true
+	case update.PhaseDownloading:
+		p := kit.Pill{Lead: kit.LeadRing, Text: T(l, "update.chip.updating")}
+		if st.Total > 0 {
+			p.Progress = float32(st.Done) / float32(st.Total)
+			p.Meta = Tf(l, "update.chip.mb", megabytes(st.Done), megabytes(st.Total))
 		}
+		return p, chipNone, true
+	case update.PhaseInstalling:
+		return kit.Pill{Lead: kit.LeadRing, Progress: 1, Text: T(l, "update.chip.installing")}, chipNone, true
+	case update.PhaseRestarting:
+		return kit.Pill{Lead: kit.LeadRing, Progress: 1, Text: T(l, "update.restarting")}, chipNone, true
 	case update.PhaseRestartNeeded:
-		b.Status, b.Icon = theme.StatusOK, icon.CheckCircle
-		b.Title = Tf(l, "update.installed", v)
-		b.Detail = T(l, "update.restartNeeded")
+		if !st.CanRestart {
+			return kit.Pill{Lead: kit.LeadCheck, Text: T(l, "update.chip.reopen")}, chipNone, true
+		}
+		return kit.Pill{Lead: kit.LeadCheck, Text: Tf(l, "update.chip.ready", v), Action: T(l, "update.chip.restart")}, chipRestart, true
 	case update.PhaseFailed:
-		b.Status, b.Icon = theme.StatusError, icon.Warning
-		b.Title = Tf(l, "update.failed", v)
-		b.Detail = updateReason(l, st.Err)
+		p := kit.Pill{Lead: kit.LeadWarning, Text: T(l, "update.chip.failed")}
+		if st.Managed != "" {
+			return p, chipNone, true
+		}
+		p.Action = T(l, "update.retry")
+		return p, chipInstall, true
 	}
-	return b, true
+	return kit.Pill{}, chipNone, false
 }
 
 // updateReason explains an update.Code to the user.
@@ -144,10 +138,16 @@ func megabytes(n int64) string { return fmt.Sprintf("%.1f", float64(n)/(1<<20)) 
 func updateStatus(l Lang, st update.State, now time.Time) string {
 	var s string
 	switch {
+	case st.Phase == update.PhaseFailed && st.Err != "":
+		// The sidebar chip only says it failed; here is why.
+		return updateReason(l, st.Err)
 	case st.Checking:
 		return T(l, "update.status.checking")
 	case st.LastCheck.IsZero():
 		s = T(l, "update.status.never")
+	case st.CheckErr == "" && st.Latest != nil && st.Managed != "":
+		// The chip cannot say why it offers no Update button; this can.
+		s = Tf(l, "update.status.available", st.Latest.Version.String()) + " — " + T(l, "update.managed."+st.Managed)
 	case st.CheckErr == "" && st.Latest != nil:
 		s = Tf(l, "update.status.available", st.Latest.Version.String())
 	case st.CheckErr == "":

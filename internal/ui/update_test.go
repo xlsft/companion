@@ -8,6 +8,7 @@ import (
 
 	"gioui.org/io/input"
 
+	"github.com/xlsft/companion/internal/ui/kit"
 	"github.com/xlsft/companion/internal/ui/theme"
 	"github.com/xlsft/companion/internal/update"
 )
@@ -17,6 +18,7 @@ type fakeUpdates struct {
 	mu                         sync.Mutex
 	st                         update.State
 	installs, checks, notes    int
+	restarts                   int
 	watchers, cancelledWatches int
 }
 
@@ -29,6 +31,7 @@ func (f *fakeUpdates) set(st update.State) { f.mu.Lock(); f.st = st; f.mu.Unlock
 func (f *fakeUpdates) CheckNow()           { f.mu.Lock(); f.checks++; f.mu.Unlock() }
 func (f *fakeUpdates) Install()            { f.mu.Lock(); f.installs++; f.mu.Unlock() }
 func (f *fakeUpdates) OpenNotes()          { f.mu.Lock(); f.notes++; f.mu.Unlock() }
+func (f *fakeUpdates) RestartNow()         { f.mu.Lock(); f.restarts++; f.mu.Unlock() }
 func (f *fakeUpdates) Watch(func()) func() {
 	f.mu.Lock()
 	f.watchers++
@@ -52,7 +55,7 @@ func availableState(t *testing.T) update.State {
 	}
 }
 
-func TestUpdateBannerStates(t *testing.T) {
+func TestUpdateChipStates(t *testing.T) {
 	base := availableState(t)
 	with := func(fn func(*update.State)) update.State {
 		st := base
@@ -60,47 +63,48 @@ func TestUpdateBannerStates(t *testing.T) {
 		return st
 	}
 	tests := []struct {
-		name    string
-		st      update.State
-		show    bool
-		title   string
-		detail  string
-		status  theme.Status
-		hasProg bool
+		name   string
+		st     update.State
+		show   bool
+		lead   kit.PillLead
+		text   string
+		meta   string
+		action string
+		act    chipAction
 	}{
-		{"nothing new", update.State{Current: base.Current}, false, "", "", 0, false},
-		{"available", base, true, "Companion v0.2.0 is available", "", theme.StatusUnknown, false},
-		{"package manager", with(func(s *update.State) { s.Managed = "package_managed" }), true, "Companion v0.2.0 is available", "package manager", theme.StatusUnknown, false},
-		{"downloading", with(func(s *update.State) { s.Phase, s.Done, s.Total = update.PhaseDownloading, 1<<20, 4<<20 }), true, "Updating to v0.2.0…", "1.0 of 4.0 MB", theme.StatusUnknown, true},
-		{"verifying", with(func(s *update.State) { s.Phase = update.PhaseVerifying }), true, "Updating to v0.2.0…", "signature", theme.StatusUnknown, false},
-		{"installing", with(func(s *update.State) { s.Phase = update.PhaseInstalling }), true, "Updating to v0.2.0…", "Installing", theme.StatusUnknown, false},
-		{"restart needed", with(func(s *update.State) { s.Phase = update.PhaseRestartNeeded }), true, "Companion v0.2.0 is installed", "open Companion again", theme.StatusOK, false},
-		{"bad signature", with(func(s *update.State) { s.Phase, s.Err = update.PhaseFailed, "bad_signature" }), true, "Couldn't update to v0.2.0", "signature is not valid", theme.StatusError, false},
-		{"unknown failure", with(func(s *update.State) { s.Phase, s.Err = update.PhaseFailed, "weird" }), true, "Couldn't update to v0.2.0", "Something went wrong", theme.StatusError, false},
+		{"nothing new", update.State{Current: base.Current}, false, 0, "", "", "", chipNone},
+		{"available", base, true, kit.LeadDot, "Version 0.2.0", "", "Update", chipInstall},
+		{"package manager", with(func(s *update.State) { s.Managed = "package_managed" }), true, kit.LeadDot, "Version 0.2.0", "", "", chipNone},
+		{"verifying", with(func(s *update.State) { s.Phase = update.PhaseVerifying }), true, kit.LeadRing, "Checking the update", "", "", chipNone},
+		{"downloading", with(func(s *update.State) { s.Phase, s.Done, s.Total = update.PhaseDownloading, 1<<20, 4<<20 }), true, kit.LeadRing, "Updating", "1.0/4.0 MB", "", chipNone},
+		{"installing", with(func(s *update.State) { s.Phase = update.PhaseInstalling }), true, kit.LeadRing, "Installing", "", "", chipNone},
+		{"ready", with(func(s *update.State) { s.Phase, s.CanRestart = update.PhaseRestartNeeded, true }), true, kit.LeadCheck, "0.2.0 is ready", "", "Restart", chipRestart},
+		{"ready, cannot restart", with(func(s *update.State) { s.Phase = update.PhaseRestartNeeded }), true, kit.LeadCheck, "Reopen Companion to finish", "", "", chipNone},
+		{"failed", with(func(s *update.State) { s.Phase, s.Err = update.PhaseFailed, "bad_signature" }), true, kit.LeadWarning, "Update failed", "", "Try again", chipInstall},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b, ok := bannerFor(LangEN, tt.st)
+			p, act, ok := chipFor(LangEN, tt.st)
 			if ok != tt.show {
 				t.Fatalf("shown = %v", ok)
 			}
 			if !ok {
 				return
 			}
-			if b.Title != tt.title || !strings.Contains(b.Detail, tt.detail) || b.Status != tt.status || (b.Progress >= 0) != tt.hasProg {
-				t.Errorf("banner = %+v", b)
+			if p.Lead != tt.lead || p.Text != tt.text || p.Meta != tt.meta || p.Action != tt.action || act != tt.act {
+				t.Errorf("chip = %+v, act %v", p, act)
 			}
-			// Every state has Russian text too.
-			if ru, _ := bannerFor(LangRU, tt.st); ru.Title == b.Title && tt.title != "" {
-				t.Errorf("ru title untranslated: %q", ru.Title)
+			if ru, _, _ := chipFor(LangRU, tt.st); ru.Text == p.Text && !strings.ContainsAny(p.Text, "0123456789") {
+				t.Errorf("ru text untranslated: %q", ru.Text)
 			}
 		})
 	}
 }
 
-// The same banner sits on top of the main window and the setup window,
-// and its buttons reach the updater.
-func TestUpdateBannerInBothWindows(t *testing.T) {
+// The same chip sits at the bottom of the sidebar in the main window and
+// in setup, and its buttons reach the updater; restarting waits for the
+// click.
+func TestUpdateChipInBothWindows(t *testing.T) {
 	fake := &fakeUpdates{st: availableState(t)}
 	h := newHarnessWith(t, ModeMain, nil, func(o *Options) { o.Updates = fake })
 	m, _ := h.mainBuilt()
@@ -109,27 +113,41 @@ func TestUpdateBannerInBothWindows(t *testing.T) {
 	for _, w := range []struct {
 		name    string
 		content surface
-		b       *updateBanner
+		c       *updateChip
 	}{{"main", m, m.update}, {"setup", wiz, wiz.update}} {
 		r := new(input.Router)
 		frame(r, h.sh, th, w.content)
 		before := fake.installs
-		w.b.install.Click()
-		w.b.notes.Click()
+		w.c.action.Click()
+		w.c.body.Click()
 		frame(r, h.sh, th, w.content)
 		if fake.installs != before+1 {
 			t.Errorf("%s: Update did not install", w.name)
 		}
 		if fake.notes == 0 {
-			t.Errorf("%s: Release notes not opened", w.name)
+			t.Errorf("%s: release notes not opened", w.name)
 		}
 	}
 	r := new(input.Router)
+	fake.set(func() update.State {
+		st := availableState(t)
+		st.Phase, st.CanRestart = update.PhaseRestartNeeded, true
+		return st
+	}())
+	frame(r, h.sh, th, m)
+	if fake.restarts != 0 {
+		t.Fatal("restarted without a click")
+	}
+	m.update.action.Click()
+	frame(r, h.sh, th, m)
+	if fake.restarts != 1 {
+		t.Errorf("Restart: restarts = %d", fake.restarts)
+	}
 	// A package-managed install offers no Update button.
 	fake.set(func() update.State { st := availableState(t); st.Managed = "package_managed"; return st }())
 	before := fake.installs
 	frame(r, h.sh, th, m)
-	m.update.install.Click()
+	m.update.action.Click()
 	frame(r, h.sh, th, m)
 	if fake.installs != before {
 		t.Error("Update offered for a package-managed install")
@@ -172,6 +190,8 @@ func TestUpdateStatusLine(t *testing.T) {
 		{update.State{LastCheck: at, Latest: &update.Release{Version: v}}, "Version 0.2.0 is available · checked 14:02"},
 		{update.State{LastCheck: at, CheckErr: "unavailable"}, "Release information isn't available · checked 14:02"},
 		{update.State{LastCheck: at, CheckErr: "offline"}, "Couldn't reach GitHub · checked 14:02"},
+		{update.State{LastCheck: at, Latest: &update.Release{Version: v}, Managed: "package_managed"}, "Version 0.2.0 is available — Companion was installed by your system's package manager; update it there. · checked 14:02"},
+		{update.State{Phase: update.PhaseFailed, Err: "bad_signature"}, "The release signature is not valid, so nothing was installed."},
 		{update.State{LastCheck: at.AddDate(0, 0, -1), CheckErr: "boom"}, "Couldn't check for updates · checked 2026-10-23 14:02"},
 	}
 	for _, tt := range tests {

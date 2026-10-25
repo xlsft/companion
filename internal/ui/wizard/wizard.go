@@ -23,6 +23,7 @@ import (
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/ui/i18n"
 	"github.com/xlsft/companion/internal/ui/kit"
+	"github.com/xlsft/companion/internal/ui/theme"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -55,8 +56,11 @@ const (
 
 // Config wires the wizard. Gate is required; the callbacks may be nil.
 type Config struct {
-	Gate     *readiness.Gate
-	Backends Backends
+	// AsideExtra, when set, draws under the language picker at the very
+	// bottom of the sidebar (the update chip).
+	AsideExtra func(gtx layout.Context, th *theme.Theme, l i18n.Lang) layout.Dimensions
+	Gate       *readiness.Gate
+	Backends   Backends
 	// Diagnose produces the capability report for the platform step.
 	Diagnose func(ctx context.Context) (contracts.CapabilityReport, error)
 	// SpeechLanguage is the configured speech language ("auto" or a code)
