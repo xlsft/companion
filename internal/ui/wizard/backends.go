@@ -87,6 +87,15 @@ type Provider interface {
 	Update(ctx context.Context, id string, in providers.Input) (*providers.Info, error)
 }
 
+// ProviderModels is a Provider backend that also lists an endpoint's
+// models; the model step then offers them to pick from. The query carries
+// the form as typed and the saved provider's id, so an empty key field can
+// use the stored key, which never comes back to the UI. Failures (no
+// listing, bad key, offline) leave the model to be typed.
+type ProviderModels interface {
+	ListModels(ctx context.Context, q providers.ModelQuery) ([]string, error)
+}
+
 // STT serves the speech-recognition step. The StepSTT check records the
 // selected microphone, transcribes with the active model and compares with
 // readiness.MicPhrase loosely (readiness.PhraseMatches).
@@ -137,4 +146,20 @@ type TTS interface {
 	Save(ctx context.Context, cfg TTSConfig, apiKey string) (TTSConfig, error)
 	// Voices lists the voices of the saved provider.
 	Voices(ctx context.Context) ([]tts.Voice, error)
+}
+
+// TTSModelQuery is the OpenAI-compatible speech server whose models the
+// voice step wants, as typed so far.
+type TTSModelQuery struct {
+	BaseURL string // "" is OpenAI's own API
+	// APIKey is the key typed in the form; "" uses the stored key while
+	// BaseURL is still the saved server.
+	APIKey string
+}
+
+// TTSModels is a TTS backend that also lists the models of an
+// OpenAI-compatible speech server; the voice step then offers them to pick
+// from. Other providers have no model field.
+type TTSModels interface {
+	ListModels(ctx context.Context, q TTSModelQuery) ([]string, error)
 }
