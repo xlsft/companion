@@ -498,6 +498,8 @@
   "wiz.done.change": "Cambiar",
   "wiz.done.double": "Doble pulsación",
   "wiz.done.double.d": "pulsa una tecla dos veces rápido para empezar a escuchar",
+  "wiz.done.double.off": "Desactivado",
+  "wiz.done.double.failed": "No se pudo activar la doble pulsación. Diagnóstico muestra los detalles.",
   "wiz.fix.llm_failed": "El modelo no respondió. Revisa la clave y el modelo del agente.",
   "wiz.tile.anthropic": "Claude",
   "wiz.tile.openai": "GPT",

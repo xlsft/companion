@@ -498,6 +498,8 @@
   "wiz.done.change": "Cambia",
   "wiz.done.double": "Doppia pressione",
   "wiz.done.double.d": "premi un tasto due volte in fretta per iniziare ad ascoltare",
+  "wiz.done.double.off": "Disattivato",
+  "wiz.done.double.failed": "Impossibile attivare la doppia pressione. Diagnostica mostra i dettagli.",
   "wiz.fix.llm_failed": "Il modello non ha risposto. Controlla chiave e modello dell’agente.",
   "wiz.tile.anthropic": "Claude",
   "wiz.tile.openai": "GPT",

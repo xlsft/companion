@@ -104,6 +104,34 @@ type fakePerm struct {
 	st      HotkeyStatus
 	result  HotkeyStatus // State and Code of the next apply
 	applies int
+
+	tapKey       string
+	tapSupported bool
+	tapErr       error // answer of the next SetDoubleTap
+	tapSets      []string
+}
+
+func (f *fakePerm) DoubleTap() (string, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.tapKey, f.tapSupported
+}
+
+func (f *fakePerm) SetDoubleTap(_ context.Context, key string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.tapSets = append(f.tapSets, key)
+	if f.tapErr != nil {
+		return f.tapErr
+	}
+	f.tapKey = key
+	return nil
+}
+
+func (f *fakePerm) taps() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.tapSets...)
 }
 
 func newFakePerm() *fakePerm {

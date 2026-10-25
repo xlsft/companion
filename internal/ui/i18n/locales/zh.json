@@ -498,6 +498,8 @@
   "wiz.done.change": "更改",
   "wiz.done.double": "双击按键",
   "wiz.done.double.d": "快速按两次某个键开始聆听",
+  "wiz.done.double.off": "关闭",
+  "wiz.done.double.failed": "无法开启双击。诊断中有详细信息。",
   "wiz.fix.llm_failed": "模型没有回答。请检查智能体的密钥和模型。",
   "wiz.tile.anthropic": "Claude",
   "wiz.tile.openai": "GPT",

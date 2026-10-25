@@ -197,6 +197,8 @@ var texts = map[string][2]string{
 	"wiz.done.change":         {"Change", "Изменить"},
 	"wiz.done.double":         {"Double press", "Двойное нажатие"},
 	"wiz.done.double.d":       {"press a key twice quickly to start listening", "дважды быстро нажмите клавишу, чтобы начать слушать"},
+	"wiz.done.double.off":     {"Off", "Выкл."},
+	"wiz.done.double.failed":  {"Could not turn on the double press. Diagnostics shows details.", "Не удалось включить двойное нажатие. Подробности — в диагностике."},
 	"wiz.fix.llm_failed":      {"The model did not answer. Check the agent's key and model.", "Модель не ответила. Проверьте ключ и модель агента."},
 	"wiz.byok.baseURL":        {"Base URL", "Base URL"},
 	"wiz.byok.model":          {"Model", "Модель"},

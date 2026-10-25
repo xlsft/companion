@@ -498,6 +498,8 @@
   "wiz.done.change": "Alterar",
   "wiz.done.double": "Toque duplo",
   "wiz.done.double.d": "pressione uma tecla duas vezes rápido para começar a ouvir",
+  "wiz.done.double.off": "Desligado",
+  "wiz.done.double.failed": "Não foi possível ativar o toque duplo. O Diagnóstico mostra os detalhes.",
   "wiz.fix.llm_failed": "O modelo não respondeu. Verifique a chave e o modelo do agente.",
   "wiz.tile.anthropic": "Claude",
   "wiz.tile.openai": "GPT",

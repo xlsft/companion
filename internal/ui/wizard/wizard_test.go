@@ -2,6 +2,7 @@ package wizard
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui/i18n"
+	"github.com/xlsft/companion/pkg/contracts"
 )
 
 func contains(s, sub string) bool { return strings.Contains(strings.ToLower(s), strings.ToLower(sub)) }
@@ -306,6 +308,61 @@ func TestDoneShowsPermissionIssue(t *testing.T) {
 	h.eventually("issue", func() bool { return h.shows(h.tr("wiz.perm.global_hotkey")) && h.has(ActApplyHotkeys) })
 	if h.shows(h.tr("wiz.perm.microphone")) {
 		t.Error("a working permission listed as an issue")
+	}
+}
+
+// The double press is a key picker where the system can see a lone key,
+// and plainly unavailable elsewhere.
+func TestDoneDoubleTap(t *testing.T) {
+	tests := []struct {
+		name      string
+		supported bool
+		err       error
+		wantSet   bool
+		wantKey   string
+		wantShown string
+	}{
+		{"unavailable", false, nil, false, "", "wiz.perm.status.unavailable"},
+		{"set ctrl", true, nil, true, "ctrl", "wiz.done.double"},
+		{"refused", true, contracts.Unsupported(contracts.CapDoubleTap), true, "", "wiz.perm.status.unavailable"},
+		{"failed", true, errors.New("boom"), true, "", "wiz.done.double.failed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.perm.mu.Lock()
+			h.perm.tapSupported, h.perm.tapErr = tt.supported, tt.err
+			h.perm.mu.Unlock()
+			h.goScreen(screenDone)
+			h.frame()
+			if tt.wantSet {
+				h.w.tap.dd.SetOpen(true)
+				h.frame()
+				h.w.tap.dd.Pick(1) // Ctrl
+				h.frame()
+				h.eventually("saved", func() bool {
+					h.w.mu.Lock()
+					defer h.w.mu.Unlock()
+					return len(h.perm.taps()) == 1 && !h.w.tap.saving
+				})
+				if got := h.perm.taps()[0]; got != "ctrl" {
+					t.Errorf("set %q, want ctrl", got)
+				}
+				h.frame()
+			}
+			if !h.shows(h.tr(tt.wantShown)) {
+				t.Errorf("%s not shown", tt.wantShown)
+			}
+			h.w.mu.Lock()
+			key := h.w.tap.key
+			h.w.mu.Unlock()
+			if key != tt.wantKey {
+				t.Errorf("key %q, want %q", key, tt.wantKey)
+			}
+			if tt.wantKey != "" && !h.shows("Ctrl") {
+				t.Error("chosen key not shown")
+			}
+		})
 	}
 }
 

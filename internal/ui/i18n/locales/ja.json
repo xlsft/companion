@@ -498,6 +498,8 @@
   "wiz.done.change": "変更",
   "wiz.done.double": "2回押し",
   "wiz.done.double.d": "キーを素早く2回押すと聞き取りを開始",
+  "wiz.done.double.off": "オフ",
+  "wiz.done.double.failed": "ダブルタップをオンにできませんでした。詳細は診断にあります。",
   "wiz.fix.llm_failed": "モデルが応答しませんでした。エージェントのキーとモデルを確認してください。",
   "wiz.tile.anthropic": "Claude",
   "wiz.tile.openai": "GPT",

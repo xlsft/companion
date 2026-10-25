@@ -498,6 +498,8 @@
   "wiz.done.change": "Ändern",
   "wiz.done.double": "Doppelt drücken",
   "wiz.done.double.d": "eine Taste zweimal schnell drücken, um zuzuhören",
+  "wiz.done.double.off": "Aus",
+  "wiz.done.double.failed": "Doppeltippen konnte nicht eingeschaltet werden. Details zeigt die Diagnose.",
   "wiz.fix.llm_failed": "Das Modell hat nicht geantwortet. Prüfen Sie Schlüssel und Modell des Agenten.",
   "wiz.tile.anthropic": "Claude",
   "wiz.tile.openai": "GPT",

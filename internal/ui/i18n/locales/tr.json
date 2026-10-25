@@ -498,6 +498,8 @@
   "wiz.done.change": "Değiştir",
   "wiz.done.double": "Çift basma",
   "wiz.done.double.d": "dinlemeye başlamak için bir tuşa iki kez hızla basın",
+  "wiz.done.double.off": "Kapalı",
+  "wiz.done.double.failed": "Çift basma açılamadı. Ayrıntıları Tanılama gösterir.",
   "wiz.fix.llm_failed": "Model yanıt vermedi. Ajanın anahtarını ve modelini denetleyin.",
   "wiz.tile.anthropic": "Claude",
   "wiz.tile.openai": "GPT",

@@ -1,6 +1,8 @@
 package wizard
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -26,12 +28,76 @@ var doneStages = []string{"capture", "llm", "pointing"}
 // answer from the last full test.
 type endToEndReply interface{ LastEndToEndReply() string }
 
+// doubleTapHotkeys is a Permissions backend with the double-tap shortcut:
+// key "" is off; SetDoubleTap answers Unsupported where the system cannot
+// see a lone key.
+type doubleTapHotkeys interface {
+	DoubleTap() (key string, supported bool)
+	SetDoubleTap(ctx context.Context, key string) error
+}
+
+// tapKeys are the double-tap choices after "Off", named by the keys' own
+// labels, which need no translation.
+var (
+	tapKeys   = []string{"ctrl", "shift", "alt", "super"}
+	tapLabels = []string{"Ctrl", "Shift", "Alt", "Super"}
+)
+
+// tapState is the double-tap row; the fields after dd are guarded by
+// Wizard.mu.
+type tapState struct {
+	dd                                kit.Dropdown
+	loaded, supported, saving, failed bool
+	key                               string
+}
+
+// setDoubleTap saves the key off the UI goroutine.
+func (w *Wizard) setDoubleTap(b doubleTapHotkeys, key string) {
+	w.mu.Lock()
+	w.tap.saving, w.tap.failed = true, false
+	w.mu.Unlock()
+	go func() {
+		err := b.SetDoubleTap(w.ctx, key)
+		w.mu.Lock()
+		t := &w.tap
+		t.saving = false
+		switch {
+		case errors.Is(err, contracts.ErrUnsupported):
+			t.supported = false
+		case err != nil:
+			t.failed = true
+		default:
+			t.key = key
+		}
+		w.mu.Unlock()
+		if err != nil {
+			w.cfg.Log.Warn("setup double tap not set", "code", runErrCode(err))
+		}
+		w.cfg.Invalidate()
+	}()
+}
+
 func (w *Wizard) doneUpdate(gtx layout.Context, s snapshot) {
 	if w.clicked(gtx, ActRunFull) && !s.running {
 		w.runCheck(readiness.StepEndToEnd, nil, nil)
 	}
 	if w.clicked(gtx, ActChangeKeys) {
 		w.keysShown = !w.keysShown
+	}
+	if b, ok := w.cfg.Backends.Permissions.(doubleTapHotkeys); ok {
+		if !w.tap.loaded {
+			key, sup := b.DoubleTap()
+			w.mu.Lock()
+			w.tap.loaded, w.tap.key, w.tap.supported = true, key, sup
+			w.mu.Unlock()
+		}
+		if i := w.tap.dd.Update(gtx, len(tapKeys)+1); i >= 0 {
+			key := ""
+			if i > 0 {
+				key = tapKeys[i-1]
+			}
+			w.setDoubleTap(b, key)
+		}
 	}
 	if w.perm.recheck.Swap(false) {
 		// Shortcuts were applied: check the permissions again now.
@@ -125,8 +191,8 @@ func (w *Wizard) doneIssues(th *theme.Theme, l i18n.Lang, s snapshot) layout.Wid
 	return panel(th, kit.VStack(th, 12, lines...))
 }
 
-// doneKeys is how to ask by voice: the shortcut, and the double press
-// that is not available yet.
+// doneKeys is how to ask by voice: the shortcut, and the double press of
+// a lone key where the system lets Companion see one.
 func (w *Wizard) doneKeys(th *theme.Theme, l i18n.Lang) layout.Widget {
 	talk := ""
 	if b := w.cfg.Backends.Permissions; b != nil {
@@ -148,9 +214,25 @@ func (w *Wizard) doneKeys(th *theme.Theme, l i18n.Lang) layout.Widget {
 		})
 		return kit.HStack(th, 6, ch...)(gtx)
 	}
-	soon := func(gtx layout.Context) layout.Dimensions {
-		w.frame.texts = append(w.frame.texts, i18n.T(l, "nav.soon"))
-		return kit.Tag(gtx, th, i18n.T(l, "nav.soon"), kit.TagNeutral)
+	w.mu.Lock()
+	tap := w.tap
+	w.mu.Unlock()
+	_, canTap := w.cfg.Backends.Permissions.(doubleTapHotkeys)
+	double := func(gtx layout.Context) layout.Dimensions {
+		if !canTap || !tap.supported {
+			w.frame.texts = append(w.frame.texts, i18n.T(l, "wiz.perm.status.unavailable"))
+			return kit.Tag(gtx, th, i18n.T(l, "wiz.perm.status.unavailable"), kit.TagNeutral)
+		}
+		labels := append([]string{i18n.T(l, "wiz.done.double.off")}, tapLabels...)
+		sel := 0
+		for i, k := range tapKeys {
+			if k == tap.key {
+				sel = i + 1
+			}
+		}
+		gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(th.Dp(140)))
+		gtx.Constraints.Min.X = gtx.Constraints.Max.X
+		return w.dropdown(gtx, th, &w.tap.dd, labels, sel, labels[0], !tap.saving)
 	}
 	lines := []layout.Widget{
 		w.text(kit.Medium(kit.Text(th, 14, i18n.T(l, "wiz.done.ask"), th.Pal.Fg))),
@@ -160,6 +242,9 @@ func (w *Wizard) doneKeys(th *theme.Theme, l i18n.Lang) layout.Widget {
 		lines = append(lines, w.perm.editor(w).Layout(th, l, &w.frame.texts))
 		w.frame.actions = append(w.frame.actions, ActApplyHotkeys)
 	}
-	lines = append(lines, row(i18n.T(l, "wiz.done.double"), i18n.T(l, "wiz.done.double.d"), soon))
+	lines = append(lines, row(i18n.T(l, "wiz.done.double"), i18n.T(l, "wiz.done.double.d"), double))
+	if tap.failed {
+		lines = append(lines, statusText(w, th, theme.StatusError, i18n.T(l, "wiz.done.double.failed")))
+	}
 	return panel(th, kit.VStack(th, 14, lines...))
 }

@@ -498,6 +498,8 @@
   "wiz.done.change": "Zmień",
   "wiz.done.double": "Podwójne naciśnięcie",
   "wiz.done.double.d": "naciśnij klawisz dwa razy szybko, aby zacząć słuchać",
+  "wiz.done.double.off": "Wył.",
+  "wiz.done.double.failed": "Nie udało się włączyć podwójnego naciśnięcia. Szczegóły pokaże Diagnostyka.",
   "wiz.fix.llm_failed": "Model nie odpowiedział. Sprawdź klucz i model agenta.",
   "wiz.tile.anthropic": "Claude",
   "wiz.tile.openai": "GPT",

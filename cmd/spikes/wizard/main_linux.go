@@ -211,8 +211,23 @@ func (c *checks) gate() map[readiness.Step]readiness.Check {
 // hotkey keeps the shortcuts in memory and pretends the system took
 // them after a short delay; the real binding is the companion's.
 type hotkey struct {
-	mu sync.Mutex
-	st wizard.HotkeyStatus
+	mu  sync.Mutex
+	st  wizard.HotkeyStatus
+	tap string
+}
+
+// DoubleTap stores the key in memory; nothing listens for it.
+func (h *hotkey) DoubleTap() (string, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.tap, true
+}
+
+func (h *hotkey) SetDoubleTap(_ context.Context, key string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.tap = key
+	return nil
 }
 
 func newHotkey() *hotkey {

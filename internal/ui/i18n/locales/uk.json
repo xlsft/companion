@@ -498,6 +498,8 @@
   "wiz.done.change": "Змінити",
   "wiz.done.double": "Подвійне натискання",
   "wiz.done.double.d": "двічі швидко натисніть клавішу, щоб почати слухати",
+  "wiz.done.double.off": "Вимк.",
+  "wiz.done.double.failed": "Не вдалося ввімкнути подвійне натискання. Подробиці покаже Діагностика.",
   "wiz.fix.llm_failed": "Модель не відповіла. Перевірте ключ і модель агента.",
   "wiz.tile.anthropic": "Claude",
   "wiz.tile.openai": "GPT",

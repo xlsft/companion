@@ -114,6 +114,7 @@ type Wizard struct {
 	frame     frameRecord
 	auto      map[readiness.Step]autoRecord
 	keysShown bool // the shortcut editor is open on the finish
+	tap       tapState
 
 	perm permState
 	byok byokState
