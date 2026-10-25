@@ -48,6 +48,15 @@ func hyprBlock(req Request) string {
 		s += "bind = " + dm + ", " + dk + ", exec, " + e + " ctl dictate-press\n" +
 			"bindr = " + dm + ", " + dk + ", exec, " + e + " ctl dictate-release\n"
 	}
+	// A modifier-only bind takes the modifier's own mask plus r; another
+	// bind used meanwhile shadows its release (hyprtester
+	// modifierReleaseBindShadowing).
+	if req.DoubleTap != "" {
+		mod := map[string]string{"ctrl": "CTRL", "shift": "SHIFT", "alt": "ALT", "super": "SUPER"}[req.DoubleTap]
+		for _, k := range tapKeys[req.DoubleTap] {
+			s += "bindr = " + mod + ", " + k + ", exec, " + TapCommand(req.Exe, req.DoubleTap) + "\n"
+		}
+	}
 	return block("#", s)
 }
 

@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/xlsft/companion/internal/doubletap"
 	"github.com/xlsft/companion/internal/platform/keys"
 	"github.com/xlsft/companion/internal/shortcut"
 	"github.com/xlsft/companion/pkg/contracts"
@@ -70,6 +71,12 @@ func (m Method) ToggleOnly() bool {
 	return true
 }
 
+// TapBinds reports whether the method can bind a lone modifier on
+// release: each clean tap then runs "ctl tap-<key>" and the core counts
+// two of them as a double tap. niri binds need a non-modifier key, and
+// GNOME's custom shortcuts cannot be a lone modifier either.
+func (m Method) TapBinds() bool { return m == MethodSway || m == MethodHyprland }
+
 // ConfigBased reports whether the method writes a desktop configuration.
 func (m Method) ConfigBased() bool {
 	switch m {
@@ -84,6 +91,10 @@ type Request struct {
 	Talk, Cancel contracts.Hotkey
 	// Dictate is the dictation chord (OC-78); a zero Hotkey binds none.
 	Dictate contracts.Hotkey
+	// DoubleTap is the modifier whose double tap toggles Talk
+	// (doubletap.Keys, OC-133); "" binds none. Only methods with
+	// TapBinds can bind it.
+	DoubleTap string
 	// Exe is the command the binds run, the absolute path of this binary.
 	Exe string
 }
@@ -195,6 +206,9 @@ func Apply(ctx context.Context, m Method, env Env, req Request) (Result, error) 
 	if err := req.check(); err != nil {
 		return Result{Method: m}, err
 	}
+	if req.DoubleTap != "" && !m.TapBinds() && m != MethodService {
+		return Result{Method: m}, fail(CodeUnsupported, contracts.Unsupported(contracts.CapDoubleTap))
+	}
 	var r Result
 	var err error
 	switch m {
@@ -262,6 +276,9 @@ func (r Request) check() error {
 	if r.Exe == "" {
 		return fail(CodeBadChord, errors.New("no command"))
 	}
+	if !doubletap.Valid(r.DoubleTap) {
+		return fail(CodeBadChord, errors.New("double-tap key"))
+	}
 	return nil
 }
 
@@ -270,6 +287,17 @@ func (r Request) check() error {
 func Commands(exe string) (talk, cancel string) {
 	e := shellWord(exe)
 	return e + " ctl talk-toggle", e + " ctl cancel"
+}
+
+// TapCommand is the ctl command line a release bind of key runs.
+func TapCommand(exe, key string) string { return shellWord(exe) + " ctl tap-" + key }
+
+// tapKeys are the XKB names of both sides of a double-tap key.
+var tapKeys = map[string][2]string{
+	"ctrl":  {"Control_L", "Control_R"},
+	"shift": {"Shift_L", "Shift_R"},
+	"alt":   {"Alt_L", "Alt_R"},
+	"super": {"Super_L", "Super_R"},
 }
 
 // DictateCommand is the ctl command line of the dictation shortcut.
