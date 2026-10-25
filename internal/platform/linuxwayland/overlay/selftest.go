@@ -187,7 +187,7 @@ func (h *Host) newVictim(ctx context.Context, o *output, w, hh int) (*victim, er
 			once.Do(func() { close(conf) })
 		}
 	})
-	_ = c.Send(h.layerShell, 0, wl.NewMsg().NewID(v.layer).Object(v.surf).Object(o.id).Uint(layerTop).String("openclick-selftest"))
+	_ = c.Send(h.layerShell, 0, wl.NewMsg().NewID(v.layer).Object(v.surf).Object(o.id).Uint(layerTop).String("companion-selftest"))
 	_ = c.Send(v.layer, 0, wl.NewMsg().Uint(uint32(w)).Uint(uint32(hh))) // set_size; no anchor = centred
 	_ = c.Send(v.layer, 4, wl.NewMsg().Uint(keyboardNone))
 	h.mu.Lock()

@@ -16,7 +16,7 @@ type ShmFile struct {
 }
 
 func NewShmFile(size int) (*ShmFile, error) {
-	fd, err := unix.MemfdCreate("openclick-wl-shm", unix.MFD_CLOEXEC|unix.MFD_ALLOW_SEALING)
+	fd, err := unix.MemfdCreate("companion-wl-shm", unix.MFD_CLOEXEC|unix.MFD_ALLOW_SEALING)
 	if err != nil {
 		return nil, fmt.Errorf("wl: memfd_create: %w", err)
 	}

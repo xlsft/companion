@@ -22,7 +22,7 @@ const (
 	keyboardNone      = 0
 	shmFormatARGB8888 = 0
 	maxBuffers        = 3
-	namespace         = "openclick-overlay"
+	namespace         = "companion-overlay"
 )
 
 // Surface is one layer-shell overlay on one output.

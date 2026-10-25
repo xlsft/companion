@@ -22,5 +22,5 @@ dependencies, portals and per-desktop capabilities: docs/linux.md in the
 source tree, or https://github.com/xlsft/companion once published.
 
 No speech model is included. Companion downloads one on first run into
-~/.config/openclick: Parakeet, SenseVoice or a streaming zipformer
+~/.config/companion: Parakeet, SenseVoice or a streaming zipformer
 (sherpa-onnx), or whisper for languages those do not cover.

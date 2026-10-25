@@ -133,7 +133,7 @@ func TestTaps(t *testing.T) {
 
 func listen(t *testing.T) *Server {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "openclick", "control.sock")
+	path := filepath.Join(t.TempDir(), "companion", "control.sock")
 	s, err := Listen(path)
 	if err != nil {
 		t.Fatal(err)

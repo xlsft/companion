@@ -44,7 +44,7 @@ func TestRedactString(t *testing.T) {
 		{"kv json", `{"password":"hunter2hunter2"}`, true, "password"},
 		{"keyboard", "keyboard layout changed", false, ""},
 		{"task", "task-force mask-ed disk-usage", false, ""},
-		{"path", "open /home/user/.local/share/openclick/models/ggml-base.bin", false, ""},
+		{"path", "open /home/user/.local/share/companion/models/ggml-base.bin", false, ""},
 		{"kebab", "a-very-long-kebab-case-identifier-without-digits", false, ""},
 		{"short token word", "token: expired", false, ""},
 		{"plain", "stt sidecar exited code=137", false, ""},

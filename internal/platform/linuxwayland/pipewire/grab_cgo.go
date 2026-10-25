@@ -202,7 +202,7 @@ static const struct spa_pod *oc_build_format(struct spa_pod_builder *b, int mods
 static oc_grab *oc_grab_start(int fd, uint32_t node, int mods, char *err, size_t errlen) {
 	pw_init(NULL, NULL);
 	oc_grab *g = calloc(1, sizeof *g);
-	g->loop = pw_thread_loop_new("openclick-grab", NULL);
+	g->loop = pw_thread_loop_new("companion-grab", NULL);
 	if (g->loop == NULL) { snprintf(err, errlen, "pw_thread_loop_new failed"); free(g); return NULL; }
 	g->context = pw_context_new(pw_thread_loop_get_loop(g->loop), NULL, 0);
 	if (g->context == NULL || pw_thread_loop_start(g->loop) < 0) {
@@ -221,7 +221,7 @@ static oc_grab *oc_grab_start(int fd, uint32_t node, int mods, char *err, size_t
 		return g;
 	}
 	pw_core_add_listener(g->core, &g->core_listener, &oc_core_events, g);
-	g->stream = pw_stream_new(g->core, "openclick-grab", pw_properties_new(
+	g->stream = pw_stream_new(g->core, "companion-grab", pw_properties_new(
 		PW_KEY_MEDIA_TYPE, "Video",
 		PW_KEY_MEDIA_CATEGORY, "Capture",
 		PW_KEY_MEDIA_ROLE, "Screen", NULL));

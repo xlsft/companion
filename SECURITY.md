@@ -14,7 +14,7 @@ otherwise.
 
 Especially relevant: anything that sends screen content, audio, transcripts or keys somewhere other than the endpoints
 the user configured, writes them to disk or logs against the settings, or lets another local user drive the control
-socket (`$XDG_RUNTIME_DIR/openclick/control.sock`).
+socket (`$XDG_RUNTIME_DIR/companion/control.sock`).
 
 ## What leaves your computer
 

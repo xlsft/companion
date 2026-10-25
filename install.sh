@@ -14,7 +14,7 @@
 #   GITHUB_API          API base URL (default: https://api.github.com)
 #
 # Running it again upgrades in place; settings and models in
-# ~/.config/openclick are never touched.
+# ~/.config/companion are never touched.
 set -eu
 
 REPO=${COMPANION_REPO:-xlsft/companion}
@@ -87,7 +87,7 @@ if [ "$uninstall" = 1 ]; then
 	installed_files | while IFS= read -r f; do rm -f "$f"; done
 	refresh_caches
 	ok "Removed Companion from $PREFIX"
-	say "${DIM}Settings, history and speech models stay in ~/.config/openclick; delete that directory to remove them too.${RESET}"
+	say "${DIM}Settings, history and speech models stay in ~/.config/companion; delete that directory to remove them too.${RESET}"
 	exit 0
 fi
 
@@ -188,7 +188,7 @@ fi
 
 previous=
 if [ -x "$PREFIX/lib/companion/companion" ]; then
-	# "-version" prints "openclick <version> (<commit>) <os>/<arch>".
+	# "-version" prints "companion <version> (<commit>) <os>/<arch>".
 	previous=$("$PREFIX/lib/companion/companion" -version 2>/dev/null | awk 'NR == 1 { print "v" $2 }' || true)
 fi
 

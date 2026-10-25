@@ -101,7 +101,8 @@ func smokeCheck(ctx context.Context, name, path string) error {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, path, "-version").Output()
-	if err != nil || !bytes.HasPrefix(out, []byte("openclick ")) {
+	// Cores before 0.1.0 print the project's old name.
+	if err != nil || !bytes.HasPrefix(out, []byte("companion ")) && !bytes.HasPrefix(out, []byte("openclick ")) {
 		return fmt.Errorf("%w: new core does not start", update.ErrBadArchive)
 	}
 	return nil

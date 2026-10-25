@@ -10,5 +10,5 @@ var (
 )
 
 func String() string {
-	return "openclick " + Version + " (" + Commit + ") " + runtime.GOOS + "/" + runtime.GOARCH
+	return "companion " + Version + " (" + Commit + ") " + runtime.GOOS + "/" + runtime.GOARCH
 }

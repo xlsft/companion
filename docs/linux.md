@@ -1,6 +1,6 @@
 # Linux
 
-Companion on Linux is two binaries that must sit in the same directory: `companion` (Gio UI, core) and `stt-sidecar` (speech recognition: sherpa-onnx, with whisper.cpp as the fallback engine). The core looks for the sidecar next to its own executable (symlinks are resolved). The sidecar loads `libsherpa-onnx-c-api.so` and `libonnxruntime.so` (prebuilt, CPU, from the sherpa-onnx Go module) from its own directory through an `$ORIGIN` runpath, so they ship beside it in the tarball, the AppImage (`usr/bin`) and the Arch package (`/usr/lib/companion`). Speech models are never bundled; they are downloaded on first run into `~/.config/openclick/models` (or the `-data` directory).
+Companion on Linux is two binaries that must sit in the same directory: `companion` (Gio UI, core) and `stt-sidecar` (speech recognition: sherpa-onnx, with whisper.cpp as the fallback engine). The core looks for the sidecar next to its own executable (symlinks are resolved). The sidecar loads `libsherpa-onnx-c-api.so` and `libonnxruntime.so` (prebuilt, CPU, from the sherpa-onnx Go module) from its own directory through an `$ORIGIN` runpath, so they ship beside it in the tarball, the AppImage (`usr/bin`) and the Arch package (`/usr/lib/companion`). Speech models are never bundled; they are downloaded on first run into `~/.config/companion/models` (or the `-data` directory).
 
 Build and packaging commands are at the end of this page.
 
@@ -33,7 +33,7 @@ is installed, its signature (see [SECURITY.md](../SECURITY.md#verifying-releases
 | `REQUIRE_SIGNATURE=1` | refuse to install unless cosign verifies the signature |
 | `GITHUB_TOKEN=…` | use a token for the GitHub API (rate limits) |
 
-Run the same command again to upgrade. To remove it (settings and models in `~/.config/openclick` stay):
+Run the same command again to upgrade. To remove it (settings and models in `~/.config/companion` stay):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/xlsft/companion/main/install.sh | sh -s -- --uninstall
@@ -133,7 +133,7 @@ If no display session is detected (SSH, tty), every display capability is report
 
 ### Binding the hotkey without a portal
 
-Wherever `GlobalShortcuts` is absent or refused (sway, niri, most bare compositors), the core listens on `$XDG_RUNTIME_DIR/openclick/control.sock` and the compositor runs `companion ctl <command>` per key press. Commands: `talk-toggle`, `talk-press`, `talk-release`, `cancel`, `dictate-toggle`, `dictate-press`, `dictate-release`, `ping`. `ctl` is a quick client; it does not start the UI and exits non-zero if the core is not running. The setup wizard shows the same snippets with your actual binary path filled in.
+Wherever `GlobalShortcuts` is absent or refused (sway, niri, most bare compositors), the core listens on `$XDG_RUNTIME_DIR/companion/control.sock` and the compositor runs `companion ctl <command>` per key press. Commands: `talk-toggle`, `talk-press`, `talk-release`, `cancel`, `dictate-toggle`, `dictate-press`, `dictate-release`, `ping`. `ctl` is a quick client; it does not start the UI and exits non-zero if the core is not running. The setup wizard shows the same snippets with your actual binary path filled in.
 
 niri (`~/.config/niri/config.kdl`; press-only, so toggle):
 

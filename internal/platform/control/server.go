@@ -22,7 +22,7 @@ const connTimeout = 5 * time.Second
 // ErrInUse means another live process already serves the socket.
 var ErrInUse = errors.New("control: socket in use by another instance")
 
-// DefaultPath is $XDG_RUNTIME_DIR/openclick/control.sock. The runtime dir
+// DefaultPath is $XDG_RUNTIME_DIR/companion/control.sock. The runtime dir
 // is per user, mode 0700 and cleared at logout, which is exactly the
 // lifetime and visibility the socket needs.
 func DefaultPath() (string, error) {
@@ -30,7 +30,7 @@ func DefaultPath() (string, error) {
 	if dir == "" {
 		return "", errors.New("control: XDG_RUNTIME_DIR is not set")
 	}
-	return filepath.Join(dir, "openclick", "control.sock"), nil
+	return filepath.Join(dir, "companion", "control.sock"), nil
 }
 
 // Server listens on the control socket and implements

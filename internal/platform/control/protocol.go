@@ -1,5 +1,5 @@
 // Package control is the local control socket of the core: a line protocol
-// on $XDG_RUNTIME_DIR/openclick/control.sock that "companion ctl" talks
+// on $XDG_RUNTIME_DIR/companion/control.sock that "companion ctl" talks
 // to. Its first user is the hotkey fallback for compositors without a
 // usable GlobalShortcuts portal (niri, Sway, Hyprland): the user binds a
 // compositor key to "companion ctl talk-toggle" and the Server turns the
