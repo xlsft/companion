@@ -53,7 +53,6 @@ type mp3Reader struct {
 	src io.ReadCloser
 	dec *mp3.Decoder
 	rs  *resampler
-	buf []byte
 }
 
 func (m *mp3Reader) Read(p []byte) (int, error) {
