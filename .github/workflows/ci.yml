@@ -4,7 +4,17 @@ on:
   push:
     branches: ["**"]
     tags-ignore: ["**"] # tags are built by Release, which calls this
+    paths-ignore: # a docs-only change builds nothing
+      - "**.md"
+      - docs/**
+      - LICENSE*
+      - NOTICE
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - docs/**
+      - LICENSE*
+      - NOTICE
   workflow_dispatch:
   workflow_call:
 
@@ -24,6 +34,8 @@ env:
     libwayland-dev libx11-dev libx11-xcb-dev libxkbcommon-x11-dev
     libgles2-mesa-dev libegl1-mesa-dev libffi-dev libxcursor-dev
     libxfixes-dev libvulkan-dev libpipewire-0.3-dev pkg-config
+  # Mesa's software renderer lets the headless Gio render tests run.
+  RENDER_DEPS: libgl1-mesa-dri libegl-mesa0
 
 jobs:
   lint:
@@ -31,19 +43,22 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: ./.github/actions/go
         with:
-          go-version-file: go.mod
+          key: lint
       - name: System packages
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends $GIO_DEPS
+        uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+        with:
+          packages: ${{ env.GIO_DEPS }}
+          version: gio-1
       - name: gofmt
         run: |
           unformatted=$(gofmt -l cmd internal pkg packaging)
           if [ -n "$unformatted" ]; then echo "Run gofmt on:"; echo "$unformatted"; exit 1; fi
       - name: go mod tidy
         run: go mod tidy && git diff --exit-code go.mod go.sum
-      - name: go vet
-        run: make vet
+      # golangci-lint's standard set includes govet, so a separate go vet
+      # only compiled everything a second time.
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
@@ -51,21 +66,39 @@ jobs:
         run: .github/scripts/govulncheck.sh
       - name: shellcheck
         run: shellcheck install.sh packaging/install.sh packaging/dist-linux.sh .github/scripts/*.sh
+      - uses: ./.github/actions/go-save
 
   test:
     name: Test
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: ./.github/actions/go
         with:
-          go-version-file: go.mod
+          key: test
       - name: System packages
-        # Mesa's software renderer lets the headless Gio render tests run.
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends $GIO_DEPS libgl1-mesa-dri libegl-mesa0
+        uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+        with:
+          packages: ${{ env.GIO_DEPS }} ${{ env.RENDER_DEPS }}
+          version: gio-render-1
       - name: go test
         # Without -race too: timing budgets (FR-VOICE-005) only hold uninstrumented.
         run: make test
+      - uses: ./.github/actions/go-save
+
+  race:
+    name: Test (race)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/go
+        with:
+          key: race
+      - name: System packages
+        uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+        with:
+          packages: ${{ env.GIO_DEPS }} ${{ env.RENDER_DEPS }}
+          version: gio-render-1
       - name: go test -race
         shell: bash
         run: |
@@ -81,21 +114,41 @@ jobs:
             [ -f coverage.out ] && echo "total $(go tool cover -func=coverage.out | tail -1 | awk '{print $NF}')"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      - uses: ./.github/actions/go-save
 
   build:
     name: Build
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: ./.github/actions/go
         with:
-          go-version-file: go.mod
+          key: build
       - name: System packages
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends $GIO_DEPS
+        uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+        with:
+          packages: ${{ env.GIO_DEPS }}
+          version: gio-1
       - name: Native build (cgo, UI included)
         run: make build
-      - name: Cross build (pure-Go packages for windows, darwin, linux)
-        run: make cross
+      - uses: ./.github/actions/go-save
+
+  cross:
+    # Pure Go with cgo off: no system packages, one OS per job.
+    name: Cross build (${{ matrix.os }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows, darwin, linux]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/go
+        with:
+          key: cross-${{ matrix.os }}
+      - name: make cross-${{ matrix.os }}
+        run: make cross-${{ matrix.os }}
+      - uses: ./.github/actions/go-save
 
   whisper:
     name: Speech sidecar (whisper.cpp)
@@ -104,11 +157,14 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: true
-      - uses: actions/setup-go@v7
+      - uses: ./.github/actions/go
         with:
-          go-version-file: go.mod
+          key: whisper
       - name: System packages
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends cmake ninja-build ccache
+        uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+        with:
+          packages: cmake ninja-build ccache
+          version: whisper-1
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: whisper-${{ runner.os }}-${{ runner.arch }}
@@ -117,6 +173,7 @@ jobs:
         run: make whisper WHISPER_NATIVE=OFF WHISPER_CMAKE_EXTRA="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
       - name: make build-whisper
         run: make build-whisper && grep -q whisper_init_from_file bin/stt-sidecar
+      - uses: ./.github/actions/go-save
 
   goreleaser:
     name: GoReleaser config

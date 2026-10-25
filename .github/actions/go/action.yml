@@ -1,0 +1,36 @@
+name: Go with a per-job cache
+description: >-
+  Sets up Go and restores the build and module caches saved by the same job
+  on main. setup-go's own cache shares one key across jobs, so only the
+  first job's builds were kept and the race, cross and vet builds started
+  cold every time.
+inputs:
+  key:
+    description: Cache name of the job, e.g. test or cross-windows.
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v7
+      with:
+        go-version-file: go.mod
+        cache: false
+    - name: Cache paths
+      shell: bash
+      run: |
+        prefix="go-${RUNNER_OS}-${RUNNER_ARCH}-${{ inputs.key }}"
+        {
+          echo "GO_CACHE_PREFIX=$prefix"
+          echo "GO_CACHE_KEY=$prefix-${{ hashFiles('go.sum') }}"
+          echo "GO_CACHE_PATHS<<EOF"
+          go env GOCACHE
+          go env GOMODCACHE
+          echo "EOF"
+        } >> "$GITHUB_ENV"
+    - uses: actions/cache/restore@v6
+      with:
+        path: ${{ env.GO_CACHE_PATHS }}
+        key: ${{ env.GO_CACHE_KEY }}-${{ github.sha }}
+        restore-keys: |
+          ${{ env.GO_CACHE_KEY }}-
+          ${{ env.GO_CACHE_PREFIX }}-

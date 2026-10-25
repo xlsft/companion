@@ -7,7 +7,7 @@ LDFLAGS := -X github.com/xlsft/companion/internal/buildinfo.Version=$(VERSION) \
 # covers every target, so build without it (ADR-0001 amendment 1).
 export GOFLAGS := $(strip $(GOFLAGS) -tags=novulkan)
 
-.PHONY: build test vet cross whisper build-whisper test-whisper whisper-clean build-sherpa test-sherpa build-stt dist-linux
+.PHONY: build test vet cross cross-windows cross-darwin cross-linux whisper build-whisper test-whisper whisper-clean build-sherpa test-sherpa build-stt dist-linux
 
 # Native build with cgo: covers the Gio UI and cmd/companion, which the
 # CGO_ENABLED=0 cross build below skips.
@@ -31,10 +31,17 @@ CGO_PKGS_RE := /cmd/companion$$|/internal/ui(/|$$)
 pure_pkgs    = $(shell GOOS=$(1) CGO_ENABLED=0 go list ./... | grep -Ev '$(CGO_PKGS_RE)')
 
 # Pure-Go packages must cross-compile for every target OS (ADR-0001 rule 6).
-cross:
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(call pure_pkgs,windows)
-	GOOS=darwin  GOARCH=arm64 CGO_ENABLED=0 go build $(call pure_pkgs,darwin)
-	GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build $(call pure_pkgs,linux)
+# One target per OS, so CI builds them in parallel jobs.
+CROSS_ARCH_windows := amd64
+CROSS_ARCH_darwin  := arm64
+CROSS_ARCH_linux   := amd64
+
+cross: cross-windows cross-darwin cross-linux
+
+# An explicit list, not a pattern rule: make skips pattern rules for
+# .PHONY targets and would build nothing.
+cross-windows cross-darwin cross-linux:
+	GOOS=$(@:cross-%=%) GOARCH=$(CROSS_ARCH_$(@:cross-%=%)) CGO_ENABLED=0 go build $(call pure_pkgs,$(@:cross-%=%))
 
 # --- whisper.cpp (OC-29) -----------------------------------------------------
 # Static whisper.cpp/ggml libraries for the `whisper` build tag, see

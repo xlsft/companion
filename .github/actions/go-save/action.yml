@@ -1,0 +1,13 @@
+name: Save the Go cache
+description: >-
+  Saves the caches restored by ./.github/actions/go. Only pushes to main
+  save: branches and pull requests read main's caches, and saving every run
+  would push them out of the repository's cache quota.
+runs:
+  using: composite
+  steps:
+    - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ env.GO_CACHE_PATHS }}
+        key: ${{ env.GO_CACHE_KEY }}-${{ github.sha }}
