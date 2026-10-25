@@ -8,7 +8,7 @@ type Preset struct {
 	ID   string
 	Name string // shown as is: service names are not translated
 	// Provider is the API the service speaks: "openai" (POST /audio/speech)
-	// or "elevenlabs".
+	// "elevenlabs" or "edge".
 	Provider string
 	// BaseURL and Model are "" for the provider's own defaults.
 	BaseURL, Model string
@@ -17,6 +17,8 @@ type Preset struct {
 	Voices []Voice
 	// Local presets run on this computer and need no API key.
 	Local bool
+	// Keyless hosted services need no API key either (Edge).
+	Keyless bool
 }
 
 // Kokoro-82M's voices (v1.0), as Kokoro-FastAPI and Speaches serve them;
@@ -37,6 +39,7 @@ func voiceList(ids ...string) []Voice {
 var Presets = []Preset{
 	{ID: "openai", Name: "OpenAI", Provider: "openai"},
 	{ID: "elevenlabs", Name: "ElevenLabs", Provider: "elevenlabs"},
+	{ID: EdgeProviderID, Name: "Microsoft Edge", Provider: EdgeProviderID, Keyless: true},
 	{ID: "kokoro", Name: "Kokoro", Provider: "openai", BaseURL: "http://localhost:8880/v1", Model: "kokoro", Voices: kokoroVoices, Local: true},
 	{ID: "speaches", Name: "Speaches", Provider: "openai", BaseURL: "http://localhost:8000/v1", Model: "speaches-ai/Kokoro-82M-v1.0-ONNX", Voices: kokoroVoices, Local: true},
 }

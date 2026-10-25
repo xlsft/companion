@@ -12,7 +12,7 @@ func TestTTSPresetsAreUsable(t *testing.T) {
 			t.Errorf("%+v: empty or duplicate id/name", p)
 		}
 		seen[p.ID] = true
-		if p.Provider != "openai" && p.Provider != "elevenlabs" {
+		if p.Provider != "openai" && p.Provider != "elevenlabs" && p.Provider != EdgeProviderID {
 			t.Errorf("%s: provider %q", p.ID, p.Provider)
 		}
 		if p.BaseURL == "" {
@@ -41,6 +41,7 @@ func TestTTSPresetFor(t *testing.T) {
 	}{
 		{"openai default", "openai", "", "openai"},
 		{"elevenlabs default", "elevenlabs", "", "elevenlabs"},
+		{"edge", EdgeProviderID, "", EdgeProviderID},
 		{"kokoro", "openai", "http://localhost:8880/v1/", "kokoro"},
 		{"provider must match", "elevenlabs", "http://localhost:8880/v1", ""},
 		{"custom", "openai", "http://tts.example.com/v1", ""},
