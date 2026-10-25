@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"sync/atomic"
 )
 
 const (
@@ -29,6 +31,9 @@ type OpenAI struct {
 	base
 	model  string
 	voices []Voice
+	// mp3 is set once the server refused raw PCM: later requests ask for
+	// MP3 straight away and decode it.
+	mp3 atomic.Bool
 }
 
 var openAIVoices = []string{"alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"}
@@ -49,7 +54,19 @@ func NewOpenAI(cfg OpenAIConfig) *OpenAI {
 	return &OpenAI{base: newBase("openai", cfg.Config, cfg.HTTPClient), model: cfg.Model, voices: voices}
 }
 
-func (o *OpenAI) ListVoices(context.Context) ([]Voice, error) {
+// ListVoices is the static list (or the preset's), except on OpenRouter,
+// where each speech model has voices of its own.
+func (o *OpenAI) ListVoices(ctx context.Context) ([]Voice, error) {
+	if o.openRouter() && o.model != "" {
+		raw, err := o.models(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if vs, ok := routerVoices(raw, o.model); ok {
+			return vs, nil
+		}
+		return nil, &Error{Kind: ErrBadRequest, Provider: o.name, Cause: errors.New("model lists no voices")}
+	}
 	return append([]Voice(nil), o.voices...), nil
 }
 
@@ -74,11 +91,30 @@ func (o *OpenAI) SynthesizeStream(ctx context.Context, req SynthesisRequest) (St
 			return nil, badRequest("openai pcm is 24000 Hz mono only")
 		}
 		rf = "pcm"
+		if o.mp3.Load() {
+			rf = "mp3"
+		}
 	case ContainerWAV:
 		rf = "wav"
 	case ContainerMP3:
 		rf = "mp3"
 	}
+	st, err := o.speak(ctx, req, rf)
+	var te *Error
+	if rf == "pcm" && errors.As(err, &te) && te.Kind == ErrBadRequest {
+		// Some compatible servers only return MP3 and refuse "pcm" with a
+		// 400; ask once more for MP3 and decode it here. A 400 that has
+		// another cause comes back the same way.
+		if st, err = o.speak(ctx, req, "mp3"); err == nil {
+			o.mp3.Store(true)
+		}
+	}
+	return st, err
+}
+
+// speak runs one request for response format rf; a PCM16 request gets
+// PCM24kMono whatever the server sends back.
+func (o *OpenAI) speak(ctx context.Context, req SynthesisRequest, rf string) (Stream, error) {
 	body, err := json.Marshal(openAISpeechBody{
 		Model: o.model, Input: req.Text, Voice: req.VoiceID, Speed: req.Speed, ResponseFormat: rf,
 	})
@@ -103,5 +139,13 @@ func (o *OpenAI) SynthesizeStream(ctx context.Context, req SynthesisRequest) (St
 		cancel()
 		return nil, err
 	}
-	return newReaderStream(sctx, cancel, ctx, resp.Body, req.Format, o.name, untrack), nil
+	out := resp.Body
+	if req.Format.Container == ContainerPCM16 {
+		asked := bodyPCM
+		if rf == "mp3" {
+			asked = bodyMP3
+		}
+		out = toPCM24k(resp.Body, kindOf(resp.Header.Get("Content-Type"), asked))
+	}
+	return newReaderStream(sctx, cancel, ctx, out, req.Format, o.name, untrack), nil
 }
