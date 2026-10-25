@@ -301,7 +301,6 @@ func (f *FakePlayer) Play(ctx context.Context, src ChunkSource, fm Format) (Play
 	p := &fakePlayback{started: make(chan struct{}), done: make(chan struct{}), stop: make(chan struct{})}
 	f.active.Add(1)
 	go func() {
-		defer f.active.Add(-1)
 		go func() {
 			select {
 			case <-p.stop:
@@ -323,6 +322,8 @@ func (f *FakePlayer) Play(ctx context.Context, src ChunkSource, fm Format) (Play
 		f.mu.Lock()
 		f.plays = append(f.plays, FakePlay{Format: fm, Bytes: n, Err: err})
 		f.mu.Unlock()
+		// Before done: whoever Waits must see the playback over.
+		f.active.Add(-1)
 		p.err = err
 		close(p.done)
 	}()
