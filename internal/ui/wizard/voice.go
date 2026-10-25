@@ -220,9 +220,7 @@ func (w *Wizard) voiceCard(th *theme.Theme, l i18n.Lang, s snapshot) layout.Widg
 		key = "wiz.voice.waitModel"
 	}
 	head := kit.Spread(
-		kit.VStack(th, 2,
-			w.text(kit.Medium(kit.Text(th, 14, i18n.T(l, "wiz.voice.title"), th.Pal.Fg))),
-			w.text(kit.Muted(th, i18n.T(l, "wiz.voice.sub")))),
+		w.text(kit.Medium(kit.Text(th, 14, i18n.T(l, "wiz.voice.title"), th.Pal.Fg))),
 		func(gtx layout.Context) layout.Dimensions {
 			return w.btn(gtx, th, act, kit.ButtonStyle{Kind: kit.Secondary, Small: true, Icon: icon.Refresh2, Label: i18n.T(l, key)}, btnEnabled)
 		})
@@ -237,7 +235,7 @@ func (w *Wizard) voiceCard(th *theme.Theme, l i18n.Lang, s snapshot) layout.Widg
 		lines = append(lines, statusText(w, th, theme.StatusUnknown, i18n.Tf(l, "wiz.voice.readNow", phrase)))
 	case s.running:
 		lines = append(lines, statusText(w, th, theme.StatusUnknown, i18n.Tf(l, "wiz.voice.running", phrase)))
-	case ttsOK && !spoke:
+	case ttsOK && ttsR.Status == readiness.Failed:
 		lines = append(lines, statusText(w, th, theme.StatusError, fixText(l, ttsR.Code)))
 	case spoke:
 		lines = append(lines, statusText(w, th, theme.StatusOK, i18n.Tf(l, "wiz.voice.said", phrase)))

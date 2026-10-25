@@ -241,6 +241,35 @@ func TestVoiceCheck(t *testing.T) {
 	}
 }
 
+// A failed voice check says what is wrong; a result without the check's
+// details (saved by an older version) is no failure at all.
+func TestVoiceCheckFailureText(t *testing.T) {
+	tests := []struct {
+		name    string
+		res     readiness.Result
+		want    string
+		notWant string
+	}{
+		{"playback", readiness.Result{Status: readiness.Failed, Code: "playback_failed",
+			Detail: map[string]string{readiness.DetailSpoke: "playback_failed", readiness.DetailHeard: readiness.DetailSkipped}},
+			"wiz.fix.playback_failed", "wiz.fix.generic"},
+		{"key rejected", readiness.Result{Status: readiness.Failed, Code: "auth"}, "wiz.fix.auth", "wiz.fix.generic"},
+		{"old result", readiness.Result{Status: readiness.Passed}, "wiz.voice.title", "wiz.fix.generic"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.checks.set(readiness.StepTTS, tt.res)
+			h.goScreen(screenVoice)
+			h.eventually("voice check ran", func() bool { return h.checks.count(readiness.StepTTS) == 1 && h.idle() })
+			h.frame()
+			if !h.shows(h.tr(tt.want)) || h.shows(h.tr(tt.notWant)) {
+				t.Errorf("want %s shown and %s hidden", tt.want, tt.notWant)
+			}
+		})
+	}
+}
+
 // The voice screen starts on Edge (no key) and shows no key field for it.
 func TestVoiceStartsOnEdge(t *testing.T) {
 	h := newHarness(t)

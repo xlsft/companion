@@ -103,12 +103,6 @@ func (b *byokState) body(w *Wizard, th *theme.Theme, l i18n.Lang, s snapshot) st
 	if len(card) > 0 {
 		card = append(card, b.status(w, th, l, s, info, saving, saveErr, loaded))
 		rows = append(rows, panel(th, kit.VStack(th, 14, card...)))
-		note := "wiz.agent.note"
-		if name != "" && !custom {
-			rows = append(rows, w.text(kit.Muted(th, i18n.Tf(l, "wiz.agent.noteFor", name))))
-		} else {
-			rows = append(rows, w.text(kit.Muted(th, i18n.T(l, note))))
-		}
 	}
 	return stepBody{rows: rows}
 }

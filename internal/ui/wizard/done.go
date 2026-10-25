@@ -114,7 +114,7 @@ func (w *Wizard) doneBody(th *theme.Theme, l i18n.Lang, s snapshot) stepBody {
 	if issues := w.doneIssues(th, l, s); issues != nil {
 		rows = append(rows, issues)
 	}
-	rows = append(rows, w.doneKeys(th, l), w.text(kit.Muted(th, i18n.T(l, "wiz.done.background"))))
+	rows = append(rows, w.doneKeys(th, l))
 	return stepBody{rows: rows}
 }
 
