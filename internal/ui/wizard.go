@@ -31,12 +31,14 @@ type wizardUI struct {
 	update  *updateChip
 }
 
+// newWizardUI runs with sh.mu held.
 func newWizardUI(sh *Shell) *wizardUI {
 	w := &wizardUI{sh: sh, update: newUpdateChip(sh.opts.Updates)}
 	w.wiz = wizard.New(wizard.Config{
-		Gate:     sh.opts.Gate,
-		Backends: sh.opts.Setup,
-		Diagnose: sh.opts.Diagnose,
+		Gate:         sh.opts.Gate,
+		Backends:     sh.opts.Setup,
+		Diagnose:     sh.opts.Diagnose,
+		StartOnVoice: sh.revoice,
 		SpeechLanguage: func() string {
 			s := sh.opts.Settings.Get()
 			return hw.SpeechLanguage(s.Voice.Language, s.UI.Language)

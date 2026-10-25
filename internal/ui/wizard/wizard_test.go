@@ -357,3 +357,36 @@ func TestLeavingScreenCancelsWork(t *testing.T) {
 	h.w.enterScreen(screenVoice)
 	h.eventually("cancelled", h.idle)
 }
+
+// Changing the voice from Settings opens the voice screen whatever is
+// done, and a Ready Gate does not send the user straight back.
+func TestStartOnVoice(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		passed []readiness.Step
+	}{
+		{"fresh", nil},
+		{"ready", readiness.Steps},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			for _, st := range tt.passed {
+				h.pass(st)
+			}
+			cfg := h.w.cfg
+			cfg.StartOnVoice = true
+			h.w.Close()
+			h.w = New(cfg)
+			t.Cleanup(h.w.Close)
+			h.frame()
+			if h.w.scr != screenVoice {
+				t.Fatalf("starts on %d, want the voice screen", h.w.scr)
+			}
+			time.Sleep(20 * time.Millisecond)
+			h.frame()
+			if h.w.scr != screenVoice || h.ready.Load() != 0 {
+				t.Errorf("left the voice screen by itself: screen %d, opened %d", h.w.scr, h.ready.Load())
+			}
+		})
+	}
+}
