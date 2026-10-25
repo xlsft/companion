@@ -15,6 +15,15 @@ const ttsEdge = tts.EdgeProviderID
 // edgeLabel names Edge in the header; the service name is not translated.
 const edgeLabel = "Microsoft Edge"
 
+// ttsProviderOrEdge is the provider that speaks for a saved provider id:
+// Edge when none is saved.
+func ttsProviderOrEdge(id string) string {
+	if id == "" {
+		return ttsEdge
+	}
+	return id
+}
+
 // speechProvider is what the speaker speaks with: Edge when it is the
 // choice or nothing usable is configured, otherwise the configured
 // provider with Edge as its fallback.

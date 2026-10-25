@@ -110,9 +110,13 @@ func (t setupTTS) Config(ctx context.Context) (wizard.TTSConfig, error) {
 	return ttsConfig(ctx, t.c.secrets, t.c.settings.Get()), nil
 }
 
+// ttsConfig reports Edge when no provider is saved: that is what speaks
+// then (speechProvider), so the voice screen opens with it selected and
+// its check runs without any input (OC-133). Nothing is written until the
+// first Save, so a user who never opens the screen keeps no setting.
 func ttsConfig(ctx context.Context, sec contracts.SecretStore, s settings.Settings) wizard.TTSConfig {
-	cfg := wizard.TTSConfig{Provider: s.TTS.ProviderID, BaseURL: s.TTS.BaseURL, Model: s.TTS.Model, Voice: s.TTS.Voice, Speed: s.Voice.TTSSpeed}
-	if cfg.Provider != "" {
+	cfg := wizard.TTSConfig{Provider: ttsProviderOrEdge(s.TTS.ProviderID), BaseURL: s.TTS.BaseURL, Model: s.TTS.Model, Voice: s.TTS.Voice, Speed: s.Voice.TTSSpeed}
+	if cfg.Provider != ttsEdge {
 		key, err := sec.Get(ctx, ttsSecret(cfg.Provider))
 		cfg.HasKey = err == nil && len(key) > 0
 	}
