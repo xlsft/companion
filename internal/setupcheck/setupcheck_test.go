@@ -182,8 +182,13 @@ func TestSTT(t *testing.T) {
 			if c.LastTranscript() != tt.heard {
 				t.Errorf("transcript %q, want %q", c.LastTranscript(), tt.heard)
 			}
-			if got.Detail != nil {
-				t.Errorf("detail %v: the transcript must not reach the result", got.Detail)
+			// The transcript never reaches the result.
+			wantDetail := map[string]string(nil)
+			if want == readiness.Passed {
+				wantDetail = map[string]string{readiness.DetailSource: readiness.SourceUser}
+			}
+			if !maps.Equal(got.Detail, wantDetail) {
+				t.Errorf("detail %v, want %v", got.Detail, wantDetail)
 			}
 		})
 	}

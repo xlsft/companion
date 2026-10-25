@@ -27,6 +27,13 @@ type fakeMic struct {
 
 	mu     sync.Mutex
 	device string
+	opens  int
+}
+
+func (m *fakeMic) openCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.opens
 }
 
 func (m *fakeMic) Devices(context.Context) ([]audio.Device, error) { return nil, nil }
@@ -34,6 +41,7 @@ func (m *fakeMic) Devices(context.Context) ([]audio.Device, error) { return nil,
 func (m *fakeMic) Open(ctx context.Context, id string) (audio.Stream, error) {
 	m.mu.Lock()
 	m.device = id
+	m.opens++
 	m.mu.Unlock()
 	if m.openErr != nil {
 		return nil, m.openErr
