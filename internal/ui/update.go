@@ -25,18 +25,19 @@ type UpdateBackend interface {
 	Watch(fn func()) (cancel func())
 }
 
-// updateChip is the update notice at the bottom of a window's sidebar:
-// one line, one action, never in the way of the content. Each window owns
-// one, so their buttons are independent widgets.
+// updateChip is the update notice in a window's sidebar or footer: one
+// line, one action and the release notes behind a small info button,
+// never in the way of the content. Each window owns one, so their buttons
+// are independent widgets.
 type updateChip struct {
 	be           UpdateBackend
-	body, action widget.Clickable
+	action, info widget.Clickable
 }
 
 func newUpdateChip(be UpdateBackend) *updateChip { return &updateChip{be: be} }
 
-// Layout draws the chip with its sidebar margins, or nothing when there is
-// no update.
+// Layout draws the chip, or nothing when there is no update; the caller
+// places it.
 func (c *updateChip) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.Dimensions {
 	if c == nil || c.be == nil {
 		return layout.Dimensions{}
@@ -60,16 +61,15 @@ func (c *updateChip) Layout(gtx layout.Context, th *theme.Theme, l Lang) layout.
 			return layout.Dimensions{}
 		}
 	}
-	if c.body.Clicked(gtx) {
+	if c.info.Clicked(gtx) {
 		c.be.OpenNotes()
 	}
 	var action *widget.Clickable
 	if act != chipNone {
 		action = &c.action
 	}
-	return layout.Inset{Left: th.Dp(8), Right: th.Dp(8), Bottom: th.Dp(12)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return p.Layout(gtx, th, &c.body, action)
-	})
+	p.InfoLabel = T(l, "update.chip.notes")
+	return p.Layout(gtx, th, action, &c.info)
 }
 
 type chipAction int

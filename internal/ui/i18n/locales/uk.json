@@ -436,6 +436,7 @@
   "update.chip.restart": "Перезапустити",
   "update.chip.reopen": "Відкрийте Companion знову",
   "update.chip.failed": "Не вдалося оновити",
+  "update.chip.notes": "Що нового",
   "wiz.screen.agent": "Налаштування агента",
   "wiz.screen.agent.intro": "Виберіть сервіс і вставте ключ.",
   "wiz.screen.voice": "Голос і мікрофон",

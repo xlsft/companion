@@ -436,6 +436,7 @@
   "update.chip.restart": "Yeniden başlat",
   "update.chip.reopen": "Companion'ı yeniden açın",
   "update.chip.failed": "Güncelleme başarısız",
+  "update.chip.notes": "Yenilikler",
   "wiz.screen.agent": "Ajan kurulumu",
   "wiz.screen.agent.intro": "Bir hizmet seçin ve anahtarını yapıştırın.",
   "wiz.screen.voice": "Ses ve mikrofon",

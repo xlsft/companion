@@ -436,6 +436,7 @@
   "update.chip.restart": "Reiniciar",
   "update.chip.reopen": "Abra o Companion de novo",
   "update.chip.failed": "Falha ao atualizar",
+  "update.chip.notes": "Novidades",
   "wiz.screen.agent": "Configurar o agente",
   "wiz.screen.agent.intro": "Escolha um serviço e cole a chave dele.",
   "wiz.screen.voice": "Voz e microfone",

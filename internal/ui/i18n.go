@@ -196,6 +196,7 @@ var catalog = map[string][2]string{
 	"update.chip.restart":            {"Restart", "Перезапустить"},
 	"update.chip.reopen":             {"Reopen Companion to finish", "Откройте Companion заново"},
 	"update.chip.failed":             {"Update failed", "Не удалось обновить"},
+	"update.chip.notes":              {"What's new", "Что нового"},
 	"update.retry":                   {"Try again", "Повторить"},
 	"update.restarting":              {"Restarting Companion…", "Перезапускаем Companion…"},
 	"update.managed.package_managed": {"Companion was installed by your system's package manager; update it there.", "Companion установлен менеджером пакетов системы — обновите его там."},

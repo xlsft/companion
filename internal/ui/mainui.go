@@ -204,7 +204,12 @@ func (m *mainUI) sidebar(gtx layout.Context, th *theme.Theme, l Lang, cur Route)
 		layout.Flexed(1, layout.Spacer{}.Layout),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return kit.Divider(gtx, th) }),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return sidebarStatus(gtx, th, l, m.chat) }),
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions { return m.update.Layout(gtx, th, l) }),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			// The chip has no margins of its own; these are the sidebar's.
+			return layout.Inset{Left: th.Dp(8), Right: th.Dp(8), Bottom: th.Dp(12)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return m.update.Layout(gtx, th, l)
+			})
+		}),
 	)
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
 }

@@ -436,6 +436,7 @@
   "update.chip.restart": "再起動",
   "update.chip.reopen": "Companion を開き直してください",
   "update.chip.failed": "更新に失敗しました",
+  "update.chip.notes": "新機能",
   "wiz.screen.agent": "エージェントの設定",
   "wiz.screen.agent.intro": "サービスを選んでキーを貼り付けてください。",
   "wiz.screen.voice": "音声とマイク",

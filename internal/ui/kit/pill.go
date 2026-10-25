@@ -37,6 +37,9 @@ type Pill struct {
 	Text     string
 	Meta     string // e.g. "19/38 MB"; shown when there is no action
 	Action   string // button label; "" for none
+	// InfoLabel names the info button for screen readers (e.g. "What's
+	// new"); the button shows only when Layout gets a clickable for it.
+	InfoLabel string
 }
 
 func (p Pill) colors(th *theme.Theme) (bg, border, mark color.NRGBA) {
@@ -51,20 +54,24 @@ func (p Pill) colors(th *theme.Theme) (bg, border, mark color.NRGBA) {
 	return th.Pal.Raised, th.Pal.Border, th.Pal.AccentLine
 }
 
-// Layout draws the pill across the available width. body is the whole
-// pill as a button (e.g. release notes), action the button at its end;
-// either may be nil.
-func (p Pill) Layout(gtx layout.Context, th *theme.Theme, body, action *widget.Clickable) layout.Dimensions {
+// Layout draws the pill across the available width. action is the button
+// at its end, info a round ghost button after it (e.g. release notes);
+// either may be nil. The pill itself is not a button: a click on action
+// must not also count as one on the pill.
+func (p Pill) Layout(gtx layout.Context, th *theme.Theme, action, info *widget.Clickable) layout.Dimensions {
 	bg, border, mark := p.colors(th)
 	h := gtx.Dp(th.Dp(34))
 	content := func(gtx layout.Context) layout.Dimensions {
 		gtx.Constraints = layout.Exact(image.Pt(gtx.Constraints.Max.X, h))
-		if body != nil && body.Hovered() && p.Lead != LeadRing {
-			bg = mix(bg, th.Pal.Fg, 0.04)
-		}
 		return Box(gtx, th, bg, border, 17, func(gtx layout.Context) layout.Dimensions {
 			return layout.Inset{Left: th.Dp(12), Right: th.Dp(6)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				var tail []layout.FlexChild
+				if info != nil {
+					tail = append(tail, HSpace(th.Dp(2)), layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						return VCenter(gtx, h, func(gtx layout.Context) layout.Dimensions { return p.info(gtx, th, info) })
+					}))
+				}
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx, append([]layout.FlexChild{
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						return VCenter(gtx, h, func(gtx layout.Context) layout.Dimensions { return p.lead(gtx, th, mark) })
 					}),
@@ -88,17 +95,33 @@ func (p Pill) Layout(gtx layout.Context, th *theme.Theme, body, action *widget.C
 						t.MaxLines = 1
 						return layout.Inset{Right: th.Dp(6)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions { return VCenter(gtx, h, t.Layout) })
 					}),
-				)
+				}, tail...)...)
 			})
 		})
 	}
-	if body == nil {
-		return content(gtx)
+	return content(gtx)
+}
+
+// info is the 22px round ghost button with the info icon; the hover
+// circle is drawn from the square's own pixels, so it stays round at any
+// scale.
+func (p Pill) info(gtx layout.Context, th *theme.Theme, c *widget.Clickable) layout.Dimensions {
+	var bg color.NRGBA
+	col := th.Pal.Fg2
+	if c.Hovered() {
+		bg, col = mix(th.Pal.Raised, th.Pal.Fg, 0.1), th.Pal.Fg
 	}
-	return FocusRing(gtx, th, gtx.Focused(body), func(gtx layout.Context) layout.Dimensions {
-		return body.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			semantic.DescriptionOp(p.Text).Add(gtx.Ops)
-			return content(gtx)
+	s := gtx.Dp(th.Dp(22))
+	return FocusRing(gtx, th, gtx.Focused(c), func(gtx layout.Context) layout.Dimensions {
+		return c.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			semantic.DescriptionOp(p.InfoLabel).Add(gtx.Ops)
+			gtx.Constraints = layout.Exact(image.Pt(s, s))
+			if bg.A != 0 {
+				paint.FillShape(gtx.Ops, bg, clip.Ellipse{Max: image.Pt(s, s)}.Op(gtx.Ops))
+			}
+			return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return Icon(gtx, th, icon.Information, 14, col)
+			})
 		})
 	})
 }

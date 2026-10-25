@@ -118,14 +118,19 @@ func TestUpdateChipInBothWindows(t *testing.T) {
 		r := new(input.Router)
 		frame(r, h.sh, th, w.content)
 		before := fake.installs
+		notes := fake.notes
 		w.c.action.Click()
-		w.c.body.Click()
 		frame(r, h.sh, th, w.content)
 		if fake.installs != before+1 {
 			t.Errorf("%s: Update did not install", w.name)
 		}
-		if fake.notes == 0 {
-			t.Errorf("%s: release notes not opened", w.name)
+		if fake.notes != notes {
+			t.Errorf("%s: Update opened the release notes", w.name)
+		}
+		w.c.info.Click()
+		frame(r, h.sh, th, w.content)
+		if fake.notes != notes+1 {
+			t.Errorf("%s: info did not open the release notes", w.name)
 		}
 	}
 	r := new(input.Router)

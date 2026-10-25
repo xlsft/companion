@@ -436,6 +436,7 @@
   "update.chip.restart": "重新启动",
   "update.chip.reopen": "重新打开 Companion",
   "update.chip.failed": "更新失败",
+  "update.chip.notes": "新功能",
   "wiz.screen.agent": "设置智能体",
   "wiz.screen.agent.intro": "选择服务并粘贴其密钥。",
   "wiz.screen.voice": "语音和麦克风",

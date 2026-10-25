@@ -296,7 +296,7 @@ func (w *Wizard) modelChip(gtx layout.Context, th *theme.Theme, l i18n.Lang) lay
 		w.frame.actions = append(w.frame.actions, ActRetryModel)
 	}
 	gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(th.Dp(280)))
-	return p.Layout(gtx, th, nil, w.clickable(ActRetryModel))
+	return p.Layout(gtx, th, w.clickable(ActRetryModel), nil)
 }
 
 func percent(done, total int64) string {
