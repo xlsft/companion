@@ -34,7 +34,7 @@ func TestDefaults(t *testing.T) {
 	}
 	if d.Version != CurrentVersion || d.Screen.KeepScreenshots || d.Screen.Target != ScreenActive ||
 		d.Voice.Language != "auto" || d.Voice.TTSSpeed != 1.0 || d.UI.Language != "en" ||
-		!d.Updates.AutoCheck || d.Updates.Prereleases {
+		!d.Updates.AutoCheck || d.Updates.Prereleases || d.Voice.DoubleTapKey != "" {
 		t.Errorf("defaults: %+v", d)
 	}
 	s, _ := newSvc(t)
@@ -59,6 +59,8 @@ func TestValidateRejects(t *testing.T) {
 		{"cancel equals talk", func(s *Settings) { s.Voice.CancelHotkey = s.Voice.TalkHotkey }},
 		{"dictate equals talk", func(s *Settings) { s.Voice.DictateHotkey = s.Voice.TalkHotkey }},
 		{"dictate without modifier", func(s *Settings) { s.Voice.DictateHotkey = "f8" }},
+		{"double tap key", func(s *Settings) { s.Voice.DoubleTapKey = "space" }},
+		{"double tap key case", func(s *Settings) { s.Voice.DoubleTapKey = "Ctrl" }},
 		{"ui language", func(s *Settings) { s.UI.Language = "xx" }},
 		{"ui language region", func(s *Settings) { s.UI.Language = "en-US" }},
 	}
@@ -268,5 +270,19 @@ func TestSecretTagStripping(t *testing.T) {
 	restoreSecrets(&v, &outer{In: inner{Token: "old", Keep: "x"}})
 	if v.In.Token != "old" || v.In.Keep != "k" {
 		t.Errorf("%+v", v)
+	}
+}
+
+func TestDoubleTapKeyAccepted(t *testing.T) {
+	for _, key := range []string{"", "ctrl", "shift", "alt", "super"} {
+		t.Run(key, func(t *testing.T) {
+			s, _ := newSvc(t)
+			if err := s.Update(context.Background(), func(s *Settings) { s.Voice.DoubleTapKey = key }); err != nil {
+				t.Fatal(err)
+			}
+			if got := s.Get().Voice.DoubleTapKey; got != key {
+				t.Errorf("stored %q, want %q", got, key)
+			}
+		})
 	}
 }
