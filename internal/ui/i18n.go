@@ -140,6 +140,11 @@ var catalog = map[string][2]string{
 	"voice.language":              {"Speech language", "Язык речи"},
 	"voice.language.d":            {"The language the recogniser expects", "Язык, который ожидает распознавание"},
 	"voice.languageAuto":          {"Auto-detect", "Автоопределение"},
+	"tts.provider":                {"Voice", "Голос"},
+	"tts.provider.d":              {"Who reads the answers aloud.", "Кто озвучивает ответы."},
+	"tts.change":                  {"Change", "Изменить"},
+	"tts.none":                    {"Not chosen yet", "Ещё не выбран"},
+	"tts.custom":                  {"Your own server", "Ваш сервер"},
 	"tts.speed":                   {"Speech speed", "Скорость речи"},
 	"tts.speedValue":              {"%.2f×", "%.2f×"},
 

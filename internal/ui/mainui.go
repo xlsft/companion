@@ -116,6 +116,7 @@ func (m *mainUI) page(r Route) page {
 		sp.updates = m.sh.opts.Updates
 		sp.diag = newDiagView(m.sh.diag, m.sh.opts.Version)
 		sp.jump = m.takeSection
+		sp.changeVoice = m.sh.opts.ChangeVoice
 		if be := m.sh.opts.Memory; be != nil {
 			sp.mem = newMemView(be, m.sh.invalidateAll)
 		}

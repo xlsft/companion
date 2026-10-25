@@ -100,6 +100,9 @@ type Options struct {
 	Memory MemoryBackend
 	// Dictation is raw system dictation; nil shows no dictation banner.
 	Dictation DictationBackend
+	// ChangeVoice leads to the voice choice from Settings; nil hides the
+	// button next to the current voice.
+	ChangeVoice func()
 	// Diagnose produces the capability report for Diagnostics.
 	Diagnose func(ctx context.Context) (contracts.CapabilityReport, error)
 	// Quit asks the process to shut down; the app lifecycle then calls Stop.
