@@ -156,9 +156,8 @@ func (b *byokState) presetIndex() int {
 }
 
 // pickPreset fills the form from preset i; len(Presets) is "Other
-// endpoint", which empties a preset's address for the user's own. A model
-// the user typed is kept, only an empty one or another preset's default is
-// replaced.
+// endpoint", which empties a preset's address for the user's own. The
+// model is always the user's choice: presets carry none.
 func (b *byokState) pickPreset(gtx layout.Context, i int) {
 	b.dirty = true
 	if i >= len(providers.Presets) {
@@ -175,10 +174,6 @@ func (b *byokState) pickPreset(gtx layout.Context, i int) {
 	b.kind.Value = string(p.Kind)
 	b.baseURL.SetText(p.BaseURL)
 	changed(gtx, &b.baseURL)
-	if m := strings.TrimSpace(b.model.Text()); m == "" || slices.ContainsFunc(providers.Presets, func(x providers.Preset) bool { return x.Model == m }) {
-		b.model.SetText(p.Model)
-		changed(gtx, &b.model)
-	}
 	if !p.Local {
 		gtx.Execute(key.FocusCmd{Tag: &b.key})
 	}

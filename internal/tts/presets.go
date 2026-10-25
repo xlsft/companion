@@ -10,8 +10,8 @@ type Preset struct {
 	// Provider is the API the service speaks: "openai" (POST /audio/speech)
 	// "elevenlabs" or "edge".
 	Provider string
-	// BaseURL and Model are "" for the provider's own defaults.
-	BaseURL, Model string
+	// BaseURL is "" for the provider's own endpoint.
+	BaseURL string
 	// Voices replaces the provider's static list for servers that ship
 	// their own voices; nil keeps it.
 	Voices []Voice
@@ -40,8 +40,8 @@ var Presets = []Preset{
 	{ID: "openai", Name: "OpenAI", Provider: "openai"},
 	{ID: "elevenlabs", Name: "ElevenLabs", Provider: "elevenlabs"},
 	{ID: EdgeProviderID, Name: "Microsoft Edge", Provider: EdgeProviderID, Keyless: true},
-	{ID: "kokoro", Name: "Kokoro", Provider: "openai", BaseURL: "http://localhost:8880/v1", Model: "kokoro", Voices: kokoroVoices, Local: true},
-	{ID: "speaches", Name: "Speaches", Provider: "openai", BaseURL: "http://localhost:8000/v1", Model: "speaches-ai/Kokoro-82M-v1.0-ONNX", Voices: kokoroVoices, Local: true},
+	{ID: "kokoro", Name: "Kokoro", Provider: "openai", BaseURL: "http://localhost:8880/v1", Voices: kokoroVoices, Local: true},
+	{ID: "speaches", Name: "Speaches", Provider: "openai", BaseURL: "http://localhost:8000/v1", Voices: kokoroVoices, Local: true},
 }
 
 // PresetFor is the preset a saved provider and endpoint came from; ok is

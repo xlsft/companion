@@ -508,8 +508,8 @@ func TestFailureStaysWhileRechecking(t *testing.T) {
 	}
 }
 
-// Picking a provider preset fills the endpoint fields; a model the user
-// typed survives switching presets, another preset's default does not.
+// Picking a provider preset fills the endpoint fields and never the model:
+// that stays the user's choice, across preset switches too.
 func TestProviderPresetFillsForm(t *testing.T) {
 	h := newHarness(t)
 	h.eventually("permissions step", func() bool { return h.view() == readiness.StepPermissions })
@@ -538,8 +538,8 @@ func TestProviderPresetFillsForm(t *testing.T) {
 		typedModel     string
 		kind, url, mdl string
 	}{
-		{"anthropic", idx("anthropic"), "", string(llm.KindAnthropic), "https://api.anthropic.com", "claude-sonnet-5-5"},
-		{"switch replaces a preset default", idx("openai"), "", string(llm.KindOpenAI), "https://api.openai.com/v1", "gpt-5"},
+		{"anthropic", idx("anthropic"), "", string(llm.KindAnthropic), "https://api.anthropic.com", ""},
+		{"switch leaves the model empty", idx("openai"), "", string(llm.KindOpenAI), "https://api.openai.com/v1", ""},
 		{"typed model kept", idx("openrouter"), "my-model", string(llm.KindOpenAI), "https://openrouter.ai/api/v1", "my-model"},
 		{"other endpoint clears the address", len(providers.Presets), "", string(llm.KindOpenAI), "", "my-model"},
 	}
@@ -561,8 +561,8 @@ func TestProviderPresetFillsForm(t *testing.T) {
 	}
 }
 
-// Picking a local speech server fills its address and model, which Save
-// hands to the backend; ElevenLabs drops them again.
+// Picking a local speech server fills its address; Save hands it and the
+// model the user typed to the backend. ElevenLabs drops them again.
 func TestTTSPresetSavesEndpoint(t *testing.T) {
 	h := newHarness(t)
 	for _, st := range []readiness.Step{readiness.StepPermissions, readiness.StepBYOK, readiness.StepSTT} {
@@ -580,6 +580,11 @@ func TestTTSPresetSavesEndpoint(t *testing.T) {
 		h.frame()
 	}
 	pick(idx)
+	if ts.model.Text() != "" {
+		t.Errorf("preset filled a model: %q", ts.model.Text())
+	}
+	ts.model.SetText("kokoro")
+	h.frame()
 	if !h.shows(i18n.T(h.lang, "wiz.byok.baseURL")) || ts.presetIndex() != idx {
 		t.Fatalf("endpoint fields not shown or preset not selected (%d)", ts.presetIndex())
 	}

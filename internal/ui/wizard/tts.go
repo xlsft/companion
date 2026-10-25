@@ -189,8 +189,8 @@ func (t *ttsState) presetIndex() int {
 }
 
 // pickPreset fills the form from preset i; len(tts.Presets) is "Other
-// endpoint". A model the user typed is kept. Voices belong to a server, so
-// they are reloaded after the next Save.
+// endpoint". The model is the user's choice: presets carry none. Voices
+// belong to a server, so they are reloaded after the next Save.
 func (t *ttsState) pickPreset(w *Wizard, gtx layout.Context, i int) {
 	t.dirty = true
 	w.mu.Lock()
@@ -211,10 +211,6 @@ func (t *ttsState) pickPreset(w *Wizard, gtx layout.Context, i int) {
 	t.provider.Value = p.Provider
 	t.baseURL.SetText(p.BaseURL)
 	changed(gtx, &t.baseURL)
-	if m := strings.TrimSpace(t.model.Text()); m == "" || slices.ContainsFunc(tts.Presets, func(x tts.Preset) bool { return x.Model == m }) {
-		t.model.SetText(p.Model)
-		changed(gtx, &t.model)
-	}
 	if !p.Local {
 		gtx.Execute(key.FocusCmd{Tag: &t.key})
 	}

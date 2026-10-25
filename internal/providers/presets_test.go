@@ -25,8 +25,8 @@ func TestPresetsAreUsable(t *testing.T) {
 		if local := u.Hostname() == "localhost"; local != p.Local {
 			t.Errorf("%s: local = %v but host is %s", p.ID, p.Local, u.Host)
 		}
-		if !p.Local && (u.Scheme != "https" || p.Model == "") {
-			t.Errorf("%s: hosted presets need https and a default model", p.ID)
+		if !p.Local && u.Scheme != "https" {
+			t.Errorf("%s: hosted presets need https", p.ID)
 		}
 	}
 }

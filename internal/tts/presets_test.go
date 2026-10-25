@@ -29,8 +29,8 @@ func TestTTSPresetsAreUsable(t *testing.T) {
 		if local := u.Hostname() == "localhost"; local != p.Local {
 			t.Errorf("%s: local = %v but host is %s", p.ID, p.Local, u.Host)
 		}
-		if p.Local && (p.Model == "" || len(p.Voices) == 0) {
-			t.Errorf("%s: a local server preset needs its model and voices", p.ID)
+		if p.Local && len(p.Voices) == 0 {
+			t.Errorf("%s: a local server preset needs its voices", p.ID)
 		}
 	}
 }
