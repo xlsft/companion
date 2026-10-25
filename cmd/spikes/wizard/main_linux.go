@@ -43,6 +43,7 @@ import (
 	"github.com/xlsft/companion/internal/tts"
 	"github.com/xlsft/companion/internal/ui"
 	"github.com/xlsft/companion/internal/ui/wizard"
+	"github.com/xlsft/companion/internal/update"
 	"github.com/xlsft/companion/pkg/contracts"
 )
 
@@ -51,19 +52,20 @@ func main() {
 	state := flag.String("state", "fresh", "fresh (not checked yet) or failed (a typical failure)")
 	themeMode := flag.String("theme", "auto", "auto (follow the system), dark or light")
 	lang := flag.String("lang", "ru", "interface language (ru, en)")
+	withUpdate := flag.Bool("update", false, "show an available update in the footer")
 	flag.Parse()
 	if *step < 1 || *step > len(readiness.Steps) || *state != "fresh" && *state != "failed" {
 		flag.Usage()
 		os.Exit(2)
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	if err := run(*step, *state == "failed", *themeMode, *lang, log); err != nil {
+	if err := run(*step, *state == "failed", *themeMode, *lang, *withUpdate, log); err != nil {
 		log.Error("wizard spike", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run(step int, failed bool, themeMode, lang string, log *slog.Logger) error {
+func run(step int, failed bool, themeMode, lang string, withUpdate bool, log *slog.Logger) error {
 	scheme, err := appearance.Choose(themeMode)
 	if err != nil {
 		return err
@@ -124,7 +126,8 @@ func run(step int, failed bool, themeMode, lang string, log *slog.Logger) error 
 	}
 	diagnose := func(ctx context.Context) (contracts.CapabilityReport, error) { return detect.New().Detect(ctx) }
 	shell := ui.New(ui.Options{Mode: ui.ModeSetup, Settings: svc, Gate: gate, Setup: backends,
-		Diagnose: diagnose, Quit: stop, Log: log, Appearance: scheme, Version: buildinfo.Version})
+		Diagnose: diagnose, Quit: stop, Log: log, Appearance: scheme, Version: buildinfo.Version,
+		Updates: newUpdates(withUpdate)})
 	go func() {
 		if err := app.New(log, shell).Run(ctx); err != nil {
 			log.Error("spike exited with error", "err", err)
@@ -366,3 +369,22 @@ func (v *voices) Voices(context.Context) ([]tts.Voice, error) {
 		{ID: "nova", Name: "Nova", Languages: []string{"en", "ru"}},
 	}, nil
 }
+
+// updates reports one available release and does nothing on its buttons;
+// nil without -update, which hides the chip.
+type updates struct{ st update.State }
+
+func newUpdates(on bool) ui.UpdateBackend {
+	if !on {
+		return nil
+	}
+	v, _ := update.ParseVersion("0.1.0")
+	return &updates{st: update.State{Latest: &update.Release{Tag: "v0.1.0", Version: v}, LastCheck: time.Now()}}
+}
+
+func (u *updates) State() update.State          { return u.st }
+func (u *updates) CheckNow()                    {}
+func (u *updates) Install()                     {}
+func (u *updates) RestartNow()                  {}
+func (u *updates) OpenNotes()                   {}
+func (u *updates) Watch(func()) (cancel func()) { return func() {} }
