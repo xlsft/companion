@@ -379,7 +379,12 @@ func (s *Service) presentLocked() {
 			return
 		}
 		s.preparing = false
-		revised := s.reviseLocked(p.Index, step)
+		// The showing's text applies only to the step it started from: a
+		// Revise that landed meanwhile is newer and must not be undone.
+		revised := false
+		if cur := s.st.Plan.Steps[p.Index]; cur.Title == p.Step.Title && cur.Say == p.Step.Say {
+			revised = s.reviseLocked(p.Index, step)
+		}
 		step = s.st.Plan.Steps[p.Index]
 		s.publishLocked()
 		s.mu.Unlock()
