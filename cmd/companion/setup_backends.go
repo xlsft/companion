@@ -95,6 +95,14 @@ func (s setupSTT) LastEndToEndTranscript() string {
 	return t
 }
 
+// LastEndToEndReply is the model's answer in the last full test.
+func (s setupSTT) LastEndToEndReply() string {
+	t, _ := s.c.e2eReply.Load().(string)
+	return t
+}
+
+// LastTranscript is what the last voice check (StepTTS) or the user's own
+// reading (StepSTT) recognised, whichever ran last.
 func (s setupSTT) LastTranscript() string {
 	if s.c.sttCheck == nil {
 		return ""

@@ -104,6 +104,7 @@ type core struct {
 
 	sttCheck *setupcheck.STT // keeps the last setup transcript in memory
 	e2eHeard atomic.Value    // string: what the full setup test heard; memory only
+	e2eReply atomic.Value    // string: the model's answer in the full setup test; memory only
 
 	talk *session.Manager
 	orch *talk.Orchestrator
