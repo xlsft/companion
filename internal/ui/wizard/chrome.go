@@ -47,8 +47,12 @@ func (w *Wizard) Layout(gtx layout.Context, th *theme.Theme, l i18n.Lang) layout
 	s := w.snap()
 	if !w.started {
 		w.started = true
-		// The Gate's own state: the subscribed copy may not have arrived.
-		w.enterScreen(screenFor(snapshot{prog: w.cfg.Gate.Progress()}))
+		sc := screenVoice
+		if !w.cfg.StartOnVoice {
+			// The Gate's own state: the subscribed copy may not have arrived.
+			sc = screenFor(snapshot{prog: w.cfg.Gate.Progress()})
+		}
+		w.enterScreen(sc)
 	}
 	w.update(gtx, s, l)
 	s = w.snap()

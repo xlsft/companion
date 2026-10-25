@@ -72,7 +72,10 @@ type Config struct {
 	// OnReady runs exactly once, off the UI goroutine, when the user opens
 	// Companion from the finish of a Ready Gate (FR-ONB-002/010); the shell
 	// then enters main mode.
-	OnReady       func()
+	OnReady func()
+	// StartOnVoice opens the voice screen whatever the Gate's progress:
+	// the user came from Settings to change the voice, not to finish setup.
+	StartOnVoice  bool
 	OnDiagnostics func()
 	OnQuit        func()
 	// Version is shown under Diagnostics when set.

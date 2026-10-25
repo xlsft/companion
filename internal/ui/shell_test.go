@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -10,9 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"gioui.org/io/input"
+
 	"github.com/xlsft/companion/internal/readiness"
 	"github.com/xlsft/companion/internal/settings"
 	"github.com/xlsft/companion/internal/store"
+	"github.com/xlsft/companion/internal/ui/theme"
 	"github.com/xlsft/companion/internal/ui/wizard"
 	"github.com/xlsft/companion/pkg/contracts"
 )
@@ -551,5 +555,74 @@ func TestNoAppearanceIsLight(t *testing.T) {
 	h := newHarness(t, ModeMain, nil)
 	if _, dark, _ := h.sh.look(); dark {
 		t.Error("dark without a source")
+	}
+}
+
+func waitUntil(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// Settings › Voice › Change reopens setup on its voice screen; Open
+// Companion on the finish returns to the same main UI, every time.
+func TestChangeVoiceRoundTrip(t *testing.T) {
+	for _, tray := range []*fakeTray{{}, nil} {
+		t.Run(fmt.Sprintf("tray=%v", tray != nil), func(t *testing.T) {
+			h := newHarness(t, ModeMain, tray)
+			h.pass.Store(true)
+			for _, st := range readiness.Steps {
+				if _, err := h.gate.Run(context.Background(), st); err != nil {
+					t.Fatal(err)
+				}
+			}
+			m, _ := h.mainBuilt()
+			th := theme.New(false, 1)
+			for round := 1; round <= 2; round++ {
+				m.showSettings(secVoice)
+				r := new(input.Router)
+				frame(r, h.sh, th, m)
+				sp := m.pages[RouteSettings].(*settingsPage)
+				if sp.changeVoice == nil {
+					t.Fatal("no Change button with a Gate")
+				}
+				mainWin := h.wins.all()[len(h.wins.all())-1]
+				sp.voiceBtn.Click()
+				frame(r, h.sh, th, m)
+				waitUntil(t, "setup window", func() bool {
+					ws := h.wins.all()
+					_, ok := ws[len(ws)-1].spec.Content.(*wizardUI)
+					return ok
+				})
+				if h.sh.Mode() != ModeSetup || !h.sh.revoice || mainWin.close.Load() != 1 {
+					t.Fatalf("round %d: mode %v revoice %v main closed %d", round, h.sh.Mode(), h.sh.revoice, mainWin.close.Load())
+				}
+				// Closing the main window for setup must not quit.
+				mainWin.userClose()
+				if h.quits.Load() != 0 {
+					t.Fatal("changing the voice quit the app")
+				}
+				h.sh.mu.Lock()
+				wiz := h.sh.wizard
+				h.sh.mu.Unlock()
+				wiz.wiz.Open()
+				waitUntil(t, "main again", func() bool {
+					h.sh.mu.Lock()
+					defer h.sh.mu.Unlock()
+					return h.sh.mode == ModeMain && h.sh.mainWin != nil
+				})
+				if got, n := h.mainBuilt(); got != m || n != 1 || h.sh.revoice {
+					t.Errorf("round %d: main rebuilt (%d builds) or revoice %v", round, n, h.sh.revoice)
+				}
+			}
+			if got := contentKinds(h.wins.all()); !slices.Equal(got, []string{"main", "wizard", "main", "wizard", "main"}) {
+				t.Errorf("windows = %v", got)
+			}
+		})
 	}
 }

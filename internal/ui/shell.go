@@ -101,7 +101,8 @@ type Options struct {
 	// Dictation is raw system dictation; nil shows no dictation banner.
 	Dictation DictationBackend
 	// ChangeVoice leads to the voice choice from Settings; nil hides the
-	// button next to the current voice.
+	// button next to the current voice. With a Gate it defaults to
+	// Shell.ChangeVoice, the setup's voice screen.
 	ChangeVoice func()
 	// Diagnose produces the capability report for Diagnostics.
 	Diagnose func(ctx context.Context) (contracts.CapabilityReport, error)
@@ -133,13 +134,16 @@ type Shell struct {
 	dark     bool
 	scale    float32
 	wizard   *wizardUI // setup mode only
-	main     *mainUI   // nil until first needed in main mode
-	wizWin   window
-	mainWin  window
-	closing  map[window]bool // closed by the shell, not the user
-	unsub    func()
-	unwatch  func() // stops update state notifications
-	undict   func() // stops dictation state notifications
+	// revoice is setup reopened from Settings to change the voice: the
+	// wizard starts on its voice screen and the main UI is kept.
+	revoice bool
+	main    *mainUI // nil until first needed in main mode
+	wizWin  window
+	mainWin window
+	closing map[window]bool // closed by the shell, not the user
+	unsub   func()
+	unwatch func() // stops update state notifications
+	undict  func() // stops dictation state notifications
 	// mainBuilds counts main UI constructions; tests assert laziness.
 	mainBuilds int
 }
@@ -167,6 +171,10 @@ func newShell(opts Options, f windowFactory) *Shell {
 		s.dark = opts.Appearance.Dark()
 	}
 	s.diag = newDiagModel(opts.Diagnose, s.invalidateAll)
+	if s.opts.ChangeVoice == nil && opts.Gate != nil {
+		// The click comes from the main window, which ChangeVoice closes.
+		s.opts.ChangeVoice = func() { go s.ChangeVoice() }
+	}
 	return s
 }
 
@@ -289,7 +297,7 @@ func (s *Shell) EnterMain() error {
 		s.mu.Unlock()
 		return errors.New("ui: shell is stopping")
 	}
-	s.mode = ModeMain
+	s.mode, s.revoice = ModeMain, false
 	wiz, wizUI := s.wizWin, s.wizard
 	s.wizWin = nil
 	s.wizard = nil
@@ -307,6 +315,49 @@ func (s *Shell) EnterMain() error {
 	}
 	if trayOK {
 		if err := s.opts.Tray.SetItems(TrayItems(ModeMain, lang)); err != nil {
+			s.log.Warn("tray menu update failed", "err", err)
+		}
+	}
+	if started {
+		s.Open()
+	}
+	return nil
+}
+
+// ChangeVoice goes back to setup on its voice screen, where the voice and
+// the microphone are chosen and checked; the user returns through the
+// finish's Open Companion, which needs a Ready Gate as on first run. The
+// main UI is kept for that return. It must not run on the main window's
+// goroutine, as it closes that window.
+func (s *Shell) ChangeVoice() error {
+	s.mu.Lock()
+	if s.stopping {
+		s.mu.Unlock()
+		return errors.New("ui: shell is stopping")
+	}
+	if s.opts.Gate == nil {
+		s.mu.Unlock()
+		return errors.New("ui: changing the voice needs Options.Gate")
+	}
+	if s.mode == ModeSetup {
+		s.mu.Unlock()
+		s.Open()
+		return nil
+	}
+	s.mode, s.revoice = ModeSetup, true
+	win := s.mainWin
+	s.mainWin = nil
+	if win != nil {
+		s.closing[win] = true
+	}
+	started, trayOK, lang := s.started, s.trayOK, s.lang
+	s.mu.Unlock()
+
+	if win != nil {
+		win.Close()
+	}
+	if trayOK {
+		if err := s.opts.Tray.SetItems(TrayItems(ModeSetup, lang)); err != nil {
 			s.log.Warn("tray menu update failed", "err", err)
 		}
 	}
